@@ -1,0 +1,10 @@
+import { Router } from 'express';
+import { ClaimController } from '../../controllers/claim.controller.js';
+import { authenticate, authorize } from '../../api/middleware/auth.middleware.js';
+const router = Router();
+router.get('/', authenticate, ClaimController.getMyClaims);
+router.get('/queue', authenticate, authorize('CLAIMS_ADMIN', 'MASTER_ADMIN'), ClaimController.getClaimQueue);
+router.post('/', authenticate, ClaimController.createClaim);
+router.patch('/:id/status', authenticate, authorize('CLAIMS_ADMIN', 'MASTER_ADMIN'), ClaimController.updateClaimStatus);
+router.get('/:id', authenticate, ClaimController.getClaimDetails);
+export default router;

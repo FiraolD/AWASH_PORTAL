@@ -1,0 +1,11 @@
+import { Router } from 'express';
+import { SupportController } from '../../controllers/support.controller.js';
+import { authenticate, authorize } from '../../api/middleware/auth.middleware.js';
+const router = Router();
+router.get('/tickets', authenticate, SupportController.getMyTickets);
+router.get('/admin/tickets', authenticate, authorize('MASTER_ADMIN', 'CUSTOMER_ADMIN'), SupportController.getAllTickets);
+router.post('/tickets', authenticate, SupportController.createTicket);
+router.get('/tickets/:ticketId', authenticate, SupportController.getTicketDetails);
+router.post('/tickets/:ticketId/responses', authenticate, SupportController.addResponse);
+router.patch('/admin/tickets/:ticketId/status', authenticate, authorize('MASTER_ADMIN', 'CUSTOMER_ADMIN'), SupportController.updateTicketStatus);
+export default router;

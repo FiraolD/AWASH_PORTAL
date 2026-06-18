@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: awash_postgres
+    environment:
+      POSTGRES_USER: awash_user
+      POSTGRES_PASSWORD: awash_password
+      POSTGRES_DB: awash_insurance
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - awash_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: awash_redis
+    ports:
+      - "6379:6379"
+    networks:
+      - awash_network
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: ../docker/Dockerfile.backend
+    container_name: awash_backend
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://awash_user:awash_password@postgres:5432/awash_insurance
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "5001:5001"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - awash_network
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: ../docker/Dockerfile.frontend
+    container_name: awash_frontend
+    ports:
+      - "3011:80"
+    depends_on:
+      - backend
+    networks:
+      - awash_network
+
+  nginx:
+    image: nginx:alpine
+    container_name: awash_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ../frontend/dist:/usr/share/nginx/html
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - awash_network
+
+volumes:
+  postgres_data:
+
+networks:
+  awash_network:
+    driver: bridge

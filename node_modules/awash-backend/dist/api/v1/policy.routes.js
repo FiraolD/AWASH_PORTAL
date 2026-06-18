@@ -1,0 +1,12 @@
+import { Router } from 'express';
+import { PolicyController } from '../../controllers/policy.controller.js';
+import { authenticate, authorize } from '../../api/middleware/auth.middleware.js';
+const router = Router();
+router.get('/', authenticate, PolicyController.getMyPolicies);
+router.get('/pending', authenticate, authorize('UNDERWRITING_ADMIN', 'MASTER_ADMIN'), PolicyController.getPendingPolicies);
+router.get('/:id/review', authenticate, authorize('UNDERWRITING_ADMIN', 'MASTER_ADMIN'), PolicyController.getPolicyForReview);
+router.post('/', authenticate, PolicyController.createPolicy);
+router.post('/calculate-premium', authenticate, PolicyController.calculatePremium);
+router.post('/:id/approve', authenticate, authorize('UNDERWRITING_ADMIN', 'MASTER_ADMIN'), PolicyController.approvePolicy);
+router.post('/:id/reject', authenticate, authorize('UNDERWRITING_ADMIN', 'MASTER_ADMIN'), PolicyController.rejectPolicy);
+export default router;

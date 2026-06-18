@@ -1,0 +1,85 @@
+import { Router } from 'express';
+import pool from '../../lib/db.js';
+import { authenticate, authorize } from '../middleware/auth.middleware.js';
+
+const router = Router();
+
+router.use(authenticate);
+router.use(authorize('MASTER_ADMIN'));
+
+// Get system overview
+router.get('/overview', async (req, res) => {
+  try {
+    const totalUsers = await pool.query("SELECT COUNT(*) FROM users");
+    const totalPolicies = await pool.query("SELECT COUNT(*) FROM policies");
+    const totalClaims = await pool.query("SELECT COUNT(*) FROM claims");
+    const totalPayments = await pool.query("SELECT COUNT(*) FROM payments");
+    const activeUsers = await pool.query("SELECT COUNT(*) FROM users WHERE status = 'ACTIVE'");
+    const pendingPolicies = await pool.query(
+      "SELECT COUNT(*) FROM policies WHERE status IN ('PENDING_UNDERWRITING', 'SUBMITTED')"
+    );
+    const pendingClaims = await pool.query("SELECT COUNT(*) FROM claims WHERE status = 'SUBMITTED'");
+    
+    res.json({
+      totalUsers: parseInt(totalUsers.rows[0].count),
+      totalPolicies: parseInt(totalPolicies.rows[0].count),
+      totalClaims: parseInt(totalClaims.rows[0].count),
+      totalPayments: parseInt(totalPayments.rows[0].count),
+      activeUsers: parseInt(activeUsers.rows[0].count),
+      pendingPolicies: parseInt(pendingPolicies.rows[0].count),
+      pendingClaims: parseInt(pendingClaims.rows[0].count),
+      systemHealth: 'OK'
+    });
+  } catch (error) {
+    console.error('Failed to fetch admin overview:', error);
+    res.status(500).json({ error: 'Failed to fetch overview' });
+  }
+});
+
+// Get system metrics
+router.get('/metrics', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '30 days') as new_users,
+        COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '30 days') as new_policies
+      FROM users, policies
+    `);
+    
+    res.json({
+      period: 'Last 30 days',
+      newUsers: parseInt(result.rows[0].new_users || 0),
+      newPolicies: parseInt(result.rows[0].new_policies || 0),
+      newClaims: 0,
+      revenue: 0
+    });
+  } catch (error) {
+    console.error('Failed to fetch system metrics:', error);
+    res.status(500).json({ error: 'Failed to fetch metrics' });
+  }
+});
+
+// Get database status
+router.get('/database/status', async (req, res) => {
+  try {
+    await pool.query('SELECT 1 as connected');
+    res.json({
+      status: 'connected',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Database connection failed:', error);
+    res.status(500).json({
+      status: 'disconnected',
+      error: 'Database connection failed',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Clear cache (placeholder)
+router.post('/cache/clear', async (req, res) => {
+  res.json({ message: 'Cache cleared successfully' });
+});
+
+export default router;

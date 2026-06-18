@@ -1,0 +1,12 @@
+import { Router } from 'express';
+import { UserController } from '../../controllers/user.controller.js';
+import { authenticate, authorize } from '../../api/middleware/auth.middleware.js';
+const router = Router();
+router.get('/', authenticate, authorize('MASTER_ADMIN'), UserController.getAllUsers);
+router.get('/customers', authenticate, authorize('MASTER_ADMIN', 'CUSTOMER_ADMIN'), UserController.getCustomers);
+router.get('/:id', authenticate, authorize('MASTER_ADMIN'), UserController.getUserById);
+router.post('/', authenticate, authorize('MASTER_ADMIN'), UserController.createUser);
+router.put('/:id', authenticate, authorize('MASTER_ADMIN'), UserController.updateUser);
+router.patch('/:id/status', authenticate, authorize('MASTER_ADMIN'), UserController.updateUserStatus);
+router.delete('/:id', authenticate, authorize('MASTER_ADMIN'), UserController.deleteUser);
+export default router;
