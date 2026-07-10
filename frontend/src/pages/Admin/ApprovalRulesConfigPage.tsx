@@ -22,6 +22,7 @@ interface ApprovalRule {
   minRiskScore?: number | string | null;
   maxRiskScore?: number | string | null;
   approvalLevels: string[];
+  approval_levels?: string[];
   isActive: boolean;
 }
 
@@ -65,10 +66,7 @@ const fetchApprovalConfig = async () => {
     apiClient.get('/approval/rules'),
     apiClient.get('/approval/role-levels'),
     apiClient.get('/products'),
-    console.log("Rules API:", rulesResponse.data);
-console.log("Role Levels API:", levelsResponse.data);
-console.log("Products API:", productsResponse.data);
-  ]);
+  ])
 
   return {
     rules: asArray<ApprovalRule>(rulesResponse.data).map((rule) => ({
