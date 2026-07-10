@@ -65,12 +65,19 @@ const fetchApprovalConfig = async () => {
     apiClient.get('/approval/rules'),
     apiClient.get('/approval/role-levels'),
     apiClient.get('/products'),
+    console.log("Rules API:", rulesResponse.data);
+console.log("Role Levels API:", levelsResponse.data);
+console.log("Products API:", productsResponse.data);
   ]);
 
   return {
     rules: asArray<ApprovalRule>(rulesResponse.data).map((rule) => ({
       ...rule,
-      approvalLevels: asArray<string>(rule.approvalLevels),
+      approvalLevels: Array.isArray(rule.approvalLevels)
+  ? rule.approvalLevels
+  : Array.isArray(rule.approval_levels)
+    ? rule.approval_levels
+    : [],
     })),
     roleLevels: asArray<RoleLevel>(levelsResponse.data),
     products: asArray<Product>(productsResponse.data),
@@ -307,14 +314,14 @@ export default function ApprovalRulesConfigPage() {
                   <div className="space-y-2">
                     <p className="text-sm font-semibold text-gray-700">Approval Levels:</p>
                     <div className="flex flex-wrap gap-2">
-                      {rule.approvalLevels.map((levelId, index) => {
+                      {(rule.approvalLevels ?? []).map((levelId, index) => {
                         const level = roleLevels.find((item) => item.id === levelId);
                         return (
                           <div key={`${rule.id}-${levelId}`} className="flex items-center gap-1">
                             <Badge variant="outline" className="bg-blue-50">
                               {index + 1}. {level ? level.levelName : levelId}
                             </Badge>
-                            {index < rule.approvalLevels.length - 1 && <span className="text-gray-400">-&gt;</span>}
+                            {index < (rule.approvalLevels ?? []).length - 1 && <span className="text-gray-400">-&gt;</span>}
                           </div>
                         );
                       })}
