@@ -58,7 +58,7 @@ export default function ClaimsAssignmentConfigPage() {
     product_type: 'ALL',
     min_amount: 0,
     max_amount: '',
-    assigned_role: 'CLAIM_OFFICER_I',
+    assigned_role: 'CLAIM_OFFICER_II',
     priority: 1,
     is_active: true
   });
@@ -162,7 +162,7 @@ export default function ClaimsAssignmentConfigPage() {
       product_type: 'ALL',
       min_amount: 0,
       max_amount: '',
-      assigned_role: 'CLAIM_OFFICER_I',
+      assigned_role: 'CLAIM_OFFICER_II',
       priority: 1,
       is_active: true
     });

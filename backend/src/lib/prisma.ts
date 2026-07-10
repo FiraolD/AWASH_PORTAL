@@ -1,9 +1,3 @@
-import { PrismaClient } from '@prisma/client';
-
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
-};
-
-export const prisma = globalForPrisma.prisma ?? new PrismaClient();
-
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+﻿// The application currently uses the pg pool in lib/db.ts. This placeholder keeps legacy imports buildable
+// until Prisma code generation is reintroduced as part of a dedicated migration.
+export const prisma = null as never;

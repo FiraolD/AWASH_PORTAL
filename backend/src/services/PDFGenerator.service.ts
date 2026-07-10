@@ -422,9 +422,8 @@ export async function generatePolicySchedule(policyData: any): Promise<string> {
       
       doc.moveDown(2);
       
-      // ==================== FOOTER - REMOVED THE PROBLEMATIC CODE ====================
       // Add a simple footer on the last page
-      const finalY = doc.y;
+     /* const finalY = doc.y;
       doc.fontSize(8)
          .fillColor('#999999')
          .text(
@@ -433,7 +432,7 @@ export async function generatePolicySchedule(policyData: any): Promise<string> {
            doc.page.height - 30,
            { align: 'center', width: 500 }
          );
-      
+      */
       // Finalize PDF
       doc.end();
       

@@ -1,4 +1,4 @@
-import { type ClassValue, clsx } from "clsx"
+﻿import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 
 // For combining Tailwind CSS classes
@@ -36,8 +36,12 @@ export function rolepermissions(role: string): string[] {
     'UNDERWRITING_ADMIN': ['view_queue', 'manage_queue', 'view_risk', 'manage_risk', 'view_endorsements', 'manage_endorsements'],
     'CLAIMS_ADMIN': ['view_claims_queue', 'manage_claims_queue', 'view_active_claims', 'manage_active_claims'],
     // Add more roles and permissions as needed
-  }};
+  };
+  return permissionsMap[role] || [];
+}
+
 // Generate random ID
 export function generateId(): string {
   return Math.random().toString(36).substring(2, 9)
 }
+

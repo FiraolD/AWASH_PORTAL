@@ -393,7 +393,7 @@ router.post('/', async (req, res) => {
         "premiumFrequency", "effectiveDate", "expirationDate", "productDetails",
         "approvalType", "createdAt", "updatedAt"
       ) VALUES (
-        gen_random_uuid()::text, $1, $2, $3, 'PENDING_UNDERWRITING', 
+        gen_random_uuid()::uuid, $1, $2, $3, 'PENDING_UNDERWRITING', 
         $4, $5, $6, $7::date, $8::date, $9::jsonb,
         'REVIEW_NEEDED', NOW(), NOW()
       ) RETURNING id, "policyNumber", status

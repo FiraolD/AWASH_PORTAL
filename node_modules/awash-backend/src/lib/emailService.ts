@@ -1,13 +1,14 @@
 import nodemailer from 'nodemailer';
 
+const SMTP_USER = process.env.SMTP_USER;
+const SMTP_PASS = process.env.SMTP_PASS;
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.gmail.com',
   port: parseInt(process.env.SMTP_PORT || '587', 10),
   secure: false,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
+  auth: SMTP_USER && SMTP_PASS ? { user: SMTP_USER, pass: SMTP_PASS } : undefined,
 });
 
 export const emailTemplates = {
@@ -39,7 +40,7 @@ export const emailTemplates = {
         <h2 style="color: #1A3E6F;">Password Reset Request</h2>
         <p>Dear ${name},</p>
         <p>We received a request to reset your password. Click the link below to create a new password:</p>
-        <a href="${process.env.FRONTEND_URL}/reset-password?token=${resetToken}" style="display: inline-block; padding: 10px 20px; background-color: #1A3E6F; color: white; text-decoration: none; border-radius: 5px;">Reset Password</a>
+        <a href="${FRONTEND_URL}/reset-password?token=${resetToken}" style="display: inline-block; padding: 10px 20px; background-color: #1A3E6F; color: white; text-decoration: none; border-radius: 5px;">Reset Password</a>
         <p>This link will expire in 1 hour.</p>
         <p>If you didn't request this, please ignore this email.</p>
         <br>

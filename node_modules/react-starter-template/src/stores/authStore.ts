@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+﻿import { create } from 'zustand';
 import axiosInstance from '../lib/axios';
 
 interface User {
@@ -10,6 +10,7 @@ interface User {
   status: string;
   phone?: string;
   avatarUrl?: string;
+  address?: { street?: string; city?: string; state?: string; zip?: string };
 }
 
 interface AuthState {
@@ -21,6 +22,7 @@ interface AuthState {
   register: (data: RegisterData) => Promise<void>;
   logout: () => void;
   fetchUser: () => Promise<void>;
+  updateUser: (updates: Partial<User>) => void;
 }
 
 interface RegisterData {
@@ -71,6 +73,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
+  updateUser: (updates: Partial<User>) => {
+    const current = get().user;
+    if (!current) return;
+    const user = { ...current, ...updates };
+    set({ user });
+    const token = get().token;
+    localStorage.setItem('awash-auth-storage', JSON.stringify({ state: { token, user } }));
+  },
+
   logout: () => {
     set({ user: null, token: null, isAuthenticated: false, isLoading: false });
     localStorage.removeItem('awash-auth-storage');
@@ -90,3 +101,5 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 }));
+
+

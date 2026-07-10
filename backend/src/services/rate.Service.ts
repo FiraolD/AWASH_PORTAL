@@ -81,22 +81,22 @@ export async function getRiskFactor(productType: string, coverageAmount: number,
 
 export async function getVatRate(): Promise<number> {
   const result = await pool.query(`
-    SELECT config_value 
+    SELECT setting_value 
     FROM system_settings 
     WHERE setting_key = 'vatRate'
   `);
   
-  return result.rows[0]?.config_value || 0.15;
+  return result.rows[0]?.setting_value || 0.15;
 }
 
 export async function getDrrRate(): Promise<number> {
   const result = await pool.query(`
-    SELECT config_value 
+    SELECT setting_value 
     FROM system_settings 
     WHERE setting_key = 'drrRate'
   `);
   
-  return result.rows[0]?.config_value || 0.01;
+  return result.rows[0]?.setting_value || 0.01;
 }
 
 export async function calculatePremium(

@@ -1,8 +1,7 @@
-import * as React from 'react';
+﻿import * as React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
-import { UserRole } from '../../types';
-import { hasPermission } from '../../lib/utils/rolePermissions';
+import { UserRole, hasPermission } from '../../lib/utils/rolePermissions';
 
 interface RoleGuardProps {
   children: React.ReactNode;
@@ -17,7 +16,7 @@ export function RoleGuard({
   allowedPermissions = [], 
   fallbackPath = '/dashboard' 
 }: RoleGuardProps) {
-  const { user, isAuthenticated, isLoading, hasPermission: storeHasPermission } = useAuthStore();
+  const { user, isAuthenticated, isLoading } = useAuthStore();
   const location = useLocation();
 
   if (isLoading) {
@@ -42,8 +41,7 @@ export function RoleGuard({
   const hasRoleAccess = allowedRoles.length === 0 || hasPermission(user.role, allowedRoles);
   
   // Check permission-based access
-  const hasPermissionAccess = allowedPermissions.length === 0 || 
-    allowedPermissions.some(perm => storeHasPermission(perm));
+  const hasPermissionAccess = allowedPermissions.length === 0;
 
   if (!hasRoleAccess || !hasPermissionAccess) {
     return <Navigate to={fallbackPath} replace />;

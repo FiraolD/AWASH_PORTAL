@@ -4,6 +4,16 @@ import { authenticate, authorize } from '../middleware/auth.middleware.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { z } from 'zod';
+import { validateBody } from '../middleware/validation.middleware.js';
+
+// Zod schema for review request
+const reviewSchema = z.object({
+  decision: z.enum(['APPROVE', 'REJECT', 'UNDER_REVIEW']),
+  approvedAmount: z.number().optional(),
+  notes: z.string().optional(),
+});
+
 
 const router = Router();
 router.use(authenticate);
@@ -54,43 +64,285 @@ async function generateClaimNumber(productCode: string): Promise<string> {
         nextNumber = parseInt(numPart) + 1;
       }
     }
-    // Helper function to extract product code from policy number
-function extractProductCodeFromPolicyNumber(policyNumber: string): string {
-    if (!policyNumber) return 'GEN';
-    const parts = policyNumber.split('/');
-    if (parts.length >= 2) {
-        return parts[1]; // Return the product code part
-    }
-    return 'GEN';
-}
-
-// In your POST /claims endpoint, after getting the policy, extract the product code:
-const policy = policyCheck.rows[0];
-const productCode = extractProductCodeFromPolicyNumber(policy.policyNumber);
-const claimNumber = await generateClaimNumber(productCode);
-const paddedNumber = nextNumber.toString().padStart(6, '0');
+    const paddedNumber = nextNumber.toString().padStart(6, '0');
     return `${prefix}${paddedNumber}/${year}`;
   } catch (error) {
     console.error('Error generating claim number:', error);
-    // Fallback to timestamp-based number
     return `CLND/AHO/${productCode || 'GEN'}/${Date.now()}/${year}`;
   }
 }
 
-// ==================== CUSTOMER ENDPOINTS ====================
+// =============================================
+// 1. SPECIFIC ROUTES (must come before /:id)
+// =============================================
 
-// GET /api/claims - Get my claims with vehicle details
-router.get('/', async (req, res) => {
+// GET /my-assigned – Claims assigned to current officer
+router.get('/my-assigned', authenticate, async (req, res) => {
   try {
     const userId = req.user?.id;
     
-    if (!userId) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
+    const result = await pool.query(
+      `SELECT 
+        c.id,
+        c."claimNumber",
+        c.status,
+        c."incidentDate",
+        c."estimatedAmount",
+        c."approvedAmount",
+        c."submittedDate",
+        c."natureOfLoss",
+        c."riskItem",
+        c.location,
+        c."incidentDescription",
+        u."firstName", 
+        u."lastName", 
+        u.email, 
+        u.phone,
+        p."policyNumber",
+        p.type as "policyType"
+      FROM claims c
+      LEFT JOIN users u ON u.id = c."userId"
+      LEFT JOIN policies p ON p.id = c."policyId"
+      WHERE c."assignedOfficer" = $1
+      ORDER BY c."submittedDate" DESC`,
+      [userId]
+    );
     
-    console.log('Fetching claims for user:', userId);
-    
+    res.json(result.rows);
+  } catch (error: any) {
+    console.error('Failed to fetch assigned claims:', error);
+    // Return empty array on error
+    res.json([]);
+  }
+});
+
+// GET /queue – Claim queue
+router.get('/queue', authenticate, authorize(...CLAIM_ROLES), async (req, res) => {
+  try {
     const result = await pool.query(`
+      SELECT 
+        c.id,
+        c."claimNumber",
+        c.status,
+        c."incidentDate",
+        c."estimatedAmount",
+        c."submittedDate",
+        c."natureOfLoss",
+        u."firstName",
+        u."lastName",
+        u.email,
+        u.phone,
+        p."policyNumber",
+        p.type
+      FROM claims c
+      LEFT JOIN users u ON u.id = c."userId"
+      LEFT JOIN policies p ON p.id = c."policyId"
+      WHERE c.status IN ('SUBMITTED', 'UNDER_REVIEW')
+      ORDER BY c."submittedDate" ASC
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Failed to fetch claim queue:', error);
+    res.status(500).json({ error: 'Failed to fetch claim queue' });
+  }
+});
+
+// GET /queue/stats – Queue statistics
+router.get('/queue/stats', authenticate, authorize(...CLAIM_ROLES), async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        COUNT(*) FILTER (WHERE status = 'SUBMITTED') as pending,
+        COUNT(*) FILTER (WHERE status = 'UNDER_REVIEW') as "underReview",
+        COUNT(*) FILTER (WHERE status = 'APPROVED') as approved,
+        COUNT(*) FILTER (WHERE status = 'REJECTED') as rejected,
+        COUNT(*) FILTER (WHERE status = 'PAID') as paid,
+        COUNT(*) as total
+      FROM claims
+    `);
+    const stats = result.rows[0];
+    Object.keys(stats).forEach(key => {
+      stats[key] = parseInt(stats[key]) || 0;
+    });
+    res.json(stats);
+  } catch (error) {
+    console.error('Failed to fetch queue stats:', error);
+    res.status(500).json({ error: 'Failed to fetch queue statistics' });
+  }
+});
+
+// GET /active – Active claims
+router.get('/active', authenticate, authorize(...CLAIM_ROLES), async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        c.id,
+        c."claimNumber",
+        c.status,
+        c."incidentDate",
+        c."estimatedAmount",
+        c."approvedAmount",
+        c."submittedDate",
+        u."firstName",
+        u."lastName",
+        u.email,
+        p."policyNumber",
+        p.type
+      FROM claims c
+      LEFT JOIN users u ON u.id = c."userId"
+      LEFT JOIN policies p ON p.id = c."policyId"
+      WHERE c.status IN ('APPROVED', 'UNDER_REVIEW', 'PAID')
+      ORDER BY c."updatedAt" DESC
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Failed to fetch active claims:', error);
+    res.status(500).json({ error: 'Failed to fetch active claims' });
+  }
+});
+
+// GET /pending-review – Claims pending officer review
+router.get('/pending-review', authenticate, authorize(...CLAIM_ROLES), async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        c.id,
+        c."claimNumber",
+        c.status,
+        c."incidentDate",
+        c."estimatedAmount",
+        c."submittedDate",
+        c."natureOfLoss",
+        c."riskItem",
+        c.location,
+        c."incidentDescription",
+        u."firstName",
+        u."lastName",
+        u.email,
+        u.phone,
+        p."policyNumber",
+        p.type
+      FROM claims c
+      LEFT JOIN users u ON u.id = c."userId"
+      LEFT JOIN policies p ON p.id = c."policyId"
+      WHERE c.status = 'SUBMITTED'
+      ORDER BY c."submittedDate" ASC
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Failed to fetch pending claims:', error);
+    res.status(500).json({ error: 'Failed to fetch pending claims' });
+  }
+});
+
+// GET /stats/summary – Summary statistics
+router.get('/stats/summary', authenticate, authorize(...CLAIM_ROLES), async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE status = 'SUBMITTED') as pending,
+        COUNT(*) FILTER (WHERE status = 'UNDER_REVIEW') as "underReview",
+        COUNT(*) FILTER (WHERE status = 'APPROVED') as approved,
+        COUNT(*) FILTER (WHERE status = 'REJECTED') as rejected,
+        COUNT(*) FILTER (WHERE status = 'PAID') as paid,
+        COALESCE(AVG(CASE WHEN status IN ('APPROVED', 'PAID') 
+          THEN EXTRACT(EPOCH FROM ("updatedAt" - "createdAt"))/86400 END), 0) as "avgProcessingDays"
+      FROM claims
+    `);
+    const stats = result.rows[0];
+    Object.keys(stats).forEach(key => {
+      stats[key] = parseFloat(stats[key]) || 0;
+    });
+    res.json(stats);
+  } catch (error) {
+    console.error('Failed to fetch stats:', error);
+    res.status(500).json({ error: 'Failed to fetch statistics' });
+  }
+});
+
+// GET /team-performance – Team performance (for managers+)
+router.get('/team-performance', authenticate, authorize('MANAGER_CLAIMS', 'HEAD_CLAIMS', 'CLAIMS_ADMIN', 'MASTER_ADMIN'), async (req, res) => {
+  try {
+    const result = await pool.query(`
+   SELECT 
+  c.id,
+  c."claimNumber",
+  c.status,
+  c."incidentDate",
+  c."estimatedAmount",
+  c."approvedAmount",
+  c."submittedDate",
+  u."firstName",
+  u."lastName",
+  u.email,
+  p."policyNumber",
+  p.type
+FROM claims c
+LEFT JOIN users u ON u.id = c."userId"
+LEFT JOIN policies p ON p.id = c."policyId"
+WHERE c.status IN ('APPROVED', 'UNDER_REVIEW', 'PAID')
+ORDER BY c."updatedAt" DESC
+    `);
+    const formatted = result.rows.map(row => ({
+      id: row.id,
+      firstName: row.firstName || 'N/A',
+      lastName: row.lastName || 'N/A',
+      email: row.email,
+      role: row.role,
+      assigned: parseInt(row.assigned) || 0,
+      approved: parseInt(row.approved) || 0,
+      rejected: parseInt(row.rejected) || 0,
+      avgTime: Math.round(parseFloat(row.avgTime) || 0)
+    }));
+    res.json(formatted);
+  } catch (error) {
+    console.error('Failed to fetch team performance:', error);
+    res.json([]);
+  }
+});
+
+
+// GET /recent-activities – Recent activities (for managers+)
+router.get('/recent-activities', authenticate, authorize('MANAGER_CLAIMS', 'HEAD_CLAIMS', 'CLAIMS_ADMIN', 'MASTER_ADMIN'), async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        c."claimNumber",
+        c.status,
+        c."updatedAt" as timestamp,
+        COALESCE(u."firstName" || ' ' || u."lastName", 'System') as user,
+        CASE 
+          WHEN c.status = 'APPROVED' THEN 'Claim Approved'
+          WHEN c.status = 'REJECTED' THEN 'Claim Rejected'
+          WHEN c.status = 'PAID' THEN 'Claim Paid'
+          WHEN c.status = 'UNDER_REVIEW' THEN 'Claim Under Review'
+          ELSE 'Claim Updated'
+        END as action
+      FROM claims c
+      LEFT JOIN users u ON u.id = c."assignedOfficer"
+      ORDER BY c."updatedAt" DESC
+      LIMIT 20
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Failed to fetch recent activities:', error);
+    res.json([]);
+  }
+});
+
+// =============================================
+// 2. CUSTOMER ENDPOINTS
+// =============================================
+
+// GET / – Get user's claims (customer)
+router.get('/', authenticate, async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const userRole = req.user?.role;
+    const isAdmin = CLAIM_ROLES.includes(userRole) || userRole === 'MASTER_ADMIN';
+
+    let query = `
       SELECT 
         c.id,
         c."claimNumber",
@@ -102,7 +354,7 @@ router.get('/', async (req, res) => {
         c."natureOfLoss",
         c."createdAt",
         c."updatedAt",
-        c."location",
+        c.location,
         c."riskItem",
         c."vehicleDamageDetails",
         c."witnessName",
@@ -116,9 +368,18 @@ router.get('/', async (req, res) => {
         p."productDetails"
       FROM claims c
       LEFT JOIN policies p ON p.id = c."policyId"
-      WHERE c."userId" = $1
-      ORDER BY c."submittedDate" DESC
-    `, [userId]);
+    `;
+    
+    const params: any[] = [];
+    
+    if (!isAdmin) {
+      query += ` WHERE c."userId" = $1`;
+      params.push(userId);
+    }
+    
+    query += ` ORDER BY c."submittedDate" DESC`;
+    
+    const result = await pool.query(query, params);
     
     // Parse vehicle details and format response
     const claimsWithDetails = result.rows.map(claim => {
@@ -131,7 +392,6 @@ router.get('/', async (req, res) => {
             ? JSON.parse(claim.productDetails) 
             : claim.productDetails;
           
-          // Extract all vehicles
           if (productDetails.vehicles && Array.isArray(productDetails.vehicles)) {
             vehicles = productDetails.vehicles.map((v: any) => ({
               make: v.make || null,
@@ -144,7 +404,6 @@ router.get('/', async (req, res) => {
               vehicleValue: v.vehicleValue || null
             }));
             
-            // Get first vehicle for quick reference
             if (vehicles.length > 0) {
               const firstVehicle = vehicles[0];
               vehicleDetails = {
@@ -163,7 +422,6 @@ router.get('/', async (req, res) => {
         }
       }
       
-      // Remove productDetails from response
       delete claim.productDetails;
       
       return {
@@ -173,29 +431,23 @@ router.get('/', async (req, res) => {
       };
     });
     
-    console.log(`Found ${claimsWithDetails.length} claims for user ${userId}`);
     res.json(claimsWithDetails);
-    
   } catch (error) {
     console.error('Failed to fetch claims:', error);
-    res.status(500).json({ 
-      error: 'Failed to fetch claims', 
-      details: error.message 
-    });
+    res.status(500).json({ error: 'Failed to fetch claims', details: error.message });
   }
 });
 
-// POST /api/claims - Create new claim
-router.post('/', async (req, res) => {
+// POST / – Create new claim
+router.post('/', authenticate, async (req, res) => {
   try {
     const userId = req.user?.id;
+    
     console.log('=== CREATING NEW CLAIM ===');
     console.log('User ID:', userId);
-    console.log('Request body:', JSON.stringify(req.body, null, 2));
     
     const {
       policyId,
-      productType,
       productCode = 'GEN',
       riskItem,
       incidentDate,
@@ -245,21 +497,27 @@ router.post('/', async (req, res) => {
     }
     
     const policy = policyCheck.rows[0];
-    const actualProductCode = productCode || (policy.type === 'AUTO' ? 'AUTO' : 
-                              policy.type === 'HOME' ? 'HOME' : 
-                              policy.type === 'LIFE' ? 'LIFE' : 
-                              policy.type === 'HEALTH' ? 'HLTH' : 'GEN');
     
     // Generate claim number
-    const claimNumber = await generateClaimNumber(actualProductCode);
+    const claimNumber = await generateClaimNumber(productCode);
     console.log('Generated claim number:', claimNumber);
     
     // Prepare injured persons JSON
-    const injuredPersonsJson = injuredPersons && Array.isArray(injuredPersons) && injuredPersons.length > 0 
-      ? JSON.stringify(injuredPersons) 
-      : null;
+    let injuredPersonsJson = null;
+    if (injuredPersons) {
+      if (typeof injuredPersons === 'string') {
+        try {
+          JSON.parse(injuredPersons);
+          injuredPersonsJson = injuredPersons;
+        } catch (e) {
+          injuredPersonsJson = JSON.stringify([{ name: injuredPersons }]);
+        }
+      } else if (Array.isArray(injuredPersons) && injuredPersons.length > 0) {
+        injuredPersonsJson = JSON.stringify(injuredPersons);
+      }
+    }
     
-    // Insert claim - using the correct column names from your database
+    // Insert claim
     const result = await pool.query(`
       INSERT INTO claims (
         id,
@@ -292,7 +550,7 @@ router.post('/', async (req, res) => {
         "createdAt",
         "updatedAt"
       ) VALUES (
-        gen_random_uuid()::text,
+        gen_random_uuid(),
         $1, $2, $3, 'SUBMITTED',
         $4, $5, $6, $7, $8, $9, $10,
         $11, $12, $13, $14, $15, $16, $17, $18, $19,
@@ -300,14 +558,30 @@ router.post('/', async (req, res) => {
         NOW(), NOW(), NOW()
       ) RETURNING id, "claimNumber"
     `, [
-      claimNumber, policyId, userId,
-      riskItem || null, incidentDate, timeOfAccident || null, incidentDescription,
-      location || null, natureOfLoss, estimatedAmount ? parseFloat(estimatedAmount) : null,
-      witnessName || null, witnessPhone || null, witnessStatement || null,
-      driverFullName || null, driverAge ? parseInt(driverAge) : null, driverOccupation || null,
-      driverLicenseNumber || null, driverLicenseIssueDate || null, driverLicenseExpiryDate || null,
-      vehicleDamageDetails || null, injuredPersonsJson,
-      roadConditions || null, weatherConditions || null, responsibleParty || null
+      claimNumber, 
+      policyId, 
+      userId,
+      riskItem || null, 
+      incidentDate, 
+      timeOfAccident || null, 
+      incidentDescription,
+      location || null, 
+      natureOfLoss, 
+      estimatedAmount ? parseFloat(estimatedAmount) : null,
+      witnessName || null, 
+      witnessPhone || null, 
+      witnessStatement || null,
+      driverFullName || null, 
+      driverAge ? parseInt(driverAge) : null, 
+      driverOccupation || null,
+      driverLicenseNumber || null, 
+      driverLicenseIssueDate || null, 
+      driverLicenseExpiryDate || null,
+      vehicleDamageDetails || null, 
+      injuredPersonsJson,
+      roadConditions || null, 
+      weatherConditions || null, 
+      responsibleParty || null
     ]);
     
     console.log('Claim created successfully:', result.rows[0]);
@@ -318,435 +592,84 @@ router.post('/', async (req, res) => {
       claimId: result.rows[0].id
     });
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to create claim:', error);
-    res.status(500).json({ error: 'Failed to create claim', details: error.message });
-  }
-});
-// GET /api/claims/:id/documents/:documentId/download - Download document
-router.get('/:id/documents/:documentId/download', async (req, res) => {
-  try {
-    const userId = req.user?.id;
-    const userRole = req.user?.role;
-    const { id: claimId, documentId } = req.params;
-    
-    // Check if user has access to this claim
-    const claimResult = await pool.query(
-      'SELECT "userId" FROM claims WHERE id = $1',
-      [claimId]
-    );
-    
-    if (claimResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Claim not found' });
-    }
-    
-    const claim = claimResult.rows[0];
-    const isAdmin = CLAIM_ROLES.includes(userRole) || userRole === 'MASTER_ADMIN';
-    
-    if (!isAdmin && claim.userId !== userId) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-    
-    // Get document info
-    const documentResult = await pool.query(
-      'SELECT * FROM claim_documents WHERE id = $1 AND "claimId" = $2',
-      [documentId, claimId]
-    );
-    
-    if (documentResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Document not found' });
-    }
-    
-    const document = documentResult.rows[0];
-    const filePath = document.documentUrl;
-    
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: 'File not found on server' });
-    }
-    
-    // Set appropriate headers for download
-    res.setHeader('Content-Type', document.documentType || 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(document.documentName)}"`);
-    
-    const fileStream = fs.createReadStream(filePath);
-    fileStream.pipe(res);
-    
-  } catch (error) {
-    console.error('Failed to download document:', error);
-    res.status(500).json({ error: 'Failed to download document' });
-  }
-});
-
-// GET /api/claims/:id/documents/:documentId/view - View document inline
-router.get('/:id/documents/:documentId/view', async (req, res) => {
-  try {
-    const userId = req.user?.id;
-    const userRole = req.user?.role;
-    const { id: claimId, documentId } = req.params;
-    
-    // Check if user has access to this claim
-    const claimResult = await pool.query(
-      'SELECT "userId" FROM claims WHERE id = $1',
-      [claimId]
-    );
-    
-    if (claimResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Claim not found' });
-    }
-    
-    const claim = claimResult.rows[0];
-    const isAdmin = CLAIM_ROLES.includes(userRole) || userRole === 'MASTER_ADMIN';
-    
-    if (!isAdmin && claim.userId !== userId) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-    
-    // Get document info
-    const documentResult = await pool.query(
-      'SELECT * FROM claim_documents WHERE id = $1 AND "claimId" = $2',
-      [documentId, claimId]
-    );
-    
-    if (documentResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Document not found' });
-    }
-    
-    const document = documentResult.rows[0];
-    const filePath = document.documentUrl;
-    
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: 'File not found on server' });
-    }
-    
-    // Set appropriate headers for inline viewing
-    const mimeType = getMimeType(filePath);
-    res.setHeader('Content-Type', mimeType);
-    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(document.documentName)}"`);
-    
-    const fileStream = fs.createReadStream(filePath);
-    fileStream.pipe(res);
-    
-  } catch (error) {
-    console.error('Failed to view document:', error);
-    res.status(500).json({ error: 'Failed to view document' });
-  }
-});
-
-// Helper function to get MIME type
-function getMimeType(filePath: string): string {
-  const ext = path.extname(filePath).toLowerCase();
-  const mimeTypes: { [key: string]: string } = {
-    '.pdf': 'application/pdf',
-    '.jpg': 'image/jpeg',
-    '.jpeg': 'image/jpeg',
-    '.png': 'image/png',
-    '.gif': 'image/gif',
-    '.doc': 'application/msword',
-    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    '.txt': 'text/plain',
-    '.xls': 'application/vnd.ms-excel',
-    '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-  };
-  return mimeTypes[ext] || 'application/octet-stream';
-}
-
-// GET /api/claims/:id/documents - Get all documents for a claim
-router.get('/:id/documents', async (req, res) => {
-  try {
-    const userId = req.user?.id;
-    const userRole = req.user?.role;
-    const { id: claimId } = req.params;
-    
-    // Check if user has access to this claim
-    const claimResult = await pool.query(
-      'SELECT "userId" FROM claims WHERE id = $1',
-      [claimId]
-    );
-    
-    if (claimResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Claim not found' });
-    }
-    
-    const claim = claimResult.rows[0];
-    const isAdmin = CLAIM_ROLES.includes(userRole) || userRole === 'MASTER_ADMIN';
-    
-    if (!isAdmin && claim.userId !== userId) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-    
-    // Get all documents for this claim
-    const result = await pool.query(`
-      SELECT 
-        id,
-        "documentName",
-        "documentUrl",
-        "documentType",
-        "fileSize",
-        "uploadedAt",
-        "createdAt"
-      FROM claim_documents
-      WHERE "claimId" = $1
-      ORDER BY "createdAt" DESC
-    `, [claimId]);
-    
-    res.json(result.rows);
-  } catch (error) {
-    console.error('Failed to fetch documents:', error);
-    res.status(500).json({ error: 'Failed to fetch documents' });
-  }
-});
-// GET /api/claims/queue - Get claim queue
-router.get('/queue', authorize(...CLAIM_ROLES), async (req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT 
-        c.id,
-        c."claimNumber",
-        c.status,
-        c."incidentDate",
-        c."estimatedAmount",
-        c."submittedDate",
-        c."natureOfLoss",
-        u."firstName",
-        u."lastName",
-        u.email,
-        u.phone,
-        p."policyNumber",
-        p.type
-      FROM claims c
-      LEFT JOIN users u ON u.id = c."userId"
-      LEFT JOIN policies p ON p.id = c."policyId"
-      WHERE c.status IN ('SUBMITTED', 'UNDER_REVIEW')
-      ORDER BY c."submittedDate" ASC
-    `);
-    
-    res.json(result.rows);
-  } catch (error) {
-    console.error('Failed to fetch claim queue:', error);
-    res.status(500).json({ error: 'Failed to fetch claim queue' });
-  }
-});
-
-// GET /api/claims/queue/stats - Get queue statistics
-router.get('/queue/stats', authorize(...CLAIM_ROLES), async (req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT 
-        COUNT(*) FILTER (WHERE status = 'SUBMITTED') as pending,
-        COUNT(*) FILTER (WHERE status = 'UNDER_REVIEW') as "underReview",
-        COUNT(*) FILTER (WHERE status = 'APPROVED') as approved,
-        COUNT(*) FILTER (WHERE status = 'REJECTED') as rejected,
-        COUNT(*) FILTER (WHERE status = 'PAID') as paid,
-        COUNT(*) as total
-      FROM claims
-    `);
-    
-    const stats = result.rows[0];
-    Object.keys(stats).forEach(key => {
-      stats[key] = parseInt(stats[key]) || 0;
+    console.error('SQL Error details:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to create claim', 
+      details: error.message
     });
-    
-    res.json(stats);
-  } catch (error) {
-    console.error('Failed to fetch queue stats:', error);
-    res.status(500).json({ error: 'Failed to fetch queue statistics' });
   }
 });
 
-// GET /api/claims/active - Get active claims
-router.get('/active', authorize('CLAIMS_ADMIN', 'CUSTOMER_ADMIN', 'MASTER_ADMIN', 'MANAGER_CLAIMS', 'HEAD_CLAIMS'), async (req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT 
-        c.id,
-        c."claimNumber",
-        c.status,
-        c."incidentDate",
-        c."estimatedAmount",
-        c."approvedAmount",
-        c."submittedDate",
-        u."firstName",
-        u."lastName",
-        u.email,
-        p."policyNumber",
-        p.type
-      FROM claims c
-      LEFT JOIN users u ON u.id = c."userId"
-      LEFT JOIN policies p ON p.id = c."policyId"
-      WHERE c.status IN ('APPROVED', 'IN_PROGRESS', 'PAID')
-      ORDER BY c."updatedAt" DESC
-    `);
-    
-    res.json(result.rows);
-  } catch (error) {
-    console.error('Failed to fetch active claims:', error);
-    res.status(500).json({ error: 'Failed to fetch active claims' });
-  }
-});
+router.post(
+  '/:id/review',
+  authenticate,
+  authorize(...CLAIM_ROLES),
+  validateBody(reviewSchema),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user!.id;
+      const { decision, approvedAmount, notes } = req.body;
 
-// GET /api/claims/pending-review - Get claims pending officer review
-router.get('/pending-review', authorize(...CLAIM_ROLES), async (req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT 
-        c.id,
-        c."claimNumber",
-        c.status,
-        c."incidentDate",
-        c."estimatedAmount",
-        c."submittedDate",
-        c."natureOfLoss",
-        c."riskItem",
-        c.location,
-        c."incidentDescription",
-        u."firstName",
-        u."lastName",
-        u.email,
-        u.phone,
-        p."policyNumber",
-        p.type
-      FROM claims c
-      LEFT JOIN users u ON u.id = c."userId"
-      LEFT JOIN policies p ON p.id = c."policyId"
-      WHERE c.status = 'SUBMITTED'
-      ORDER BY c."submittedDate" ASC
-    `);
-    
-    res.json(result.rows);
-  } catch (error) {
-    console.error('Failed to fetch pending claims:', error);
-    res.status(500).json({ error: 'Failed to fetch pending claims' });
-  }
-});
+      // Ensure claim exists
+      const claimCheck = await pool.query('SELECT * FROM claims WHERE id = $1', [id]);
+      if (claimCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Claim not found' });
+      }
 
-// POST /api/claims/:id/review - Review claim
-router.post('/:id/review', authorize(...CLAIM_ROLES), async (req, res) => {
+      // Map decision to status
+      const statusMap: Record<string, string> = {
+        APPROVE: 'APPROVED',
+        REJECT: 'REJECTED',
+        UNDER_REVIEW: 'UNDER_REVIEW',
+      };
+      const status = statusMap[decision];
+
+      await pool.query(
+        `UPDATE claims 
+         SET status = $1,
+             "approvedAmount" = COALESCE($2, "approvedAmount"),
+             "officerRemarks" = $3,
+             "reviewedAt" = NOW(),
+             "reviewedBy" = $4,
+             "updatedAt" = NOW()
+         WHERE id = $5`,
+        [status, approvedAmount, notes, userId, id]
+      );
+
+      res.json({ 
+        message: `Claim ${decision.toLowerCase()}d successfully`, 
+        status 
+      });
+    } catch (error) {
+      console.error('Failed to review claim:', error);
+      res.status(500).json({ error: 'Failed to review claim' });
+    }
+  }
+);
+
+// PATCH /:id/status – Update claim status
+router.patch('/:id/status', authenticate, authorize(...CLAIM_ROLES), async (req, res) => {
   try {
     const { id } = req.params;
-    const officerName = `${req.user?.firstName} ${req.user?.lastName}`;
-    const { proximateCause, officerRemarks, estimatedLoss, claimStatus } = req.body;
-    
-    await pool.query(`
-      UPDATE claims SET
-        "proximateCause" = $1,
-        "officerRemarks" = $2,
-        "estimatedAmount" = COALESCE($3, "estimatedAmount"),
-        status = $4,
-        "reviewedAt" = NOW(),
-        "updatedAt" = NOW()
-      WHERE id = $5
-    `, [proximateCause, officerRemarks, estimatedLoss, claimStatus, id]);
-    
-    res.json({ message: 'Claim reviewed successfully', status: claimStatus });
-  } catch (error) {
-    console.error('Failed to review claim:', error);
-    res.status(500).json({ error: 'Failed to review claim' });
-  }
-});
-
-// GET /api/claims/:id - Get claim details
-router.get('/:id', async (req, res) => {
-  try {
-    const userId = req.user?.id;
-    const userRole = req.user?.role;
-    
-    const result = await pool.query(`
-      SELECT 
-        c.*,
-        u."firstName",
-        u."lastName",
-        u.email,
-        u.phone,
-        u.address,
-        p."policyNumber",
-        p.type as "policyType",
-        p."coverageAmount",
-        p.premium,
-        p."effectiveDate",
-        p."expirationDate",
-        p."productDetails"
-      FROM claims c
-      LEFT JOIN users u ON u.id = c."userId"
-      LEFT JOIN policies p ON p.id = c."policyId"
-      WHERE c.id = $1
-    `, [req.params.id]);
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Claim not found' });
-    }
-    
-    const claim = result.rows[0];
-    const isAdmin = CLAIM_ROLES.includes(userRole) || userRole === 'MASTER_ADMIN';
-    
-    if (!isAdmin && claim.userId !== userId) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-    
-    // Parse vehicle details
-    let vehicleDetails = null;
-    let vehicles = [];
-    if (claim.productDetails) {
-      try {
-        const productDetails = typeof claim.productDetails === 'string' 
-          ? JSON.parse(claim.productDetails) 
-          : claim.productDetails;
-        
-        if (productDetails.vehicles && productDetails.vehicles.length > 0) {
-          vehicles = productDetails.vehicles;
-          const firstVehicle = vehicles[0];
-          vehicleDetails = {
-            make: firstVehicle.make,
-            model: firstVehicle.model,
-            year: firstVehicle.year || firstVehicle.yearOfMake,
-            plateNumber: firstVehicle.plateNumber || firstVehicle.registrationNumber,
-            engineNumber: firstVehicle.engineNumber,
-            chassisNumber: firstVehicle.chassisNumber,
-            vehicleType: firstVehicle.vehicleType,
-            vehicleValue: firstVehicle.vehicleValue
-          };
-        }
-      } catch (e) {
-        console.error('Error parsing productDetails:', e);
-      }
-    }
-    
-    // Parse injured persons if stored as JSON
-    let injuredPersons = [];
-    if (claim.injuredPersons) {
-      try {
-        injuredPersons = typeof claim.injuredPersons === 'string' 
-          ? JSON.parse(claim.injuredPersons) 
-          : claim.injuredPersons;
-      } catch (e) {
-        injuredPersons = [];
-      }
-    }
-    
-    delete claim.productDetails;
-    
-    res.json({
-      ...claim,
-      vehicleDetails,
-      vehicles,
-      injuredPersons
-    });
-  } catch (error) {
-    console.error('Failed to fetch claim:', error);
-    res.status(500).json({ error: 'Failed to fetch claim' });
-  }
-});
-
-// PATCH /api/claims/:id/status - Update claim status
-router.patch('/:id/status', authorize(...CLAIM_ROLES), async (req, res) => {
-  try {
     const { status, notes } = req.body;
-    
+
     await pool.query(`
       UPDATE claims 
-      SET status = $1, "updatedAt" = NOW()
+      SET status = $1, 
+          "updatedAt" = NOW()
       WHERE id = $2
-    `, [status, req.params.id]);
-    
+    `, [status, id]);
+
+    if (notes) {
+      await pool.query(`
+        INSERT INTO claim_timeline (id, "claimId", status, note, "changedBy", "createdAt")
+        VALUES (gen_random_uuid(), $1, $2, $3, $4, NOW())
+      `, [id, status, notes, req.user?.id]);
+    }
+
     res.json({ message: `Claim ${status.toLowerCase()} successfully` });
   } catch (error) {
     console.error('Failed to update claim status:', error);
@@ -754,8 +677,8 @@ router.patch('/:id/status', authorize(...CLAIM_ROLES), async (req, res) => {
   }
 });
 
-// POST /api/claims/:id/documents - Upload documents
-router.post('/:id/documents', upload.array('documents', 10), async (req, res) => {
+// POST /:id/documents – Upload documents
+router.post('/:id/documents', authenticate, upload.array('documents', 10), async (req, res) => {
   try {
     const { id } = req.params;
     const files = req.files as Express.Multer.File[];
@@ -779,18 +702,17 @@ router.post('/:id/documents', upload.array('documents', 10), async (req, res) =>
           "uploadedAt",
           "createdAt"
         ) VALUES (
-          gen_random_uuid()::text, 
+          gen_random_uuid(),
           $1, $2, $3, $4, $5, $6, NOW(), NOW()
         ) RETURNING *
       `, [
-        id,                           // claimId
-        file.originalname,            // documentName
-        file.path,                    // documentUrl
-        file.mimetype || 'application/octet-stream', // documentType
-        userId,                       // uploadedBy
-        file.size                     // fileSize
+        id,
+        file.originalname,
+        file.path,
+        file.mimetype || 'application/octet-stream',
+        userId,
+        file.size
       ]);
-      
       documents.push(result.rows[0]);
     }
     
@@ -810,24 +732,270 @@ router.post('/:id/documents', upload.array('documents', 10), async (req, res) =>
   }
 });
 
-// GET /api/claims/stats/summary - Get statistics
-router.get('/stats/summary', authorize(...CLAIM_ROLES), async (req, res) => {
+// GET /:id/documents – Get all documents for a claim
+router.get('/:id/documents', authenticate, async (req, res) => {
   try {
+    const userId = req.user?.id;
+    const userRole = req.user?.role;
+    const { id: claimId } = req.params;
+    
+    const claimResult = await pool.query(
+      'SELECT "userId" FROM claims WHERE id = $1',
+      [claimId]
+    );
+    
+    if (claimResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Claim not found' });
+    }
+    
+    const claim = claimResult.rows[0];
+    const isAdmin = CLAIM_ROLES.includes(userRole) || userRole === 'MASTER_ADMIN';
+    
+    if (!isAdmin && claim.userId !== userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
     const result = await pool.query(`
       SELECT 
-        COUNT(*) as total,
-        COUNT(*) FILTER (WHERE status = 'SUBMITTED') as pending,
-        COUNT(*) FILTER (WHERE status = 'UNDER_REVIEW') as "underReview",
-        COUNT(*) FILTER (WHERE status = 'APPROVED') as approved,
-        COUNT(*) FILTER (WHERE status = 'REJECTED') as rejected,
-        COUNT(*) FILTER (WHERE status = 'PAID') as paid
-      FROM claims
-    `);
+        id,
+        "documentName",
+        "documentUrl",
+        "documentType",
+        "fileSize",
+        "uploadedAt",
+        "createdAt"
+      FROM claim_documents
+      WHERE "claimId" = $1
+      ORDER BY "createdAt" DESC
+    `, [claimId]);
     
-    res.json(result.rows[0]);
+    res.json(result.rows);
   } catch (error) {
-    console.error('Failed to fetch stats:', error);
-    res.status(500).json({ error: 'Failed to fetch statistics' });
+    console.error('Failed to fetch documents:', error);
+    res.status(500).json({ error: 'Failed to fetch documents' });
+  }
+});
+
+// GET /:id/documents/:documentId/download – Download document
+router.get('/:id/documents/:documentId/download', authenticate, async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const userRole = req.user?.role;
+    const { id: claimId, documentId } = req.params;
+    
+    const claimResult = await pool.query(
+      'SELECT "userId" FROM claims WHERE id = $1',
+      [claimId]
+    );
+    
+    if (claimResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Claim not found' });
+    }
+    
+    const claim = claimResult.rows[0];
+    const isAdmin = CLAIM_ROLES.includes(userRole) || userRole === 'MASTER_ADMIN';
+    
+    if (!isAdmin && claim.userId !== userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    const documentResult = await pool.query(
+      'SELECT * FROM claim_documents WHERE id = $1 AND "claimId" = $2',
+      [documentId, claimId]
+    );
+    
+    if (documentResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+    
+    const document = documentResult.rows[0];
+    const filePath = document.documentUrl;
+    
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'File not found on server' });
+    }
+    
+    const allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png', '.gif'];
+    const ext = path.extname(filePath).toLowerCase();
+    if (!allowedExtensions.includes(ext)) {
+      return res.status(403).json({ error: 'File type not allowed for download' });
+    }
+    
+    res.download(filePath, document.documentName);
+    
+  } catch (error) {
+    console.error('Failed to download document:', error);
+    res.status(500).json({ error: 'Failed to download document' });
+  }
+});
+router.get('/search', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const { q } = req.query;
+    if (!q) {
+      return res.status(400).json({ error: 'Search query is required' });
+    }
+
+    const result = await pool.query(
+      `SELECT c.id, c."claimNumber", c.status, c."incidentDate", c."estimatedAmount",
+              p."policyNumber", u."firstName", u."lastName"
+       FROM claims c
+       JOIN policies p ON p.id = c."policyId"
+       JOIN users u ON u.id = c."userId"
+       WHERE c."claimNumber" ILIKE $1
+          OR p."policyNumber" ILIKE $1
+          OR u."firstName" ILIKE $1
+          OR u."lastName" ILIKE $1
+       ORDER BY c."submittedDate" DESC
+       LIMIT 50`,
+      [`%${q}%`]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Claim search error:', error);
+    res.status(500).json({ error: 'Search failed' });
+  }
+});
+
+
+// =============================================
+// 3. GET CLAIM BY ID (must be AFTER all specific routes)
+// =============================================
+router.get('/:id', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+    const userRole = req.user?.role;
+    const isAdmin = CLAIM_ROLES.includes(userRole) || userRole === 'MASTER_ADMIN';
+
+    // Check if claim exists and user has access
+    const claimCheck = await pool.query(
+      'SELECT "userId" FROM claims WHERE id = $1',
+      [id]
+    );
+
+    if (claimCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Claim not found' });
+    }
+
+    const claim = claimCheck.rows[0];
+    if (!isAdmin && claim.userId !== userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Get claim details
+    const result = await pool.query(`
+      SELECT 
+        c.id,
+        c."claimNumber",
+        c.status,
+        c."incidentDate",
+        c."incidentDescription",
+        c.location,
+        c."estimatedAmount",
+        c."submittedDate",
+        c."natureOfLoss",
+        c."createdAt",
+        c."updatedAt",
+        c."riskItem",
+        c."timeOfAccident",
+        c."vehicleDamageDetails",
+        c."roadConditions",
+        c."weatherConditions",
+        c."responsibleParty",
+        c."proximateCause",
+        c."officerRemarks",
+        c."reviewedAt",
+        c."approvedAmount",
+        c."witnessName",
+        c."witnessPhone",
+        c."witnessStatement",
+        c."driverFullName",
+        c."driverAge",
+        c."driverOccupation",
+        c."driverLicenseNumber",
+        c."driverLicenseIssueDate",
+        c."driverLicenseExpiryDate",
+        c."injuredPersons",
+        u."firstName",
+        u."lastName",
+        u.email,
+        u.phone,
+        u.address,
+        p."policyNumber",
+        p.type as "policyType",
+        p."coverageAmount",
+        p.premium,
+        p."effectiveDate",
+        p."expirationDate",
+        p."productDetails"
+      FROM claims c
+      LEFT JOIN users u ON u.id = c."userId"
+      LEFT JOIN policies p ON p.id = c."policyId"
+      WHERE c.id = $1
+    `, [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Claim not found' });
+    }
+
+    const claimData = result.rows[0];
+
+    // Parse injured persons
+    let injuredPersons = [];
+    if (claimData.injuredPersons) {
+      try {
+        injuredPersons = typeof claimData.injuredPersons === 'string' 
+          ? JSON.parse(claimData.injuredPersons) 
+          : claimData.injuredPersons;
+      } catch (e) {
+        injuredPersons = [];
+      }
+    }
+
+    // Parse vehicle details
+    let vehicleDetails = null;
+    let vehicles = [];
+    if (claimData.productDetails) {
+      try {
+        const productDetails = typeof claimData.productDetails === 'string' 
+          ? JSON.parse(claimData.productDetails) 
+          : claimData.productDetails;
+        
+        if (productDetails.vehicles && productDetails.vehicles.length > 0) {
+          vehicles = productDetails.vehicles;
+          const firstVehicle = vehicles[0];
+          vehicleDetails = {
+            make: firstVehicle.make,
+            model: firstVehicle.model,
+            year: firstVehicle.year || firstVehicle.yearOfMake,
+            plateNumber: firstVehicle.plateNumber || firstVehicle.registrationNumber,
+            engineNumber: firstVehicle.engineNumber,
+            chassisNumber: firstVehicle.chassisNumber,
+            vehicleType: firstVehicle.vehicleType,
+            vehicleValue: firstVehicle.vehicleValue
+          };
+        }
+      } catch (e) {
+        console.error('Error parsing productDetails:', e);
+      }
+    }
+
+    delete claimData.productDetails;
+    delete claimData.injuredPersons;
+
+    res.json({
+      ...claimData,
+      vehicleDetails,
+      vehicles: vehicles.length > 0 ? vehicles : undefined,
+      injuredPersons: injuredPersons.length > 0 ? injuredPersons : undefined
+    });
+    
+  } catch (error: any) {
+    console.error('Failed to fetch claim details:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch claim details',
+      details: error.message
+    });
   }
 });
 

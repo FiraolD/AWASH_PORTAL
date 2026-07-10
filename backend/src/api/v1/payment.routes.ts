@@ -12,11 +12,12 @@ router.get('/my-payments', async (req, res) => {
     const userId = req.user?.id;
     
     const result = await pool.query(
-      `SELECT p.*, pol.policy_number, pol.type
+      `SELECT p.id, p."policyId", p."userId", p.amount, p."paymentMethod", p."referenceNumber", p."transactionId", p.status, p."paidAt", p."createdAt", p."updatedAt", 
+              pol."policyNumber", pol.type
        FROM payments p
-       JOIN policies pol ON pol.id = p.policy_id
-       WHERE p.user_id = $1
-       ORDER BY p.created_at DESC`,
+       JOIN policies pol ON pol.id = p."policyId"
+       WHERE p."userId" = $1
+       ORDER BY p."createdAt" DESC`,
       [userId]
     );
     
@@ -33,10 +34,11 @@ router.get('/:id', async (req, res) => {
     const userId = req.user?.id;
     
     const result = await pool.query(
-      `SELECT p.*, pol.policy_number
+      `SELECT p.id, p."policyId", p."userId", p.amount, p."paymentMethod", p."referenceNumber", p."transactionId", p.status, p."paidAt", p."createdAt", p."updatedAt",
+              pol."policyNumber"
        FROM payments p
-       JOIN policies pol ON pol.id = p.policy_id
-       WHERE p.id = $1 AND p.user_id = $2`,
+       JOIN policies pol ON pol.id = p."policyId"
+       WHERE p.id = $1 AND p."userId" = $2`,
       [req.params.id, userId]
     );
     
@@ -58,9 +60,9 @@ router.post('/', async (req, res) => {
     const { policyId, amount, paymentMethod, reference } = req.body;
     
     const result = await pool.query(
-      `INSERT INTO payments (id, policy_id, user_id, amount, payment_method, reference_number, status, created_at)
-       VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, 'PENDING', NOW())
-       RETURNING *`,
+      `INSERT INTO payments (id, "policyId", "userId", amount, "paymentMethod", "referenceNumber", status, "createdAt", "updatedAt")
+       VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, 'PENDING', NOW(), NOW())
+       RETURNING id, "policyId", "userId", amount, "paymentMethod", "referenceNumber", "transactionId", status, "paidAt", "createdAt", "updatedAt"`,
       [policyId, userId, amount, paymentMethod, reference]
     );
     
@@ -81,9 +83,9 @@ router.patch('/:id/status', async (req, res) => {
     
     const result = await pool.query(
       `UPDATE payments 
-       SET status = $1, transaction_id = $2, paid_at = CASE WHEN $1 = 'COMPLETED' THEN NOW() ELSE paid_at END, updated_at = NOW()
+       SET status = $1, "transactionId" = $2, "paidAt" = CASE WHEN $1 = 'COMPLETED' THEN NOW() ELSE "paidAt" END, "updatedAt" = NOW()
        WHERE id = $3
-       RETURNING *`,
+       RETURNING id, "policyId", "userId", amount, "paymentMethod", "referenceNumber", "transactionId", status, "paidAt", "createdAt", "updatedAt"`,
       [status, transactionId, req.params.id]
     );
     
@@ -91,9 +93,9 @@ router.patch('/:id/status', async (req, res) => {
     if (status === 'COMPLETED' && result.rows.length > 0) {
       await pool.query(
         `UPDATE policies 
-         SET payment_status = 'PAID', updated_at = NOW()
+         SET status = 'ACTIVE', "updatedAt" = NOW()
          WHERE id = $1`,
-        [result.rows[0].policy_id]
+        [result.rows[0]["policyId"]]
       );
     }
     

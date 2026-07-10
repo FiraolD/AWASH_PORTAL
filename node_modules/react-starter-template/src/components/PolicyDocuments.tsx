@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios'; // ← ADD THIS IMPORT
+﻿import React, { useEffect, useState } from 'react';
+import axios from 'axios'; // â† ADD THIS IMPORT
 import { Download, Eye, FileText, Trash2, Upload } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -21,9 +21,11 @@ interface Document {
 interface PolicyDocumentsProps {
     policyId: string;
     policyNumber?: string;
+    open?: boolean;
+    onClose?: () => void;
 }
 
-export default function PolicyDocuments({ policyId, policyNumber }: PolicyDocumentsProps) {
+export default function PolicyDocuments({ policyId, policyNumber, open = true }: PolicyDocumentsProps) {
     const [documents, setDocuments] = useState<Document[]>([]);
     const [loading, setLoading] = useState(true);
     const { token } = useAuthStore();
@@ -117,6 +119,8 @@ export default function PolicyDocuments({ policyId, policyNumber }: PolicyDocume
         return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${sizes[i]}`;
     };
 
+    if (!open) return null;
+
     if (loading) {
         return (
             <div className="flex justify-center items-center h-48">
@@ -156,7 +160,7 @@ export default function PolicyDocuments({ policyId, policyNumber }: PolicyDocume
                                     <div>
                                         <p className="font-medium text-sm">{doc.fileName || 'Policy Document'}</p>
                                         <p className="text-xs text-gray-500">
-                                            {doc.documentType || 'PDF'} • {formatFileSize(doc.fileSize)} • 
+                                            {doc.documentType || 'PDF'} â€¢ {formatFileSize(doc.fileSize)} â€¢ 
                                             Uploaded: {new Date(doc.uploadedAt).toLocaleDateString()}
                                         </p>
                                     </div>

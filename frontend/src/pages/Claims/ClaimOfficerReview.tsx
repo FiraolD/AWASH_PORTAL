@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, CheckCircle, XCircle, Clock, AlertCircle, DollarSign, FileText, Send } from 'lucide-react';
+import { Eye, CheckCircle, XCircle, Clock, AlertCircle, DollarSign, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -55,16 +55,11 @@ export default function ClaimOfficerReview() {
     const [loading, setLoading] = useState(true);
     const [selectedClaim, setSelectedClaim] = useState<ClaimDetail | null>(null);
     const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
-    const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
     const [reviewData, setReviewData] = useState({
-        proximateCause: '',
-        officerRemarks: '',
-        estimatedLoss: '',
-        claimStatus: 'UNDER_REVIEW'
-    });
-    const [paymentData, setPaymentData] = useState({
-        amount: '',
-        notes: ''
+        decision: 'UNDER_REVIEW',   // Changed from claimStatus
+        approvedAmount: '',
+        notes: '',                 // Combined notes field
+        // Removed proximateCause, officerRemarks, estimatedLoss
     });
 
     const getAuthHeaders = () => {
@@ -106,43 +101,33 @@ export default function ClaimOfficerReview() {
 
     const handleReview = async () => {
         if (!selectedClaim) return;
-        
-        try {
-            await axios.post(`${API_URL}/claims/${selectedClaim.id}/review`, {
-                proximateCause: reviewData.proximateCause,
-                officerRemarks: reviewData.officerRemarks,
-                estimatedLoss: reviewData.estimatedLoss ? parseFloat(reviewData.estimatedLoss) : null,
-                claimStatus: reviewData.claimStatus
-            }, { headers: getAuthHeaders() });
-            
-            toast.success('Claim reviewed successfully');
-            setReviewDialogOpen(false);
-            fetchPendingClaims();
-            setSelectedClaim(null);
-        } catch (error) {
-            console.error('Failed to review claim:', error);
-            toast.error('Failed to review claim');
-        }
-    };
 
-    const handleCreatePaymentOrder = async () => {
-        if (!selectedClaim || !paymentData.amount) {
-            toast.error('Please enter payment amount');
+        // Validate required fields
+        if (!reviewData.decision) {
+            toast.error('Please select a decision');
             return;
         }
-        
+
         try {
-            await axios.post(`${API_URL}/claims/${selectedClaim.id}/payment-order`, {
-                amount: parseFloat(paymentData.amount),
-                notes: paymentData.notes
-            }, { headers: getAuthHeaders() });
-            
-            toast.success('Payment order created and sent for approval');
-            setPaymentDialogOpen(false);
+            // Map decision to backend format
+            const payload = {
+                decision: reviewData.decision, // 'APPROVE', 'REJECT', 'UNDER_REVIEW'
+                approvedAmount: reviewData.approvedAmount ? parseFloat(reviewData.approvedAmount) : null,
+                notes: reviewData.notes,
+            };
+
+            await axios.post(`${API_URL}/claims/${selectedClaim.id}/review`, payload, {
+                headers: getAuthHeaders()
+            });
+
+            toast.success(`Claim ${reviewData.decision.toLowerCase()}d successfully`);
+            setReviewDialogOpen(false);
+            setSelectedClaim(null);
             fetchPendingClaims();
-        } catch (error) {
-            console.error('Failed to create payment order:', error);
-            toast.error('Failed to create payment order');
+        } catch (error: any) {
+            console.error('Failed to review claim:', error);
+            const errorMsg = error.response?.data?.error || 'Failed to review claim';
+            toast.error(errorMsg);
         }
     };
 
@@ -166,7 +151,10 @@ export default function ClaimOfficerReview() {
 
     return (
         <div className="space-y-6">
-            <div><h1 className="text-3xl font-bold text-[#1A3E6F]">Claim Officer Review</h1><p className="text-gray-500">Review and process pending claims</p></div>
+            <div>
+                <h1 className="text-3xl font-bold text-[#1A3E6F]">Claim Officer Review</h1>
+                <p className="text-gray-500">Review and process pending claims</p>
+            </div>
 
             {claims.length === 0 ? (
                 <Card><CardContent className="text-center py-12"><CheckCircle className="h-12 w-12 text-green-300 mx-auto mb-3" /><p>No pending claims to review</p></CardContent></Card>
@@ -238,11 +226,40 @@ export default function ClaimOfficerReview() {
                             )}
 
                             <div className="space-y-4">
-                                <div><Label>Proximate Cause of Loss *</Label><Textarea value={reviewData.proximateCause} onChange={(e) => setReviewData({...reviewData, proximateCause: e.target.value})} placeholder="Determine the proximate cause of the loss..." rows={2} required /></div>
-                                <div><Label>Officer Remarks *</Label><Textarea value={reviewData.officerRemarks} onChange={(e) => setReviewData({...reviewData, officerRemarks: e.target.value})} placeholder="Add your assessment and recommendations..." rows={3} required /></div>
-                                <div><Label>Estimated Loss Amount</Label><Input type="number" value={reviewData.estimatedLoss} onChange={(e) => setReviewData({...reviewData, estimatedLoss: e.target.value})} placeholder="Enter estimated loss amount" /></div>
-                                <div><Label>Claim Status</Label><select className="w-full rounded-lg border p-2" value={reviewData.claimStatus} onChange={(e) => setReviewData({...reviewData, claimStatus: e.target.value})}><option value="UNDER_REVIEW">Under Review</option><option value="APPROVED">Approve</option><option value="REJECTED">Reject</option></select></div>
-                                <div className="flex gap-3 pt-4"><Button onClick={handleReview} className="flex-1 bg-[#1A3E6F]">Submit Review</Button><Button variant="outline" onClick={() => setReviewDialogOpen(false)}>Cancel</Button></div>
+                                <div>
+                                    <Label>Decision *</Label>
+                                    <select 
+                                        className="w-full rounded-lg border p-2" 
+                                        value={reviewData.decision} 
+                                        onChange={(e) => setReviewData({...reviewData, decision: e.target.value})}
+                                    >
+                                        <option value="UNDER_REVIEW">Under Review</option>
+                                        <option value="APPROVE">Approve</option>
+                                        <option value="REJECT">Reject</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <Label>Approved Amount (ETB)</Label>
+                                    <Input 
+                                        type="number" 
+                                        value={reviewData.approvedAmount} 
+                                        onChange={(e) => setReviewData({...reviewData, approvedAmount: e.target.value})} 
+                                        placeholder="Enter approved amount if applicable" 
+                                    />
+                                </div>
+                                <div>
+                                    <Label>Notes</Label>
+                                    <Textarea 
+                                        value={reviewData.notes} 
+                                        onChange={(e) => setReviewData({...reviewData, notes: e.target.value})} 
+                                        placeholder="Add your assessment and recommendations..." 
+                                        rows={3} 
+                                    />
+                                </div>
+                                <div className="flex gap-3 pt-4">
+                                    <Button onClick={handleReview} className="flex-1 bg-[#1A3E6F]">Submit Review</Button>
+                                    <Button variant="outline" onClick={() => setReviewDialogOpen(false)}>Cancel</Button>
+                                </div>
                             </div>
                         </div>
                     )}

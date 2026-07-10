@@ -1,6 +1,6 @@
-import * as React from 'react';
+﻿import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Upload, X, FileText, AlertCircle, Plus, Minus, User, Car, Camera, MapPin, Calendar, Clock, FileCheck, Users, Flag, Cloud, Sun, Umbrella, Wind, CheckCircle, Copy, Download, Home, Phone, Mail } from 'lucide-react';
+import { ArrowLeft, Upload, X, FileText, AlertCircle, Plus, Minus, User, Car, Camera, MapPin, Calendar, Clock, FileCheck, Users, Flag, Cloud, Sun, Umbrella, Wind, CheckCircle, Copy, Download, Home, Phone, Mail, Check } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -844,11 +844,11 @@ const handlePolicySelect = (policy: any) => {
                                     <div>
                                         <p className="text-sm font-semibold text-blue-800">Important Information</p>
                                         <p className="text-xs text-blue-700 mt-1">
-                                            • Provide accurate information to expedite your claim<br />
-                                            • Upload clear photos of the damage<br />
-                                            • A claim officer will contact you within 48 hours<br />
-                                            • Keep your policy number handy for reference<br />
-                                            • Police report is required for theft or vandalism claims
+                                            â€¢ Provide accurate information to expedite your claim<br />
+                                            â€¢ Upload clear photos of the damage<br />
+                                            â€¢ A claim officer will contact you within 48 hours<br />
+                                            â€¢ Keep your policy number handy for reference<br />
+                                            â€¢ Police report is required for theft or vandalism claims
                                         </p>
                                     </div>
                                 </div>

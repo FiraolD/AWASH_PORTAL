@@ -1,6 +1,7 @@
-import { Request, Response, NextFunction } from 'express';
+﻿import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import pool from '../../lib/db.js';
+import { getJwtSecret } from '../../lib/security.js';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -15,22 +16,17 @@ export interface AuthRequest extends Request {
 export const authenticate = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers.authorization;
-    console.log('Auth header present:', !!authHeader);
-    
     if (!authHeader) {
       return res.status(401).json({ error: 'No authorization header' });
     }
     
     const token = authHeader.replace('Bearer ', '');
-    console.log('Token length:', token?.length);
-    
     if (!token) {
       return res.status(401).json({ error: 'No token provided' });
     }
     
     // Verify the token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as any;
-    console.log('Token decoded successfully:', decoded.id);
+    const decoded = jwt.verify(token, getJwtSecret()) as any;
     
     // Get user from database
     const result = await pool.query(

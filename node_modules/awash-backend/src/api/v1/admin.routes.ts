@@ -39,17 +39,20 @@ router.get('/overview', async (req, res) => {
 // Get system metrics
 router.get('/metrics', async (req, res) => {
   try {
-    const result = await pool.query(`
-      SELECT 
-        COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '30 days') as new_users,
-        COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '30 days') as new_policies
-      FROM users, policies
+    const usersResult = await pool.query(`
+      SELECT COUNT(*) FILTER (WHERE "createdAt" > NOW() - INTERVAL '30 days') as new_users
+      FROM users
+    `);
+    
+    const policiesResult = await pool.query(`
+      SELECT COUNT(*) FILTER (WHERE "createdAt" > NOW() - INTERVAL '30 days') as new_policies
+      FROM policies
     `);
     
     res.json({
       period: 'Last 30 days',
-      newUsers: parseInt(result.rows[0].new_users || 0),
-      newPolicies: parseInt(result.rows[0].new_policies || 0),
+      newUsers: parseInt(usersResult.rows[0].new_users || 0),
+      newPolicies: parseInt(policiesResult.rows[0].new_policies || 0),
       newClaims: 0,
       revenue: 0
     });

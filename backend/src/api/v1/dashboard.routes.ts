@@ -26,6 +26,7 @@ router.get('/stats', authenticate, async (req, res) => {
       const totalPremium = await pool.query("SELECT COALESCE(SUM(premium), 0) as total FROM policies WHERE status = 'ACTIVE'");
       const activePolicies = await pool.query("SELECT COUNT(*) as count FROM policies WHERE status = 'ACTIVE'");
       const pendingClaims = await pool.query("SELECT COUNT(*) as count FROM claims WHERE status = 'SUBMITTED'");
+      const totalProducts = await pool.query("SELECT COUNT(*) as count FROM products");
       
       res.json({
         totalCustomers: parseInt(totalCustomers.rows[0].count),
@@ -35,7 +36,8 @@ router.get('/stats', authenticate, async (req, res) => {
         activePolicies: parseInt(activePolicies.rows[0].count),
         pendingClaims: parseInt(pendingClaims.rows[0].count),
         totalRevenue: 0,
-        newCustomersThisMonth: 0
+        newCustomersThisMonth: 0,
+        totalProducts: parseInt(totalProducts.rows[0].count)
       });
     } 
     
@@ -53,13 +55,18 @@ router.get('/stats', authenticate, async (req, res) => {
         "SELECT COUNT(*) as count FROM support_tickets WHERE \"userId\" = $1 AND status IN ('OPEN', 'IN_PROGRESS')",
         [userId]
       );
+      const totalProducts = await pool.query(
+        "SELECT COUNT(*) as count FROM products where \"userID\" = $1 AND isActive = 'true'",
+        [userId]
+      );
       
       res.json({
         activePolicies: parseInt(activePolicies.rows[0].count),
         pendingClaims: parseInt(pendingClaims.rows[0].count),
         openTickets: parseInt(openTickets.rows[0].count),
         totalPaid: 0,
-        totalPremium: 0
+        totalPremium: 0,
+        totalProducts: parseInt(totalProducts.rows[0].count)
       });
     }
     

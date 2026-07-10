@@ -14,7 +14,7 @@ router.get('/', async (req, res) => {
     const userId = req.user?.id;
     
     const result = await pool.query(
-      `SELECT id, email, "firstName", "lastName", phone, "avatarUrl", address, date_of_birth, gender, created_at, last_login_at
+      `SELECT id, email, "firstName", "lastName", phone, "avatarUrl", address, "createdAt", "lastLoginAt", "updatedAt"
        FROM users WHERE id = $1`,
       [userId]
     );
@@ -34,7 +34,7 @@ router.get('/', async (req, res) => {
 router.put('/', async (req, res) => {
   try {
     const userId = req.user?.id;
-    const { firstName, lastName, phone, address, dateOfBirth, gender } = req.body;
+    const { firstName, lastName, phone, address } = req.body;
     
     const result = await pool.query(
       `UPDATE users 
@@ -42,12 +42,10 @@ router.put('/', async (req, res) => {
            "lastName" = COALESCE($2, "lastName"),
            phone = COALESCE($3, phone),
            address = COALESCE($4, address),
-           date_of_birth = COALESCE($5, date_of_birth),
-           gender = COALESCE($6, gender),
-           updated_at = NOW()
-       WHERE id = $7
-       RETURNING id, email, "firstName", "lastName", phone, "avatarUrl", address, date_of_birth, gender`,
-      [firstName, lastName, phone, address, dateOfBirth, gender, userId]
+           "updatedAt" = NOW()
+       WHERE id = $5
+       RETURNING id, email, "firstName", "lastName", phone, "avatarUrl", address, "createdAt", "updatedAt"`,
+      [firstName, lastName, phone, address, userId]
     );
     
     res.json({ message: 'Profile updated successfully', profile: result.rows[0] });
@@ -79,7 +77,7 @@ router.post('/change-password', async (req, res) => {
     
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     await pool.query(
-      'UPDATE users SET "passwordHash" = $1, updated_at = NOW() WHERE id = $2',
+      'UPDATE users SET "passwordHash" = $1, "updatedAt" = NOW() WHERE id = $2',
       [hashedPassword, userId]
     );
     
@@ -103,7 +101,7 @@ router.post('/avatar', uploadAvatar.single('avatar'), async (req, res) => {
     const avatarUrl = `/uploads/avatars/${req.file.filename}`;
     
     const result = await pool.query(
-      `UPDATE users SET "avatarUrl" = $1, updated_at = NOW() WHERE id = $2 RETURNING "avatarUrl"`,
+      `UPDATE users SET "avatarUrl" = $1, "updatedAt" = NOW() WHERE id = $2 RETURNING "avatarUrl"`,
       [avatarUrl, userId]
     );
     

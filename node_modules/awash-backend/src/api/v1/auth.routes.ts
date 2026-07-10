@@ -1,20 +1,26 @@
-import { Router } from 'express';
+﻿import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import pool from '../../lib/db.js';
 import { EmailService } from '../../services/email.service.js';
+import { getJwtSecret } from '../../lib/security.js';
+import { authenticate } from '../middleware/auth.middleware.js';
 
 const router = Router();
 
-// Login
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
     
+    // Find user case-insensitively
     const result = await pool.query(
-      `SELECT id, email, "firstName", "lastName", role, status, "passwordHash", "avatarUrl", phone 
-       FROM users WHERE email = $1`,
-      [email.toLowerCase()]
+      `SELECT id, email, "passwordHash", "firstName", "lastName", role, status 
+       FROM users WHERE LOWER(email) = LOWER($1)`,
+      [email]
     );
     
     if (result.rows.length === 0) {
@@ -23,25 +29,32 @@ router.post('/login', async (req, res) => {
     
     const user = result.rows[0];
     
+    // Check status
     if (user.status !== 'ACTIVE') {
       return res.status(401).json({ error: 'Account is inactive' });
     }
     
+    // Verify password
     const isValid = await bcrypt.compare(password, user.passwordHash);
     if (!isValid) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
     
-    await pool.query('UPDATE users SET "lastLoginAt" = NOW() WHERE id = $1', [user.id]);
-    
+    // Generate token
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET || 'your-secret-key',
+      getJwtSecret(),
       { expiresIn: '7d' }
     );
     
+    // Remove password hash from response
     const { passwordHash, ...userWithoutPassword } = user;
-    res.json({ success: true, user: userWithoutPassword, token });
+    
+    res.json({ 
+      success: true, 
+      user: userWithoutPassword, 
+      token 
+    });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -53,7 +66,7 @@ router.post('/register', async (req, res) => {
   try {
     const { email, password, firstName, lastName, phone } = req.body;
     
-    const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
+    const existing = await pool.query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [email]);
     if (existing.rows.length > 0) {
       return res.status(400).json({ error: 'Email already registered' });
     }
@@ -70,7 +83,7 @@ router.post('/register', async (req, res) => {
     const user = result.rows[0];
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET || 'your-secret-key',
+      getJwtSecret(),
       { expiresIn: '7d' }
     );
     
@@ -82,56 +95,58 @@ router.post('/register', async (req, res) => {
 });
 
 // Get current user
-router.get('/me', async (req, res) => {
+router.get('/me', authenticate, async (req, res) => {
   try {
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    if (!token) {
-      return res.status(401).json({ error: 'No token provided' });
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
-    
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as any;
-    
+
     const result = await pool.query(
       `SELECT id, email, "firstName", "lastName", role, status, phone, "avatarUrl", "createdAt" 
        FROM users WHERE id = $1`,
-      [decoded.id]
+      [userId]
     );
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
-    
+
     res.json(result.rows[0]);
   } catch (error) {
-    res.status(401).json({ error: 'Invalid token' });
+    console.error('Fetch current user error:', error);
+    res.status(500).json({ error: 'Failed to fetch current user' });
   }
 });
 
 // Change password
-router.post('/change-password', async (req, res) => {
+router.post('/change-password', authenticate, async (req, res) => {
   try {
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    if (!token) {
-      return res.status(401).json({ error: 'No token provided' });
-    }
-    
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as any;
+    const userId = req.user?.id;
     const { currentPassword, newPassword } = req.body;
-    
-    const result = await pool.query('SELECT "passwordHash" FROM users WHERE id = $1', [decoded.id]);
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (!currentPassword || !newPassword || newPassword.length < 8) {
+      return res.status(400).json({ error: 'Current password and new password are required. New password must be at least 8 characters.' });
+    }
+
+    const result = await pool.query('SELECT "passwordHash" FROM users WHERE id = $1', [userId]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
-    
+
     const isValid = await bcrypt.compare(currentPassword, result.rows[0].passwordHash);
     if (!isValid) {
       return res.status(401).json({ error: 'Current password is incorrect' });
     }
-    
+
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     await pool.query('UPDATE users SET "passwordHash" = $1, "updatedAt" = NOW() WHERE id = $2', 
-      [hashedPassword, decoded.id]);
-    
+      [hashedPassword, userId]);
+
     res.json({ message: 'Password changed successfully' });
   } catch (error) {
     console.error('Change password error:', error);
@@ -144,7 +159,7 @@ router.post('/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
 
-    const result = await pool.query('SELECT id, "firstName", "lastName" FROM users WHERE email = $1', [email.toLowerCase()]);
+    const result = await pool.query('SELECT id, "firstName", "lastName" FROM users WHERE LOWER(email) = LOWER($1)', [email]);
     if (result.rows.length === 0) {
       return res.json({ message: 'If an account exists, a reset link will be sent' });
     }
@@ -152,7 +167,7 @@ router.post('/forgot-password', async (req, res) => {
     const user = result.rows[0];
     const resetToken = jwt.sign(
       { id: user.id, email },
-      process.env.JWT_SECRET || 'your-secret-key',
+      getJwtSecret(),
       { expiresIn: '1h' }
     );
 
@@ -172,10 +187,10 @@ router.post('/forgot-password', async (req, res) => {
 // Reset password
 router.post('/reset-password', async (req, res) => {
   try {
-    const { token, newPassword } = req.body;
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as any;
+    const { token, newPassword, password } = req.body;`r`;   const nextPassword = newPassword || password;
+    const decoded = jwt.verify(token, getJwtSecret()) as any;
     
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const hashedPassword = await bcrypt.hash(nextPassword, 10);
     await pool.query('UPDATE users SET "passwordHash" = $1, "updatedAt" = NOW() WHERE id = $2', 
       [hashedPassword, decoded.id]);
     
@@ -187,7 +202,7 @@ router.post('/reset-password', async (req, res) => {
 });
 
 // Logout
-router.post('/logout', async (req, res) => {
+router.post('/logout', authenticate, async (req, res) => {
   res.json({ message: 'Logged out successfully' });
 });
 
@@ -201,7 +216,7 @@ router.post('/verify-reset-token', async (req, res) => {
     }
 
     try {
-      jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      jwt.verify(token, getJwtSecret());
       res.json({ valid: true });
     } catch (error) {
       console.error('Invalid token:', error);
@@ -214,3 +229,4 @@ router.post('/verify-reset-token', async (req, res) => {
 });
 
 export default router;
+

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Users, Headphones, Clock, CheckCircle, Star, MessageCircle, TrendingUp, Loader2 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import axiosInstance from '../../lib/axios';
@@ -60,31 +60,32 @@ export default function CustomerAdminDashboard() {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      // Fetch customers
-      const customersResponse = await axiosInstance.get('/users/customers');
-      const customers = customersResponse.data;
-      
-      // Calculate customer stats
+      const [customersResult, ticketsResult] = await Promise.allSettled([
+        axiosInstance.get('/users/customers'),
+        axiosInstance.get('/support/admin/tickets')
+      ]);
+
+      const customers = customersResult.status === 'fulfilled' && Array.isArray(customersResult.value.data)
+        ? customersResult.value.data
+        : [];
+      const tickets = ticketsResult.status === 'fulfilled' && Array.isArray(ticketsResult.value.data)
+        ? ticketsResult.value.data
+        : [];
+
       const totalCustomers = customers.length;
       const activeCustomers = customers.filter((c: Customer) => c.status === 'ACTIVE').length;
-      
-      // Get current month start date
+
       const startOfMonth = new Date();
       startOfMonth.setDate(1);
       startOfMonth.setHours(0, 0, 0, 0);
-      
-      const newCustomersThisMonth = customers.filter((c: Customer) => 
+
+      const newCustomersThisMonth = customers.filter((c: Customer) =>
         new Date(c.createdAt) >= startOfMonth
       ).length;
-      
-      // Fetch support tickets
-      const ticketsResponse = await axiosInstance.get('/support/admin/tickets');
-      const tickets = ticketsResponse.data;
-      
+
       const openTickets = tickets.filter((t: any) => t.status === 'OPEN' || t.status === 'IN_PROGRESS').length;
       const resolvedTickets = tickets.filter((t: any) => t.status === 'RESOLVED' || t.status === 'CLOSED').length;
-      
-      // Get recent tickets (last 5)
+
       const recentTicketsData = tickets.slice(0, 5).map((t: any) => ({
         id: t.id,
         ticketNumber: t.ticketNumber,
@@ -95,10 +96,10 @@ export default function CustomerAdminDashboard() {
         status: t.status,
         createdAt: t.createdAt
       }));
-      
+
       setRecentTickets(recentTicketsData);
       setRecentCustomers(customers.slice(0, 5));
-      
+
       setStats({
         totalCustomers,
         activeCustomers,
@@ -109,7 +110,11 @@ export default function CustomerAdminDashboard() {
         customerSatisfaction: 4.2,
         pendingRenewals: 0
       });
-      
+
+      if (customersResult.status === 'rejected' || ticketsResult.status === 'rejected') {
+        toast.warning('Some customer admin data is temporarily unavailable');
+      }
+
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
       toast.error('Failed to load dashboard data');

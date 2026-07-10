@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Clock, CheckCircle, XCircle, Eye, Search, RefreshCw, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -22,9 +23,14 @@ interface Claim {
   status: string;
   submittedDate: string;
   description: string;
+  firstName?: string;
+  lastName?: string;
+  policyNumber?: string;
+  policyType?: string;
 }
 
 export default function ClaimQueuePage() {
+  const navigate = useNavigate();
   const [claims, setClaims] = React.useState<Claim[]>([]);
   const [stats, setStats] = React.useState({ submitted: 0, underReview: 0, approved: 0, paid: 0 });
   const [loading, setLoading] = React.useState(true);
@@ -51,15 +57,42 @@ export default function ClaimQueuePage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [claimsRes, statsRes] = await Promise.all([
-        axios.get(`${API_URL}/claims/queue`, { headers: getAuthHeaders() }),
-        axios.get(`${API_URL}/claims/queue/stats`, { headers: getAuthHeaders() })
-      ]);
-      setClaims(claimsRes.data);
-      setStats(statsRes.data);
+      // 🔥 Use /my-assigned to get only claims assigned to the current officer
+      const claimsRes = await axios.get(`${API_URL}/claims/my-assigned`, { 
+        headers: getAuthHeaders() 
+      });
+      
+      // Calculate stats from assigned claims
+      const claimsData = claimsRes.data || [];
+      const statsData = {
+        submitted: claimsData.filter((c: any) => c.status === 'SUBMITTED').length,
+        underReview: claimsData.filter((c: any) => c.status === 'UNDER_REVIEW').length,
+        approved: claimsData.filter((c: any) => c.status === 'APPROVED').length,
+        paid: claimsData.filter((c: any) => c.status === 'PAID').length,
+      };
+      
+      // Normalize claims for display
+      const normalizedClaims = claimsData.map((claim: any) => ({
+        id: claim.id,
+        claimNumber: claim.claimNumber,
+        customerName: `${claim.firstName || ''} ${claim.lastName || ''}`.trim() || 'Unknown Customer',
+        customerEmail: claim.email || '',
+        type: claim.policyType || claim.type || 'Policy',
+        amount: claim.estimatedAmount || claim.amount || 0,
+        status: claim.status || 'SUBMITTED',
+        submittedDate: claim.submittedDate || claim.createdAt,
+        description: claim.incidentDescription || claim.natureOfLoss || 'No description',
+        firstName: claim.firstName,
+        lastName: claim.lastName,
+        policyNumber: claim.policyNumber,
+        policyType: claim.policyType || claim.type,
+      }));
+      
+      setClaims(normalizedClaims);
+      setStats(statsData);
     } catch (error) {
-      console.error('Failed to fetch data:', error);
-      toast.error('Failed to load claims');
+      console.error('Failed to fetch assigned claims:', error);
+      toast.error('Failed to load your assigned claims');
     } finally {
       setLoading(false);
     }
@@ -75,7 +108,7 @@ export default function ClaimQueuePage() {
       );
       toast.success(`Claim ${status.toLowerCase()}`);
       setIsReviewOpen(false);
-      fetchData();
+      fetchData(); // Refresh list
     } catch (error) {
       console.error('Failed to update status:', error);
       toast.error('Failed to update claim status');
@@ -88,9 +121,14 @@ export default function ClaimQueuePage() {
     setIsReviewOpen(true);
   };
 
+  const handleClaimClick = (claimId: string) => {
+    navigate(`/claims/${claimId}`);
+  };
+
   const filteredClaims = claims.filter(claim =>
     claim.claimNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    claim.customerName.toLowerCase().includes(searchTerm.toLowerCase())
+    claim.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (claim.policyNumber && claim.policyNumber.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const getStatusBadge = (status: string) => {
@@ -99,7 +137,7 @@ export default function ClaimQueuePage() {
       case 'UNDER_REVIEW': return <Badge className="bg-blue-100 text-blue-800">Under Review</Badge>;
       case 'APPROVED': return <Badge className="bg-green-100 text-green-800">Approved</Badge>;
       case 'PAID': return <Badge className="bg-purple-100 text-purple-800">Paid</Badge>;
-      case 'DENIED': return <Badge className="bg-red-100 text-red-800">Denied</Badge>;
+      case 'REJECTED': return <Badge className="bg-red-100 text-red-800">Rejected</Badge>;
       default: return <Badge>{status}</Badge>;
     }
   };
@@ -109,7 +147,7 @@ export default function ClaimQueuePage() {
       <div className="flex justify-center items-center h-96">
         <div className="text-center">
           <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#1A3E6F] border-t-transparent mx-auto mb-4" />
-          <p className="text-gray-500">Loading claims...</p>
+          <p className="text-gray-500">Loading your assigned claims...</p>
         </div>
       </div>
     );
@@ -119,37 +157,96 @@ export default function ClaimQueuePage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-[#1A3E6F]">Claim Queue</h1>
-          <p className="text-gray-500 mt-1">Process and manage incoming claims</p>
+          <h1 className="text-3xl font-bold text-[#1A3E6F]">My Claim Queue</h1>
+          <p className="text-gray-500 mt-1">Claims assigned to you for processing</p>
+          <p className="text-sm text-gray-400">Total assigned: {claims.length}</p>
         </div>
-        <Button onClick={fetchData} variant="outline"><RefreshCw className="mr-2 h-4 w-4" /> Refresh</Button>
+        <Button onClick={fetchData} variant="outline">
+          <RefreshCw className="mr-2 h-4 w-4" /> Refresh
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card><CardContent className="p-6"><p className="text-sm text-gray-500">Submitted</p><p className="text-2xl font-bold">{stats.submitted}</p></CardContent></Card>
-        <Card><CardContent className="p-6"><p className="text-sm text-gray-500">Under Review</p><p className="text-2xl font-bold">{stats.underReview}</p></CardContent></Card>
-        <Card><CardContent className="p-6"><p className="text-sm text-gray-500">Approved</p><p className="text-2xl font-bold">{stats.approved}</p></CardContent></Card>
-        <Card><CardContent className="p-6"><p className="text-sm text-gray-500">Paid</p><p className="text-2xl font-bold">{stats.paid}</p></CardContent></Card>
+        <Card>
+          <CardContent className="p-6">
+            <p className="text-sm text-gray-500">Submitted</p>
+            <p className="text-2xl font-bold">{stats.submitted}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6">
+            <p className="text-sm text-gray-500">Under Review</p>
+            <p className="text-2xl font-bold">{stats.underReview}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6">
+            <p className="text-sm text-gray-500">Approved</p>
+            <p className="text-2xl font-bold">{stats.approved}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6">
+            <p className="text-sm text-gray-500">Paid</p>
+            <p className="text-2xl font-bold">{stats.paid}</p>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
-            <CardTitle>Claims Queue ({claims.length})</CardTitle>
-            <div className="relative w-64"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" /><Input placeholder="Search..." className="pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
+            <CardTitle>Assigned Claims ({filteredClaims.length})</CardTitle>
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input 
+                placeholder="Search..." 
+                className="pl-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
           </div>
         </CardHeader>
         <CardContent>
-          {filteredClaims.length === 0 ? <div className="text-center py-8 text-gray-500">No claims found</div> : (
+          {filteredClaims.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              {claims.length === 0 
+                ? 'No claims assigned to you yet.' 
+                : 'No claims match your search.'}
+            </div>
+          ) : (
             <div className="space-y-3">
               {filteredClaims.map((claim) => (
-                <div key={claim.id} className="flex items-center justify-between p-4 rounded-xl border border-gray-100 hover:shadow-md">
-                  <div><p className="font-semibold">{claim.claimNumber}</p><p className="text-sm text-gray-500">{claim.customerName} • {claim.type}</p></div>
-                  <div className="text-right"><p className="font-semibold text-[#1A3E6F]">ETB {claim.amount?.toLocaleString() || 0}</p><p className="text-xs text-gray-400">{new Date(claim.submittedDate).toLocaleDateString()}</p></div>
-                  <div className="flex items-center gap-3">
-                    {getStatusBadge(claim.status)}
-                    <Button size="sm" variant="outline" onClick={() => openReviewDialog(claim)}><Eye className="mr-2 h-4 w-4" /> Review</Button>
+                <div 
+                  key={claim.id} 
+                  onClick={() => handleClaimClick(claim.id)}
+                  className="flex items-center justify-between p-4 rounded-xl border border-gray-100 hover:shadow-md transition-all cursor-pointer hover:border-[#1A3E6F]"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <p className="font-semibold text-[#1A3E6F]">{claim.claimNumber}</p>
+                      {getStatusBadge(claim.status)}
+                    </div>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {claim.customerName} • {claim.policyNumber || claim.type}
+                    </p>
+                    <p className="text-sm text-gray-500 line-clamp-1">{claim.description}</p>
+                    <div className="flex gap-4 mt-1 text-xs text-gray-400">
+                      <span>Amount: ETB {claim.amount?.toLocaleString() || 0}</span>
+                      <span>Submitted: {new Date(claim.submittedDate).toLocaleDateString()}</span>
+                    </div>
                   </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openReviewDialog(claim);
+                    }}
+                  >
+                    <Eye className="h-4 w-4 mr-1" /> Review
+                  </Button>
                 </div>
               ))}
             </div>
@@ -157,20 +254,61 @@ export default function ClaimQueuePage() {
         </CardContent>
       </Card>
 
+      {/* Review Dialog */}
       <Dialog open={isReviewOpen} onOpenChange={setIsReviewOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Review Claim</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Review Claim</DialogTitle>
+          </DialogHeader>
           {selectedClaim && (
             <div className="space-y-4">
-              <div><p className="text-sm text-gray-500">Claim #</p><p className="font-semibold">{selectedClaim.claimNumber}</p></div>
-              <div><p className="text-sm text-gray-500">Customer</p><p className="font-semibold">{selectedClaim.customerName}</p><p className="text-sm">{selectedClaim.customerEmail}</p></div>
-              <div><p className="text-sm text-gray-500">Description</p><p className="text-sm bg-gray-50 p-3 rounded-lg">{selectedClaim.description}</p></div>
-              <div><p className="text-sm text-gray-500">Amount</p><p className="font-semibold text-[#1A3E6F]">ETB {selectedClaim.amount?.toLocaleString() || 0}</p></div>
-              <div><p className="text-sm text-gray-500">Review Notes</p><Textarea rows={3} value={reviewNotes} onChange={(e) => setReviewNotes(e.target.value)} placeholder="Add notes..." /></div>
+              <div>
+                <p className="text-sm text-gray-500">Claim #</p>
+                <p className="font-semibold">{selectedClaim.claimNumber}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Customer</p>
+                <p className="font-semibold">{selectedClaim.customerName}</p>
+                <p className="text-sm">{selectedClaim.customerEmail}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Description</p>
+                <p className="text-sm bg-gray-50 p-3 rounded-lg">{selectedClaim.description}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Amount</p>
+                <p className="font-semibold text-[#1A3E6F]">ETB {selectedClaim.amount?.toLocaleString() || 0}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Review Notes</p>
+                <Textarea 
+                  rows={3} 
+                  value={reviewNotes} 
+                  onChange={(e) => setReviewNotes(e.target.value)} 
+                  placeholder="Add notes..." 
+                />
+              </div>
               <div className="flex gap-3">
-                {selectedClaim.status === 'SUBMITTED' && <Button className="flex-1 bg-blue-600" onClick={() => updateStatus('UNDER_REVIEW')}><Clock className="mr-2 h-4 w-4" /> Start Review</Button>}
-                {selectedClaim.status === 'UNDER_REVIEW' && <><Button className="flex-1 bg-green-600" onClick={() => updateStatus('APPROVED')}><CheckCircle className="mr-2 h-4 w-4" /> Approve</Button><Button variant="outline" className="flex-1 border-red-200 text-red-600" onClick={() => updateStatus('DENIED')}><XCircle className="mr-2 h-4 w-4" /> Deny</Button></>}
-                {selectedClaim.status === 'APPROVED' && <Button className="flex-1 bg-purple-600" onClick={() => updateStatus('PAID')}>Mark as Paid</Button>}
+                {selectedClaim.status === 'SUBMITTED' && (
+                  <Button className="flex-1 bg-blue-600" onClick={() => updateStatus('UNDER_REVIEW')}>
+                    <Clock className="mr-2 h-4 w-4" /> Start Review
+                  </Button>
+                )}
+                {(selectedClaim.status === 'SUBMITTED' || selectedClaim.status === 'UNDER_REVIEW') && (
+                  <>
+                    <Button className="flex-1 bg-green-600" onClick={() => updateStatus('APPROVED')}>
+                      <CheckCircle className="mr-2 h-4 w-4" /> Approve
+                    </Button>
+                    <Button variant="outline" className="flex-1 border-red-200 text-red-600" onClick={() => updateStatus('REJECTED')}>
+                      <XCircle className="mr-2 h-4 w-4" /> Reject
+                    </Button>
+                  </>
+                )}
+                {selectedClaim.status === 'APPROVED' && (
+                  <Button className="flex-1 bg-purple-600" onClick={() => updateStatus('PAID')}>
+                    Mark as Paid
+                  </Button>
+                )}
               </div>
             </div>
           )}

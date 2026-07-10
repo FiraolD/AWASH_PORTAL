@@ -4,17 +4,25 @@ import { Toaster } from 'sonner';
 import { useAuthStore } from './stores/authStore';
 import { UserRole } from './types';
 import MainLayout from './components/layout/MainLayout';
-import { RoleGuard } from '../src/components/layout/RoleGuard';
+import { RoleGuard } from './components/layout/RoleGuard';
 import DashboardRouter from './pages/Dashboard/DashboardRouter';
 import BuyNewPolicyPage from './pages/Customer/BuyNewPolicyPage';
+import FinalApprovalQueue from './pages/Underwriting/FinalApprovalQueue';
 
-// Auth Pages
+
+
+// ============================================
+// AUTH PAGES
+// ============================================
 const LoginPage = React.lazy(() => import('./pages/Auth/LoginPage'));
 const RegisterPage = React.lazy(() => import('./pages/Auth/RegisterPage'));
 const ForgotPasswordPage = React.lazy(() => import('./pages/Auth/ForgotPasswordPage'));
 const ResetPasswordPage = React.lazy(() => import('./pages/Auth/ResetPasswordPage'));
 
-// Admin Pages
+// ============================================
+// ADMIN PAGES
+// ============================================
+const MasterAdminDashboard = React.lazy(() => import('./pages/Dashboard/MasterAdminDashboard'));
 const UserManagementPage = React.lazy(() => import('./pages/Admin/UserManagementPage'));
 const RoleAssignmentPage = React.lazy(() => import('./pages/Admin/RoleAssignmentPage'));
 const SystemSettingsPage = React.lazy(() => import('./pages/Admin/SystemSettingsPage'));
@@ -25,22 +33,31 @@ const WorkflowConfigPage = React.lazy(() => import('./pages/Admin/WorkflowConfig
 const AuditLogsPage = React.lazy(() => import('./pages/Admin/AuditLogsPage'));
 const ApprovalRulesConfigPage = React.lazy(() => import('./pages/Admin/ApprovalRulesConfigPage'));
 
-// Customer Admin Pages
+// ============================================
+// CUSTOMER ADMIN PAGES
+// ============================================
 const SupportTicketsPage = React.lazy(() => import('./pages/Admin/SupportTicketsPage'));
 const CustomerManagementPage = React.lazy(() => import('./pages/Admin/CustomerManagementPage'));
 
-// Underwriting Pages
-const PolicyQueuePage = React.lazy(() => import('./pages/Underwriting/PolicyQueuePage'));
-const RiskAssessmentPage = React.lazy(() => import('./pages/Underwriting/RiskAssessmentPage'));
-const EndorsementsPage = React.lazy(() => import('./pages/Underwriting/EndorsementsPage'));
-const UnderwriterReviewQueue = React.lazy(() => import('./pages/Underwriting/UnderwriterReviewQueue'));
-const FinalApprovalQueue = React.lazy(() => import('./pages/Underwriting/FinalApprovalQueue'));
+// ============================================
+// UNDERWRITING PAGES
+// ============================================
+const UnifiedUnderwritingDashboard = React.lazy(() => import('./pages/Underwriting/UnifiedUnderwritingDashboard'));
 
-// Claims Pages
+
+// ============================================
+// CLAIMS PAGES
+// ============================================
 const ClaimQueuePage = React.lazy(() => import('./pages/Claims/ClaimQueuePage'));
 const ActiveClaimsPage = React.lazy(() => import('./pages/Claims/ActiveClaimsPage'));
+const ClaimsOfficerDashboard = React.lazy(() => import('./pages/Claims/ClaimsOfficerDashboard'));
+const ClaimOfficerReview = React.lazy(() => import('./pages/Claims/ClaimOfficerReview'));
+const ClaimsManagerDashboard = React.lazy(() => import('./pages/Claims/ClaimsManagerDashboard'));
+const ClaimsAdminDashboard = React.lazy(() => import('./pages/Claims/ClaimsAdminDashboard'));
 
-// Customer Pages
+// ============================================
+// CUSTOMER PAGES
+// ============================================
 const CustomerPoliciesPage = React.lazy(() => import('./pages/Policies/PoliciesPage'));
 const CustomerClaimsPage = React.lazy(() => import('./pages/Customer/ClaimsPage'));
 const CustomerNewClaimPage = React.lazy(() => import('./pages/Claims/NewClaimPage'));
@@ -49,21 +66,21 @@ const CustomerProfilePage = React.lazy(() => import('./pages/Profile/ProfilePage
 const CustomerDocumentsPage = React.lazy(() => import('./pages/Customer/DocumentsPage'));
 const CustomerSupportPage = React.lazy(() => import('./pages/Customer/SupportPage'));
 const CustomerPolicyDecisions = React.lazy(() => import('./pages/Underwriting/CustomerPolicyDecisions'));
-// In your App.tsx or routes configuration
-const ClaimDetailsPage = React.lazy(() => import ('./pages/customer/ClaimDetailsPage'));
-const PolicyDetailsPage = React.lazy(() => import ( './pages/policies/PolicyDetailsPage'));
+const ClaimDetailsPage = React.lazy(() => import('./pages/Customer/ClaimDetailsPage'));
+const PolicyDetailsPage = React.lazy(() => import('./pages/Policies/PolicyDetailsPage'));
+const CustomerDashboardPage = React.lazy(() => import('./pages/Dashboard/CustomerDashboard'));
 
-
-
-
-
-// Shared Pages
+// ============================================
+// SHARED PAGES
+// ============================================
 const ProfilePage = React.lazy(() => import('./pages/Profile/ProfilePage'));
 const PoliciesPage = React.lazy(() => import('./pages/Policies/PoliciesPage'));
-//const ClaimsPage = React.lazy(() => import('./pages/Claims/ClaimsPage'));
 const PaymentsPage = React.lazy(() => import('./pages/Payments/PaymentsPage'));
 const SupportPage = React.lazy(() => import('./pages/support/SupportPage'));
 
+// ============================================
+// HELPERS
+// ============================================
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, isLoading } = useAuthStore();
   const location = useLocation();
@@ -89,6 +106,9 @@ const LoadingFallback = () => (
   </div>
 );
 
+// ============================================
+// MAIN APP
+// ============================================
 export default function App() {
   return (
     <React.Suspense fallback={<LoadingFallback />}>
@@ -99,126 +119,350 @@ export default function App() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
-        
-        {/* Main Application Routes - All protected routes go inside here */}
-        <Route path="/" element={
-          <ProtectedRoute>
-            <MainLayout />
-          </ProtectedRoute>
-        }>
+
+        {/* Main Application Routes */}
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <MainLayout />
+            </ProtectedRoute>
+          }
+        >
           <Route index element={<Navigate to="/dashboard" replace />} />
-          
+
           {/* Dashboard */}
           <Route path="dashboard" element={<DashboardRouter />} />
 
-          {/* ==================== UNDERWRITING ROUTES ==================== */}
+          {/* ==================== UNDERWRITING ==================== */}
           <Route path="underwriting">
-            <Route path="queue" element={
-              <RoleGuard allowedRoles={[UserRole.UNDERWRITING_ADMIN, UserRole.MANAGER_UNDERWRITING, UserRole.HEAD_UNDERWRITING, UserRole.UNDERWRITING_OFFICER, UserRole.UNDERWRITING_OFFICER_I, UserRole.UNDERWRITING_OFFICER_II, UserRole.SENIOR_UNDERWRITING_OFFICER]}>
-                <PolicyQueuePage />
-              </RoleGuard>
-            } />
-            <Route path="risk-assessment" element={
-              <RoleGuard allowedRoles={[UserRole.UNDERWRITING_ADMIN, UserRole.MANAGER_UNDERWRITING, UserRole.HEAD_UNDERWRITING, UserRole.UNDERWRITING_OFFICER, UserRole.UNDERWRITING_OFFICER_II, UserRole.SENIOR_UNDERWRITING_OFFICER]}>
-                <RiskAssessmentPage />
-              </RoleGuard>
-            } />
-            <Route path="endorsements" element={
-              <RoleGuard allowedRoles={[UserRole.UNDERWRITING_ADMIN, UserRole.MANAGER_UNDERWRITING, UserRole.HEAD_UNDERWRITING, UserRole.SENIOR_UNDERWRITING_OFFICER]}>
-                <EndorsementsPage />
-              </RoleGuard>
-            } />
-            <Route path="review-queue" element={
-              <RoleGuard allowedRoles={[UserRole.UNDERWRITING_ADMIN, UserRole.MANAGER_UNDERWRITING, UserRole.HEAD_UNDERWRITING, UserRole.UNDERWRITING_OFFICER, UserRole.UNDERWRITING_OFFICER_I, UserRole.UNDERWRITING_OFFICER_II, UserRole.SENIOR_UNDERWRITING_OFFICER]}>
-                <UnderwriterReviewQueue />
-              </RoleGuard>
-            } />
-            <Route path="final-approval" element={
-              <RoleGuard allowedRoles={[UserRole.UNDERWRITING_ADMIN, UserRole.MANAGER_UNDERWRITING, UserRole.HEAD_UNDERWRITING, UserRole.SENIOR_UNDERWRITING_OFFICER]}>
-                <FinalApprovalQueue />
-              </RoleGuard>
-            } />
+            <Route
+              path="queue"
+              element={
+                <RoleGuard
+                  allowedRoles={[
+                    UserRole.UNDERWRITING_ADMIN,
+                    UserRole.MANAGER_UNDERWRITING,
+                    UserRole.HEAD_UNDERWRITING,
+                    UserRole.UNDERWRITING_OFFICER,
+                    UserRole.UNDERWRITING_OFFICER_I,
+                    UserRole.UNDERWRITING_OFFICER_II,
+                    UserRole.SENIOR_UNDERWRITING_OFFICER,
+                  ]}
+                >
+                  <UnifiedUnderwritingDashboard />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="risk-assessment"
+              element={
+                <RoleGuard
+                  allowedRoles={[
+                    UserRole.UNDERWRITING_ADMIN,
+                    UserRole.MANAGER_UNDERWRITING,
+                    UserRole.HEAD_UNDERWRITING,
+                    UserRole.UNDERWRITING_OFFICER,
+                    UserRole.UNDERWRITING_OFFICER_II,
+                    UserRole.SENIOR_UNDERWRITING_OFFICER,
+                  ]}
+                >
+                  <UnifiedUnderwritingDashboard />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="endorsements"
+              element={
+                <RoleGuard
+                  allowedRoles={[
+                    UserRole.UNDERWRITING_ADMIN,
+                    UserRole.MANAGER_UNDERWRITING,
+                    UserRole.HEAD_UNDERWRITING,
+                    UserRole.SENIOR_UNDERWRITING_OFFICER,
+                  ]}
+                >
+                  <UnifiedUnderwritingDashboard />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="review-queue"
+              element={
+                <RoleGuard
+                  allowedRoles={[
+                    UserRole.UNDERWRITING_ADMIN,
+                    UserRole.MANAGER_UNDERWRITING,
+                    UserRole.HEAD_UNDERWRITING,
+                    UserRole.UNDERWRITING_OFFICER,
+                    UserRole.UNDERWRITING_OFFICER_I,
+                    UserRole.UNDERWRITING_OFFICER_II,
+                    UserRole.SENIOR_UNDERWRITING_OFFICER,
+                  ]}
+                >
+                  <UnifiedUnderwritingDashboard />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="final-approval"
+              element={
+                <RoleGuard
+                  allowedRoles={[
+                    UserRole.UNDERWRITING_ADMIN,
+                    UserRole.MANAGER_UNDERWRITING,
+                    UserRole.HEAD_UNDERWRITING,
+                    UserRole.SENIOR_UNDERWRITING_OFFICER,
+                  ]}
+                >
+                  <FinalApprovalQueue />
+                </RoleGuard>
+              }
+            />
           </Route>
 
-          {/* ==================== MASTER ADMIN ROUTES ==================== */}
+          {/* ==================== MASTER ADMIN ==================== */}
           <Route path="admin">
-            <Route path="users" element={
-              <RoleGuard allowedRoles={[UserRole.MASTER_ADMIN]}>
-                <UserManagementPage />
-              </RoleGuard>
-            } />
-            <Route path="roles" element={
-              <RoleGuard allowedRoles={[UserRole.MASTER_ADMIN]}>
-                <RoleAssignmentPage />
-              </RoleGuard>
-            } />
-            <Route path="settings" element={
-              <RoleGuard allowedRoles={[UserRole.MASTER_ADMIN]}>
-                <SystemSettingsPage />
-              </RoleGuard>
-            } />
-            <Route path="products" element={
-              <RoleGuard allowedRoles={[UserRole.MASTER_ADMIN]}>
-                <ProductManagementPage />
-              </RoleGuard>
-            } />
-            <Route path="workflow" element={
-              <RoleGuard allowedRoles={[UserRole.MASTER_ADMIN]}>
-                <WorkflowConfigPage />
-              </RoleGuard>
-            } />
-            <Route path="approval-rules" element={
-              <RoleGuard allowedRoles={[UserRole.MASTER_ADMIN]}>
-                <ApprovalRulesConfigPage />
-              </RoleGuard>
-            } />
-            <Route path="audit-logs" element={
-              <RoleGuard allowedRoles={[UserRole.MASTER_ADMIN]}>
-                <AuditLogsPage />
-              </RoleGuard>
-            } />
-            <Route path="rates" element={
-              <RoleGuard allowedRoles={[UserRole.MASTER_ADMIN]}>
-                <RatesManagementPage />
-              </RoleGuard>
-            } />
-            <Route path="claims-assignment" element={
-              <RoleGuard allowedRoles={[UserRole.MASTER_ADMIN, UserRole.CLAIMS_ADMIN]}>
-                <ClaimsAssignmentConfigPage />
-              </RoleGuard>
-            } />
+            <Route
+              path="users"
+              element={
+                <RoleGuard allowedRoles={[UserRole.MASTER_ADMIN]}>
+                  <UserManagementPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="roles"
+              element={
+                <RoleGuard allowedRoles={[UserRole.MASTER_ADMIN]}>
+                  <RoleAssignmentPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="settings"
+              element={
+                <RoleGuard allowedRoles={[UserRole.MASTER_ADMIN]}>
+                  <SystemSettingsPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="products"
+              element={
+                <RoleGuard allowedRoles={[UserRole.MASTER_ADMIN]}>
+                  <ProductManagementPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="workflow"
+              element={
+                <RoleGuard allowedRoles={[UserRole.MASTER_ADMIN]}>
+                  <WorkflowConfigPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="approval-rules"
+              element={
+                <RoleGuard allowedRoles={[UserRole.MASTER_ADMIN]}>
+                  <ApprovalRulesConfigPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="audit-logs"
+              element={
+                <RoleGuard allowedRoles={[UserRole.MASTER_ADMIN]}>
+                  <AuditLogsPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="rates"
+              element={
+                <RoleGuard allowedRoles={[UserRole.MASTER_ADMIN]}>
+                  <RatesManagementPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="claims-assignment"
+              element={
+                <RoleGuard allowedRoles={[UserRole.MASTER_ADMIN, UserRole.CLAIMS_ADMIN, UserRole.MANAGER_CLAIMS, UserRole.HEAD_CLAIMS]}>
+                  <ClaimsAssignmentConfigPage />
+                </RoleGuard>
+              }
+            />
           </Route>
 
-          {/* ==================== CUSTOMER ADMIN ROUTES ==================== */}
+          <Route 
+            path="master-admin-dashboard"
+            element={
+              <RoleGuard allowedRoles={[UserRole.MASTER_ADMIN]}>
+                <MasterAdminDashboard />
+              </RoleGuard>
+            }
+          />  
+      
+
+          {/* ==================== CUSTOMER ADMIN ==================== */}
           <Route path="support">
-            <Route path="tickets" element={
-              <RoleGuard allowedRoles={[UserRole.CUSTOMER_ADMIN, UserRole.MASTER_ADMIN]}>
-                <SupportTicketsPage />
-              </RoleGuard>
-            } />
-            <Route path="customers" element={
-              <RoleGuard allowedRoles={[UserRole.CUSTOMER_ADMIN, UserRole.MASTER_ADMIN]}>
-                <CustomerManagementPage />
-              </RoleGuard>
-            } />
+            <Route
+              path="tickets"
+              element={
+                <RoleGuard allowedRoles={[UserRole.CUSTOMER_ADMIN, UserRole.MASTER_ADMIN]}>
+                  <SupportTicketsPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="customers"
+              element={
+                <RoleGuard allowedRoles={[UserRole.CUSTOMER_ADMIN, UserRole.MASTER_ADMIN]}>
+                  <CustomerManagementPage />
+                </RoleGuard>
+              }
+            />
           </Route>
 
-          {/* ==================== CLAIMS ADMIN ROUTES ==================== */}
-          <Route path="claims-admin">
-            <Route path="queue" element={
-              <RoleGuard allowedRoles={[UserRole.CLAIMS_ADMIN, UserRole.MANAGER_CLAIMS, UserRole.HEAD_CLAIMS, UserRole.CLAIM_OFFICER]}>
+          {/* ==================== CLAIMS ROUTES ==================== */}
+          {/* Specific routes FIRST */}
+          <Route
+            path="claims/queue"
+            element={
+              <RoleGuard
+                allowedRoles={[
+                  UserRole.CLAIMS_ADMIN,
+                  UserRole.MANAGER_CLAIMS,
+                  UserRole.HEAD_CLAIMS,
+                  UserRole.CLAIM_OFFICER,
+                  UserRole.CLAIM_OFFICER_I,
+                  UserRole.CLAIM_OFFICER_II,
+                  UserRole.SENIOR_CLAIM_OFFICER,
+                  UserRole.SUPERVISOR_CLAIMS,
+                ]}
+              >
                 <ClaimQueuePage />
               </RoleGuard>
-            } />
-            <Route path="active" element={
-              <RoleGuard allowedRoles={[UserRole.CLAIMS_ADMIN, UserRole.MANAGER_CLAIMS, UserRole.HEAD_CLAIMS]}>
+            }
+          />
+
+          <Route
+            path="claims/active"
+            element={
+              <RoleGuard
+                allowedRoles={[
+                  UserRole.CLAIMS_ADMIN,
+                  UserRole.MANAGER_CLAIMS,
+                  UserRole.HEAD_CLAIMS,
+                  UserRole.CLAIM_OFFICER,
+                  UserRole.CLAIM_OFFICER_I,
+                  UserRole.CLAIM_OFFICER_II,
+                  UserRole.SENIOR_CLAIM_OFFICER,
+                  UserRole.SUPERVISOR_CLAIMS,
+                ]}
+              >
                 <ActiveClaimsPage />
               </RoleGuard>
-            } />
-          </Route>
+            }
+          />
+
+          <Route
+            path="claims/new"
+            element={
+              <RoleGuard
+                allowedRoles={[
+                  UserRole.MASTER_ADMIN,
+                  UserRole.CLAIMS_ADMIN,
+                  UserRole.CLAIM_OFFICER,
+                  UserRole.CLAIM_OFFICER_I,
+                  UserRole.CLAIM_OFFICER_II,
+                ]}
+              >
+                <CustomerNewClaimPage />
+              </RoleGuard>
+            }
+          />
+
+          <Route
+            path="claims"
+            element={
+              <RoleGuard
+                allowedRoles={[
+                  UserRole.MASTER_ADMIN,
+                  UserRole.CLAIMS_ADMIN,
+                  UserRole.MANAGER_CLAIMS,
+                  UserRole.HEAD_CLAIMS,
+                  UserRole.CLAIM_OFFICER,
+                  UserRole.CLAIM_OFFICER_I,
+                  UserRole.CLAIM_OFFICER_II,
+                  UserRole.SENIOR_CLAIM_OFFICER,
+                  UserRole.SUPERVISOR_CLAIMS,
+                ]}
+              >
+                <CustomerClaimsPage />
+              </RoleGuard>
+            }
+          />
+
+          {/* Dynamic claim details – MUST BE LAST */}
+          <Route
+            path="claims/:id"
+            element={
+              <RoleGuard
+                allowedRoles={[
+                  UserRole.MASTER_ADMIN,
+                  UserRole.CLAIMS_ADMIN,
+                  UserRole.MANAGER_CLAIMS,
+                  UserRole.HEAD_CLAIMS,
+                  UserRole.CLAIM_OFFICER,
+                  UserRole.CLAIM_OFFICER_I,
+                  UserRole.CLAIM_OFFICER_II,
+                  UserRole.SENIOR_CLAIM_OFFICER,
+                  UserRole.SUPERVISOR_CLAIMS,
+                  UserRole.CUSTOMER,
+                ]}
+              >
+                <ClaimDetailsPage />
+              </RoleGuard>
+            }
+          />
+
+          {/* ==================== SPECIALISED CLAIMS DASHBOARDS ==================== */}
+          <Route
+            path="claims-manager-dashboard"
+            element={
+              <RoleGuard allowedRoles={[UserRole.CLAIMS_ADMIN, UserRole.MANAGER_CLAIMS, UserRole.HEAD_CLAIMS]}>
+                <ClaimsManagerDashboard />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="claims-admin-dashboard"
+            element={
+              <RoleGuard allowedRoles={[UserRole.CLAIMS_ADMIN]}>
+                <ClaimsAdminDashboard />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="claims-officer-dashboard"
+            element={
+              <RoleGuard allowedRoles={[UserRole.CLAIM_OFFICER_I, UserRole.CLAIM_OFFICER_II, UserRole.SENIOR_CLAIM_OFFICER]}>
+                <ClaimsOfficerDashboard />
+              </RoleGuard>
+            }
+          />
 
           {/* ==================== CUSTOMER ROUTES ==================== */}
           <Route path="customer">
+            <Route path="dashboard" element={
+              <RoleGuard allowedRoles={[UserRole.CUSTOMER]}>
+                <CustomerDashboardPage />
+              </RoleGuard>
+            } />
             <Route path="policies" element={
               <RoleGuard allowedRoles={[UserRole.CUSTOMER]}>
                 <CustomerPoliciesPage />
@@ -229,20 +473,11 @@ export default function App() {
                 <BuyNewPolicyPage />
               </RoleGuard>
             } />
-      
-            <Route path="claims/:id" element={
+            <Route path="policies/:id" element={
               <RoleGuard allowedRoles={[UserRole.CUSTOMER]}>
-              <ClaimDetailsPage />
-               </RoleGuard>
-              } />
-
-
-            <Route path="/customer/policies/:id" element={
-              <RoleGuard allowedRoles={[UserRole.CUSTOMER]}>
-              <PolicyDetailsPage />
+                <PolicyDetailsPage />
               </RoleGuard>
             } />
-
             <Route path="claims" element={
               <RoleGuard allowedRoles={[UserRole.CUSTOMER]}>
                 <CustomerClaimsPage />
@@ -251,6 +486,11 @@ export default function App() {
             <Route path="claims/new" element={
               <RoleGuard allowedRoles={[UserRole.CUSTOMER]}>
                 <CustomerNewClaimPage />
+              </RoleGuard>
+            } />
+            <Route path="claims/:id" element={
+              <RoleGuard allowedRoles={[UserRole.CUSTOMER]}>
+                <ClaimDetailsPage />
               </RoleGuard>
             } />
             <Route path="payments" element={
@@ -280,39 +520,60 @@ export default function App() {
             } />
           </Route>
 
-          {/* ==================== SHARED ROUTES ==================== */}
-          <Route path="policies" element={
-            <RoleGuard allowedRoles={[UserRole.MASTER_ADMIN, UserRole.UNDERWRITING_ADMIN, UserRole.CLAIMS_ADMIN, UserRole.CUSTOMER_ADMIN]}>
-              <PoliciesPage />
-            </RoleGuard>
-          } />
-          <Route path="claims" element={
-            <RoleGuard allowedRoles={[UserRole.MASTER_ADMIN, UserRole.CLAIMS_ADMIN, UserRole.MANAGER_CLAIMS, UserRole.HEAD_CLAIMS]}>
-              <CustomerClaimsPage />
-            </RoleGuard>
-          } />
-          <Route path="claims/new" element={
-            <RoleGuard allowedRoles={[UserRole.MASTER_ADMIN, UserRole.CLAIMS_ADMIN, UserRole.CLAIM_OFFICER]}>
-              <CustomerNewClaimPage />
-            </RoleGuard>
-          } />
-          <Route path="payments" element={
-            <RoleGuard allowedRoles={[UserRole.MASTER_ADMIN, UserRole.CUSTOMER_ADMIN, UserRole.CUSTOMER]}>
-              <PaymentsPage />
-            </RoleGuard>
-          } />
-          <Route path="support" element={
-            <RoleGuard allowedRoles={[UserRole.MASTER_ADMIN, UserRole.CUSTOMER_ADMIN, UserRole.CLAIMS_ADMIN, UserRole.CUSTOMER]}>
-              <SupportPage />
-            </RoleGuard>
-          } />
+          {/* ==================== SHARED ROUTES (staff) ==================== */}
+          <Route
+            path="policies"
+            element={
+              <RoleGuard
+                allowedRoles={[
+                  UserRole.MASTER_ADMIN,
+                  UserRole.UNDERWRITING_ADMIN,
+                  UserRole.CLAIMS_ADMIN,
+                  UserRole.CUSTOMER_ADMIN,
+                ]}
+              >
+                <PoliciesPage />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="payments"
+            element={
+              <RoleGuard
+                allowedRoles={[
+                  UserRole.MASTER_ADMIN,
+                  UserRole.CUSTOMER_ADMIN,
+                  UserRole.CUSTOMER,
+                ]}
+              >
+                <PaymentsPage />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="support"
+            element={
+              <RoleGuard
+                allowedRoles={[
+                  UserRole.MASTER_ADMIN,
+                  UserRole.CUSTOMER_ADMIN,
+                  UserRole.CLAIMS_ADMIN,
+                  UserRole.CUSTOMER,
+                ]}
+              >
+                <SupportPage />
+              </RoleGuard>
+            }
+          />
+
+          {/* Profile – accessible to all authenticated users */}
           <Route path="profile" element={<ProfilePage />} />
-          
-          {/* Catch all - redirect to dashboard */}
+
+          {/* Catch‑all inside main layout */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>
-        
-        {/* Catch all outside main layout */}
+
+        {/* Catch‑all outside main layout */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </React.Suspense>

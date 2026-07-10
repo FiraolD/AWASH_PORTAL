@@ -7,6 +7,8 @@ import App from './App';
 import './index.css';
 import './theme.css';
 import './lib/axios';
+import { ErrorBoundary } from 'react-error-boundary';
+
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -21,10 +23,12 @@ const queryClient = new QueryClient({
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
+      <ErrorBoundary fallback={<div>Something went wrong</div>}>
       <BrowserRouter>
         <App />
       </BrowserRouter>
       <ReactQueryDevtools initialIsOpen={false} />
+      </ErrorBoundary>
     </QueryClientProvider>
   </React.StrictMode>
 );

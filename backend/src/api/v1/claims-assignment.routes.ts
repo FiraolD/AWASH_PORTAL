@@ -5,7 +5,7 @@ import { authenticate, authorize } from '../middleware/auth.middleware.js';
 const router = Router();
 
 // Get assignment rules
-router.get('/assignment-rules', authenticate, authorize('MASTER_ADMIN', 'CLAIMS_ADMIN'), async (req, res) => {
+router.get('/assignment-rules', authenticate, authorize('MASTER_ADMIN', 'CLAIMS_ADMIN', 'MANAGER_CLAIMS', 'HEAD_CLAIMS'), async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT * FROM claims_assignment_rules WHERE is_active = true ORDER BY priority ASC`
@@ -18,7 +18,7 @@ router.get('/assignment-rules', authenticate, authorize('MASTER_ADMIN', 'CLAIMS_
 });
 
 // Create assignment rule
-router.post('/assignment-rules', authenticate, authorize('MASTER_ADMIN'), async (req, res) => {
+router.post('/assignment-rules', authenticate, authorize('MASTER_ADMIN', 'CLAIMS_ADMIN', 'MANAGER_CLAIMS', 'HEAD_CLAIMS'), async (req, res) => {
   try {
     const { rule_name, product_type, min_amount, max_amount, assigned_role, priority } = req.body;
     
@@ -37,7 +37,7 @@ router.post('/assignment-rules', authenticate, authorize('MASTER_ADMIN'), async 
 });
 
 // Update assignment rule
-router.put('/assignment-rules/:id', authenticate, authorize('MASTER_ADMIN'), async (req, res) => {
+router.put('/assignment-rules/:id', authenticate, authorize('MASTER_ADMIN', 'MANAGER_CLAIMS', 'HEAD_CLAIMS'), async (req, res) => {
   try {
     const { rule_name, product_type, min_amount, max_amount, assigned_role, priority, is_active } = req.body;
     
@@ -64,7 +64,7 @@ router.put('/assignment-rules/:id', authenticate, authorize('MASTER_ADMIN'), asy
 });
 
 // Delete assignment rule
-router.delete('/assignment-rules/:id', authenticate, authorize('MASTER_ADMIN'), async (req, res) => {
+router.delete('/assignment-rules/:id', authenticate, authorize('MASTER_ADMIN, MANAGER_CLAIMS, HEAD_CLAIMS'), async (req, res) => {
   try {
     await pool.query('DELETE FROM claims_assignment_rules WHERE id = $1', [req.params.id]);
     res.json({ message: 'Assignment rule deleted successfully' });
@@ -75,13 +75,13 @@ router.delete('/assignment-rules/:id', authenticate, authorize('MASTER_ADMIN'), 
 });
 
 // Assign claim to officer
-router.post('/claims/:claimId/assign', authenticate, authorize('CLAIMS_ADMIN', 'CLAIMS_MANAGER'), async (req, res) => {
+router.post('/claims/:claimId/assign', authenticate, authorize('CLAIMS_ADMIN', 'MANAGER_CLAIMS', 'HEAD_CLAIMS', 'MASTER_ADMIN'), async (req, res) => {
   try {
     const { officerId } = req.body;
     
     await pool.query(
       `UPDATE claims 
-       SET assigned_to = $1, status = 'ASSIGNED', updated_at = NOW()
+       SET "assignedTo" = $1, status = 'ASSIGNED', "updatedAt" = NOW()
        WHERE id = $2`,
       [officerId, req.params.claimId]
     );
@@ -94,7 +94,7 @@ router.post('/claims/:claimId/assign', authenticate, authorize('CLAIMS_ADMIN', '
 });
 
 // Get claim officers
-router.get('/officers', authenticate, authorize('MASTER_ADMIN', 'CLAIMS_ADMIN'), async (req, res) => {
+router.get('/officers', authenticate, authorize('MASTER_ADMIN', 'CLAIMS_ADMIN', 'MANAGER_CLAIMS', 'HEAD_CLAIMS'), async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT co.*, u."firstName", u."lastName", u.email

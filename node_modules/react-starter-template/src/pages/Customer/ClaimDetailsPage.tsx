@@ -1,38 +1,10 @@
-// frontend/src/pages/customer/ClaimDetailsPage.tsx
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
-  ArrowLeft, 
-  FileText, 
-  Clock, 
-  CheckCircle2, 
-  XCircle, 
-  AlertCircle,
-  Calendar,
-  MapPin,
-  DollarSign,
-  User,
-  Phone,
-  Mail,
-  Car,
-  Users,
-  Cloud,
-  Eye,
-  Download,
-  FileCheck,
-  MessageSquare,
-  Key,
-  Hash,
-  Wrench,
-  Truck,
-  Building,
-  Home,
-  Briefcase,
-  CreditCard,
-  FileSignature,
-  Loader2,
-  Copy,
-  Check
+  ArrowLeft, FileText, Clock, CheckCircle2, XCircle, AlertCircle,
+  Calendar, MapPin, DollarSign, User, Phone, Mail, Car, Users, Cloud,
+  Key, Hash, Wrench, Truck, Briefcase, CreditCard, Home, Loader2, Copy, Check,
+  Shield, RefreshCw, MessageSquare, FileCheck
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -41,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/ta
 import { Separator } from '../../components/ui/separator';
 import { useAuthStore } from '../../stores/authStore';
 import { toast } from 'sonner';
+import axiosInstance from '../../lib/axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
@@ -105,6 +78,7 @@ interface ClaimDetail {
   proximateCause?: string;
   officerRemarks?: string;
   reviewedAt?: string;
+  assignedOfficer?: string | null;   // UUID of assigned officer
   assignedOfficerName?: string;
   
   // Policy Info
@@ -126,6 +100,7 @@ interface ClaimDetail {
   phone?: string;
   address?: string;
 }
+
 
 const StatusBadge = ({ status }: { status?: string }) => {
   const s = status?.toLowerCase();
@@ -160,11 +135,16 @@ const InfoRow = ({ label, value, icon: Icon }: { label: string; value?: string |
 export default function ClaimDetailsPage() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { token } = useAuthStore();
+  const { token, user } = useAuthStore();
   const [claim, setClaim] = useState<ClaimDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [copied, setCopied] = useState(false);
+  const [updating, setUpdating] = useState(false);
+
+  // UUID validation regex
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  
 
   const getAuthHeaders = () => {
     const stored = localStorage.getItem('awash-auth-storage');
@@ -185,17 +165,18 @@ export default function ClaimDetailsPage() {
     }
   };
 
-  const fetchClaimDetails = async () => {
+    const fetchClaimDetails = async () => {
+    // Extra safety: if id is invalid, don't fetch
+    if (!id || !uuidRegex.test(id)) {
+      navigate('/claims', { replace: true });
+      return;
+    }
     setLoading(true);
     try {
       const response = await fetch(`${API_URL}/claims/${id}`, {
         headers: getAuthHeaders()
       });
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch claim details');
-      }
-      
+      if (!response.ok) throw new Error('Failed to fetch claim details');
       const data = await response.json();
       setClaim(data);
     } catch (error) {
@@ -205,11 +186,34 @@ export default function ClaimDetailsPage() {
       setLoading(false);
     }
   };
+  const updateStatus = async (newStatus: string) => {
+    if (!claim) return;
+    setUpdating(true);
+    try {
+      await axiosInstance.patch(`/claims/${claim.id}/status`, {
+        status: newStatus,
+        notes: `Status updated to ${newStatus} by officer`
+      }, {
+        headers: getAuthHeaders()
+      });
+      toast.success(`Claim ${newStatus.toLowerCase()} successfully`);
+      await fetchClaimDetails();
+    } catch (error: any) {
+      console.error('Failed to update status:', error);
+      toast.error(error.response?.data?.error || 'Failed to update claim status');
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   useEffect(() => {
-    if (id) {
-      fetchClaimDetails();
+    // Validate UUID immediately on mount
+    if (!id || !uuidRegex.test(id)) {
+      toast.error('Invalid claim ID');
+      navigate('/claims', { replace: true });
+      return;
     }
+    fetchClaimDetails();
   }, [id]);
 
   const getStatusIcon = () => {
@@ -221,6 +225,9 @@ export default function ClaimDetailsPage() {
     if (s === 'rejected') return <XCircle className="h-16 w-16 text-red-500" />;
     return <FileText className="h-16 w-16 text-gray-500" />;
   };
+
+  // Check if current user is the assigned officer
+  const isAssignedOfficer = claim?.assignedOfficer === user?.id;
 
   if (loading) {
     return (
@@ -239,7 +246,7 @@ export default function ClaimDetailsPage() {
         <AlertCircle className="h-16 w-16 text-red-300 mx-auto mb-4" />
         <h2 className="text-2xl font-bold text-gray-700">Claim Not Found</h2>
         <p className="text-gray-500 mt-2">The claim you're looking for doesn't exist or you don't have access.</p>
-        <Button onClick={() => navigate('/customer/claims')} className="mt-6 bg-[#1A3E6F]">
+        <Button onClick={() => navigate('/claims')} className="mt-6 bg-[#1A3E6F]">
           Back to Claims
         </Button>
       </div>
@@ -257,10 +264,17 @@ export default function ClaimDetailsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
-        <Button variant="ghost" onClick={() => navigate('/customer/claims')} className="p-0 hover:bg-transparent">
+        <Button variant="ghost" onClick={() => navigate('/claims')} className="p-0 hover:bg-transparent">
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Claims
         </Button>
-        <StatusBadge status={claim.status} />
+        <div className="flex items-center gap-3">
+          <StatusBadge status={claim.status} />
+          {isAssignedOfficer && (
+            <Badge className="bg-green-100 text-green-800 flex items-center gap-1">
+              <Shield className="h-3 w-3" /> Assigned to You
+            </Badge>
+          )}
+        </div>
       </div>
 
       {/* Hero Section */}
@@ -293,6 +307,82 @@ export default function ClaimDetailsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Review Actions (only if assigned) */}
+      {isAssignedOfficer && (
+        <Card className="border-2 border-blue-200 bg-blue-50">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Shield className="h-5 w-5 text-blue-600" />
+              Officer Actions
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-3">
+              {claim.status === 'SUBMITTED' && (
+                <Button 
+                  onClick={() => updateStatus('UNDER_REVIEW')} 
+                  disabled={updating}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {updating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Clock className="h-4 w-4 mr-2" />}
+                  Start Review
+                </Button>
+              )}
+              {(claim.status === 'SUBMITTED' || claim.status === 'UNDER_REVIEW') && (
+                <>
+                  <Button 
+                    onClick={() => updateStatus('APPROVED')} 
+                    disabled={updating}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {updating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+                    Approve
+                  </Button>
+                  <Button 
+                    onClick={() => updateStatus('REJECTED')} 
+                    disabled={updating}
+                    variant="destructive"
+                  >
+                    {updating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <XCircle className="h-4 w-4 mr-2" />}
+                    Reject
+                  </Button>
+                </>
+              )}
+              {claim.status === 'APPROVED' && (
+                <Button 
+                  onClick={() => updateStatus('PAID')} 
+                  disabled={updating}
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
+                  {updating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <DollarSign className="h-4 w-4 mr-2" />}
+                  Mark as Paid
+                </Button>
+              )}
+              <Button 
+                variant="outline" 
+                onClick={fetchClaimDetails} 
+                disabled={updating}
+                className="ml-auto"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" /> Refresh
+              </Button>
+            </div>
+            {updating && <p className="text-sm text-gray-600 mt-2">Processing...</p>}
+          </CardContent>
+        </Card>
+      )}
+
+      {!isAssignedOfficer && claim.assignedOfficer && (
+        <Card className="border-2 border-gray-200 bg-gray-50">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 text-gray-600">
+              <AlertCircle className="h-5 w-5" />
+              <p>You are not assigned to this claim. Review actions are disabled.</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">

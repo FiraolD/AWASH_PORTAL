@@ -2,7 +2,8 @@
 import React, { useEffect, useState } from 'react';
 import { 
   Users, FileText, Shield, DollarSign, Activity, 
-  RefreshCw, TrendingUp, Clock, CheckCircle, AlertCircle 
+  RefreshCw, TrendingUp, Clock, CheckCircle, AlertCircle, 
+  Box
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -22,6 +23,7 @@ interface DashboardStats {
   pendingClaims: number;
   totalRevenue: number;
   newCustomersThisMonth: number;
+  totalproducts?: number;
 }
 
 interface Activity {
@@ -45,7 +47,8 @@ export default function MasterAdminDashboard() {
     activePolicies: 0,
     pendingClaims: 0,
     totalRevenue: 0,
-    newCustomersThisMonth: 0
+    newCustomersThisMonth: 0,
+    totalproducts: 0
   });
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,6 +87,7 @@ export default function MasterAdminDashboard() {
           activePolicies: statsResponse.data.activePolicies || 0,
           pendingClaims: statsResponse.data.pendingClaims || 0,
           totalRevenue: statsResponse.data.totalRevenue || 0,
+          totalproducts: statsResponse.data.totalproducts || 0,
           newCustomersThisMonth: statsResponse.data.newCustomersThisMonth || 0
         });
       }
@@ -226,15 +230,14 @@ export default function MasterAdminDashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Total Premium</p>
-                <p className="text-2xl font-bold text-green-600">{formatCurrency(stats.totalPremium)}</p>
+                <p className="text-sm text-gray-500">Total Products</p>
+                <p className="text-2xl font-bold text-[#1A3E6F]">{stats.totalproducts}</p>
               </div>
               <DollarSign className="h-8 w-8 text-green-500" />
             </div>
           </CardContent>
         </Card>
       </div>
-
       {/* Recent Activities */}
       <Card>
         <CardHeader>

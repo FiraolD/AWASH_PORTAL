@@ -22,6 +22,11 @@ interface ActiveClaim {
   progress: number;
   adjusterName: string;
   submittedDate: string;
+  estimatedAmount?: number;
+  incidentDescription?: string;
+  firstName?: string;
+  lastName?: string;
+  policyType?: string;
 }
 
 export default function ActiveClaimsPage() {
@@ -51,7 +56,23 @@ export default function ActiveClaimsPage() {
       const response = await axios.get(`${API_URL}/claims/active`, {
         headers: getAuthHeaders()
       });
-      setClaims(response.data);
+      const normalizedClaims = (response.data || []).map((claim: any) => ({
+        id: claim.id,
+        claimNumber: claim.claimNumber || 'N/A',
+        customerName: [claim.firstName, claim.lastName].filter(Boolean).join(' ') || 'Unknown customer',
+        type: claim.policyType || claim.type || 'Policy',
+        amount: claim.estimatedAmount || claim.amount || 0,
+        status: claim.status || 'UNKNOWN',
+        progress: 0,
+        adjusterName: claim.assignedOfficerName || 'Unassigned',
+        submittedDate: claim.submittedDate || '',
+        estimatedAmount: claim.estimatedAmount || claim.amount || 0,
+        incidentDescription: claim.incidentDescription || claim.natureOfLoss || 'No description available',
+        firstName: claim.firstName,
+        lastName: claim.lastName,
+        policyType: claim.policyType || claim.type,
+      }));
+      setClaims(normalizedClaims);
     } catch (error) {
       console.error('Failed to fetch active claims:', error);
       toast.error('Failed to load active claims');
@@ -71,8 +92,9 @@ export default function ActiveClaimsPage() {
   };
 
   const filteredClaims = claims.filter(claim =>
-    claim.claimNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    claim.customerName.toLowerCase().includes(searchTerm.toLowerCase())
+    (claim.claimNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (claim.customerName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (claim.incidentDescription || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (loading) {
@@ -109,14 +131,14 @@ export default function ActiveClaimsPage() {
               <div key={claim.id} className="p-4 rounded-xl border border-gray-100">
                 <div className="flex justify-between items-start mb-3">
                   <div><p className="font-semibold text-[#111827]">{claim.claimNumber}</p><p className="text-sm text-gray-500">{claim.customerName} • {claim.type}</p></div>
-                  <Badge className="bg-blue-100 text-blue-800">{claim.status.replace('_', ' ')}</Badge>
+                  <Badge className="bg-blue-100 text-blue-800">{(claim.status || 'UNKNOWN').replace('_', ' ')}</Badge>
                 </div>
                 <div className="space-y-2 mb-3">
                   <div className="flex justify-between text-sm"><span>Progress</span><span className="font-semibold">{getProgressByStatus(claim.status)}%</span></div>
                   <Progress value={getProgressByStatus(claim.status)} className="h-2" />
                 </div>
                 <div className="flex justify-between items-center pt-3 border-t">
-                  <div className="flex items-center gap-2 text-sm text-gray-500"><Clock className="h-4 w-4" /><span>Adjuster: {claim.adjusterName || 'Unassigned'}</span></div>
+                  <div className="flex items-center gap-2 text-sm text-gray-500"><Clock className="h-4 w-4" /><span>{claim.incidentDescription || 'No description available'}</span></div>
                   <div className="flex gap-2"><Button variant="ghost" size="sm" onClick={() => navigate(`/claims-admin/queue`)}><Eye className="h-4 w-4" /></Button><Button variant="ghost" size="sm"><MessageCircle className="h-4 w-4" /></Button></div>
                 </div>
               </div>

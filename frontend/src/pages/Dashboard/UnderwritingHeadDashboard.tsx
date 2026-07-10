@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { 
   TrendingUp, TrendingDown, Award, AlertTriangle, DollarSign, 
   Calendar, Target, Shield, Users, BarChart3, PieChart,
-  Download, Filter, Loader2, Activity, CheckCircle, XCircle
+  Download, Filter, Loader2, Activity, CheckCircle, XCircle, Eye
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -164,7 +164,7 @@ export default function UnderwritingHeadDashboard() {
               <div>
                 <p className="text-sm text-gray-600">Total Policies (YTD)</p>
                 <p className="text-2xl font-bold">{stats.totalPoliciesYTD.toLocaleString()}</p>
-                <p className="text-sm text-green-600 mt-1">↑ 12% vs last year</p>
+                <p className="text-sm text-green-600 mt-1">â†‘ 12% vs last year</p>
               </div>
               <Shield className="h-8 w-8 text-green-600" />
             </div>
@@ -190,7 +190,7 @@ export default function UnderwritingHeadDashboard() {
               <div>
                 <p className="text-sm text-gray-600">Renewal Rate</p>
                 <p className="text-2xl font-bold">{stats.renewalRate}%</p>
-                <p className="text-sm text-green-600 mt-1">↑ 5% from target</p>
+                <p className="text-sm text-green-600 mt-1">â†‘ 5% from target</p>
               </div>
               <Award className="h-8 w-8 text-purple-600" />
             </div>

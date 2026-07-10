@@ -1,4 +1,4 @@
-import pool from '../lib/db.js';
+﻿import pool from '../lib/db.js';
 
 interface Vehicle {
   make?: string;
@@ -11,9 +11,11 @@ interface Vehicle {
 }
 
 interface PremiumCalculationParams {
-  productCode: string;
+  productCode?: string;
+  productType?: string;
   coverageAmount: number;
   termMonths: number;
+  riskScore?: number;
   vehicles?: Vehicle[];
   vehicleCount?: number;
 }
@@ -186,7 +188,8 @@ class PremiumCalculationService {
 
   // Main premium calculation method
   async calculatePremium(params: PremiumCalculationParams): Promise<PremiumResult> {
-    const { productCode, coverageAmount, termMonths, vehicles = [], vehicleCount = vehicles.length || 1 } = params;
+    const { productCode: rawProductCode, productType, coverageAmount, termMonths, vehicles = [], vehicleCount = vehicles.length || 1 } = params;
+    const productCode = rawProductCode || productType || 'GENERAL';
     
     // Get base rate from your premium_rates table
     const { rate: baseRate, tier: coverageTier } = await this.getBaseRate(productCode, coverageAmount);
@@ -257,3 +260,4 @@ class PremiumCalculationService {
 }
 
 export const premiumCalculationService = new PremiumCalculationService();
+
