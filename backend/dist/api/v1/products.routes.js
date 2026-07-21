@@ -230,7 +230,7 @@ router.post('/:productId/fields', authenticate, authorize('MASTER_ADMIN'), async
         "createdAt", 
         "updatedAt"
       ) VALUES (
-        gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, NOW(), NOW()
+        gen_random_uuid()::uuid, $1, $2, $3, $4, $5, $6, $7, NOW(), NOW()
       ) RETURNING *
     `, [productId, fieldName, fieldLabel, fieldType || 'text', isRequired || false, JSON.stringify(options || []), displayOrder || 0]);
         console.log('Product field created:', result.rows[0]);

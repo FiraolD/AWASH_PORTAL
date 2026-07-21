@@ -721,12 +721,26 @@ router.get('/:id/documents/:documentId/download', authenticate, async (req, res)
 });
 router.get('/search', authenticate, async (req, res) => {
     try {
-        const { q } = req.query;
-        if (!q) {
-            return res.status(400).json({ error: 'Search query is required' });
+        const { query } = req.query; // match frontend's `params: { query }`
+        if (!query || query.trim().length < 3) {
+            return res.status(400).json({ error: 'Search query must be at least 3 characters' });
         }
-        const result = await pool.query(`SELECT c.id, c."claimNumber", c.status, c."incidentDate", c."estimatedAmount",
-              p."policyNumber", u."firstName", u."lastName"
+        const searchTerm = `%${query.trim()}%`;
+        const result = await pool.query(`SELECT 
+          c.id, 
+          c."claimNumber", 
+          c.status, 
+          c."incidentDate", 
+          c."estimatedAmount",
+          c."natureOfLoss",
+          c."submittedDate",
+          c."incidentDescription",
+          c."location",
+          c."approvedAmount",
+          c."assignedOfficer",
+          c."officerRemarks",
+          p."policyNumber",
+          CONCAT(u."firstName", ' ', u."lastName") AS "customerName"
        FROM claims c
        JOIN policies p ON p.id = c."policyId"
        JOIN users u ON u.id = c."userId"
@@ -734,8 +748,9 @@ router.get('/search', authenticate, async (req, res) => {
           OR p."policyNumber" ILIKE $1
           OR u."firstName" ILIKE $1
           OR u."lastName" ILIKE $1
+          OR c."natureOfLoss" ILIKE $1
        ORDER BY c."submittedDate" DESC
-       LIMIT 50`, [`%${q}%`]);
+       LIMIT 50`, [searchTerm]);
         res.json(result.rows);
     }
     catch (error) {

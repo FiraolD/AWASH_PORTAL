@@ -107,7 +107,7 @@ router.post('/', authenticate, authorize('MASTER_ADMIN'), async (req, res) => {
         created_at, 
         updated_at
       ) VALUES (
-        gen_random_uuid()::text, 
+        gen_random_uuid()::uuid, 
         $1, $2, $3, $4, $5, $6, $7, true, NOW(), NOW()
       ) RETURNING *
     `, [

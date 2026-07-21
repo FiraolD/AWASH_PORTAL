@@ -1,16 +1,34 @@
 import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Shield, DollarSign, Calendar, AlertCircle, Loader2, CheckCircle, FileText, Eye, Car, Plus, Minus, Info, Copy, Download } from 'lucide-react';
+import {
+  ArrowLeft, Shield, DollarSign, Calendar, AlertCircle, Loader2,
+  CheckCircle, FileText, Eye, Copy, Info, ChevronDown
+} from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Switch } from '../../components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
+import { Textarea } from '../../components/ui/textarea';
+import { Popover, PopoverContent, PopoverTrigger } from '../../components/ui/popover';
+import { Checkbox } from '../../components/ui/checkbox';
 import { useAuthStore } from '../../stores/authStore';
 import PolicyDocuments from '../../components/PolicyDocuments';
 import axiosInstance from '../../lib/axios';
 import { toast } from 'sonner';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
+
+// ----------------------------------------------------------------------------
+// Types
+// ----------------------------------------------------------------------------
+interface CustomField {
+  name: string;
+  label: string;
+  type: 'text' | 'number' | 'date' | 'select' | 'textarea' | 'checkbox';
+  required: boolean;
+  options?: string[];
+  placeholder?: string;
+}
 
 interface Product {
   id: string;
@@ -19,19 +37,7 @@ interface Product {
   description: string;
   requires_approval: boolean;
   is_active: boolean;
-}
-
-interface Vehicle {
-  id: string;
-  make: string;
-  model: string;
-  yearOfMake: string;
-  plateNumber: string;
-  engineNumber: string;
-  chassisNumber: string;
-  vehicleType: string;
-  usage: string;
-  vehicleValue: number;
+  customFields?: CustomField[];
 }
 
 interface Peril {
@@ -66,6 +72,63 @@ interface PremiumCalculation {
   riderBreakdown?: any[];
 }
 
+// ----------------------------------------------------------------------------
+// Multi‑Select Dropdown Component
+// ----------------------------------------------------------------------------
+interface MultiSelectProps {
+  options: { label: string; value: string }[];
+  selected: string[];
+  onChange: (selected: string[]) => void;
+  placeholder?: string;
+}
+
+const MultiSelect: React.FC<MultiSelectProps> = ({
+  options,
+  selected,
+  onChange,
+  placeholder = 'Select...',
+}) => {
+  const handleToggle = (value: string) => {
+    if (selected.includes(value)) {
+      onChange(selected.filter(v => v !== value));
+    } else {
+      onChange([...selected, value]);
+    }
+  };
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" className="w-full justify-between">
+          {selected.length > 0 ? `${selected.length} selected` : placeholder}
+          <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[300px] p-0">
+        <div className="max-h-[200px] overflow-y-auto p-2 space-y-1">
+          {options.map(option => (
+            <div
+              key={option.value}
+              className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded cursor-pointer"
+              onClick={() => handleToggle(option.value)}
+            >
+              <Checkbox
+                checked={selected.includes(option.value)}
+                onCheckedChange={() => handleToggle(option.value)}
+                onClick={e => e.stopPropagation()}
+              />
+              <Label className="flex-1 cursor-pointer select-none">{option.label}</Label>
+            </div>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
+// ----------------------------------------------------------------------------
+// Main Component
+// ----------------------------------------------------------------------------
 export default function BuyNewPolicyPage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
@@ -78,34 +141,32 @@ export default function BuyNewPolicyPage() {
   const [showDocuments, setShowDocuments] = React.useState(false);
   const [createdPolicyId, setCreatedPolicyId] = React.useState('');
   const [createdPolicyNumber, setCreatedPolicyNumber] = React.useState('');
-  const [submissionComplete, setSubmissionComplete] = React.useState(false); // NEW: Track submission status
-  
-  // Vehicle state
-  const [vehicleCount, setVehicleCount] = React.useState<number>(1);
-  const [selectedVehicleIndex, setSelectedVehicleIndex] = React.useState<number>(0);
-  const [vehicles, setVehicles] = React.useState<Vehicle[]>([
-    { id: '1', make: '', model: '', yearOfMake: '', plateNumber: '', engineNumber: '', chassisNumber: '', vehicleType: '', usage: '', vehicleValue: 0 }
-  ]);
-  const [vehicleErrors, setVehicleErrors] = React.useState<Record<string, string>>({});
-  
-  // Perils and Riders state
+  const [submissionComplete, setSubmissionComplete] = React.useState(false);
+
+  // Custom fields state
+  const [customFields, setCustomFields] = React.useState<CustomField[]>([]);
+  const [fieldValues, setFieldValues] = React.useState<Record<string, any>>({});
+  const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
+  const [fetchingFields, setFetchingFields] = React.useState(false);
+
+  // Perils & Riders (optional)
   const [availablePerils, setAvailablePerils] = React.useState<Peril[]>([]);
   const [availableRiders, setAvailableRiders] = React.useState<Rider[]>([]);
   const [selectedPerils, setSelectedPerils] = React.useState<string[]>([]);
   const [selectedRiders, setSelectedRiders] = React.useState<string[]>([]);
-  
+
   const [formData, setFormData] = React.useState({
     productType: '',
     productId: '',
     coverageAmount: 500000,
     termMonths: 12,
     effectiveDate: new Date().toISOString().split('T')[0],
-    productDetails: {} as Record<string, any>
+    productDetails: {} as Record<string, any>,
   });
 
-  const vehicleTypes = ['Sedan', 'SUV', 'Truck', 'Motorcycle', 'Van', 'Bus', 'Pickup', 'Luxury'];
-  const usageOptions = ['Private', 'Commercial', 'Rental', 'Government', 'Taxi', 'Ride-sharing'];
-
+  // ----------------------------------------------------------------------------
+  // Data fetching
+  // ----------------------------------------------------------------------------
   React.useEffect(() => {
     fetchProducts();
   }, []);
@@ -114,32 +175,13 @@ export default function BuyNewPolicyPage() {
     if (formData.coverageAmount >= 100000 && formData.productType) {
       calculatePremium();
     }
-  }, [formData.coverageAmount, formData.productType, formData.termMonths, vehicles, selectedPerils, selectedRiders]);
+  }, [formData.coverageAmount, formData.productType, formData.termMonths, selectedPerils, selectedRiders, fieldValues]);
 
   React.useEffect(() => {
     if (formData.productId && formData.productType) {
       fetchPerilsAndRiders();
     }
   }, [formData.productId, formData.productType]);
-
-  React.useEffect(() => {
-    const newVehicles = [...vehicles];
-    if (vehicleCount > vehicles.length) {
-      for (let i = vehicles.length; i < vehicleCount; i++) {
-        newVehicles.push({
-          id: Date.now().toString() + i,
-          make: '', model: '', yearOfMake: '', plateNumber: '', engineNumber: '', chassisNumber: '', vehicleType: '', usage: '', vehicleValue: 0
-        });
-      }
-    } else if (vehicleCount < vehicles.length) {
-      newVehicles.splice(vehicleCount);
-    }
-    setVehicles(newVehicles);
-    
-    if (selectedVehicleIndex >= vehicleCount) {
-      setSelectedVehicleIndex(0);
-    }
-  }, [vehicleCount]);
 
   const fetchProducts = async () => {
     try {
@@ -151,15 +193,95 @@ export default function BuyNewPolicyPage() {
     }
   };
 
+const fetchCustomFields = async (productId: string, productType: string) => {
+  setFetchingFields(true);
+  try {
+    // Attempt 1: Direct product endpoint
+    try {
+      const res = await axiosInstance.get(`/products/${productId}`);
+      const product = res.data;
+      
+      // Check multiple possible property names
+      let fields = product.customFields || product.fields || product.formFields || product.productFields;
+      
+      if (Array.isArray(fields) && fields.length > 0) {
+        console.log('[fetchCustomFields] Found fields in product:', fields);
+        setCustomFields(normalizeFields(fields));
+        return;
+      }
+    } catch { /* ignore */ }
+
+    // Attempt 2: Dedicated fields endpoint
+    try {
+      const res = await axiosInstance.get(`/products/${productId}/fields`);
+      if (Array.isArray(res.data) && res.data.length > 0) {
+        console.log('[fetchCustomFields] Found fields via /fields endpoint:', res.data);
+        setCustomFields(normalizeFields(res.data));
+        return;
+      }
+    } catch { /* ignore */ }
+
+    // Attempt 3: Fields by product type code
+    if (productType) {
+      try {
+        const res = await axiosInstance.get(`/policies/fields/${productType}`);
+        if (Array.isArray(res.data) && res.data.length > 0) {
+          console.log('[fetchCustomFields] Found fields via type endpoint:', res.data);
+          setCustomFields(normalizeFields(res.data));
+          return;
+        }
+      } catch { /* ignore */ }
+    }
+
+    // If no fields found
+    console.warn('[fetchCustomFields] No fields found for product:', productId);
+    setCustomFields([]);
+  } catch (error) {
+    console.error('[fetchCustomFields] Error:', error);
+    toast.error('Could not load product fields');
+    setCustomFields([]);
+  } finally {
+    setFetchingFields(false);
+  }
+};
+
+// Normalize field definitions to match our expected format
+const normalizeFields = (fields: any[]): CustomField[] => {
+  return fields.map((field: any) => ({
+    name: field.name || field.fieldName || field.key || field.id || '',
+    label: field.label || field.displayName || field.title || field.name || field.fieldName || 'Unnamed Field',
+    type: normalizeFieldType(field.type || field.fieldType || 'text'),
+    required: field.required || field.isRequired || false,
+    options: field.options || field.choices || field.selectOptions || [],
+    placeholder: field.placeholder || field.hint || ''
+  }));
+};
+
+const normalizeFieldType = (type: string): CustomField['type'] => {
+  const typeMap: Record<string, CustomField['type']> = {
+    'string': 'text',
+    'integer': 'number',
+    'decimal': 'number',
+    'float': 'number',
+    'boolean': 'checkbox',
+    'datetime': 'date',
+    'dropdown': 'select',
+    'choice': 'select',
+    'enum': 'select',
+    'multiline': 'textarea',
+  };
+  return typeMap[type.toLowerCase()] || 'text';
+};
+
   const fetchPerilsAndRiders = async () => {
     try {
       const [perilsRes, ridersRes] = await Promise.all([
         axiosInstance.get(`/policies/perils/${formData.productType}`),
-        axiosInstance.get(`/policies/riders/${formData.productType}`)
+        axiosInstance.get(`/policies/riders/${formData.productType}`),
       ]);
       setAvailablePerils(perilsRes.data);
       setAvailableRiders(ridersRes.data);
-      
+      // Set default perils (those that are marked as default)
       const defaultPerilIds = perilsRes.data.filter((p: Peril) => p.isDefault).map((p: Peril) => p.id);
       setSelectedPerils(defaultPerilIds);
     } catch (error) {
@@ -172,23 +294,16 @@ export default function BuyNewPolicyPage() {
       toast.warning('Coverage amount must be at least ETB 100,000');
       return;
     }
-    
+
     setCalculating(true);
     try {
-      const vehicleData = vehicles.filter(v => v.make || v.model).map(v => ({
-        vehicleValue: v.vehicleValue,
-        vehicleType: v.vehicleType,
-        usage: v.usage,
-        yearOfMake: v.yearOfMake
-      }));
-      
       const response = await axiosInstance.post('/policies/calculate-premium', {
         productType: formData.productType,
         coverageAmount: formData.coverageAmount,
         termMonths: formData.termMonths,
-        vehicles: vehicleData,
-        selectedPerils: selectedPerils,
-        selectedRiders: selectedRiders
+        productDetails: fieldValues,
+        selectedPerils,
+        selectedRiders,
       });
       setPremiumResult(response.data);
     } catch (error) {
@@ -199,38 +314,125 @@ export default function BuyNewPolicyPage() {
     }
   };
 
-  const handleProductSelect = (product: Product) => {
-    setFormData({ 
-      ...formData, 
+  // ----------------------------------------------------------------------------
+  // Product selection & custom fields
+  // ----------------------------------------------------------------------------
+  const handleProductSelect = async (product: Product) => {
+    setFormData({
+      ...formData,
       productType: product.code,
-      productId: product.id 
+      productId: product.id,
     });
+    setFieldValues({});
+    setFieldErrors({});
+
+    // If product already contains customFields (rare), use them
+    if (product.customFields && product.customFields.length > 0) {
+      setCustomFields(product.customFields);
+      setStep(2);
+      return;
+    }
+
+    // Otherwise, fetch them dynamically
+    await fetchCustomFields(product.id, product.code);
     setStep(2);
   };
 
-  const handleVehicleChange = (field: keyof Vehicle, value: any) => {
-    const updatedVehicles = [...vehicles];
-    updatedVehicles[selectedVehicleIndex] = {
-      ...updatedVehicles[selectedVehicleIndex],
-      [field]: value
-    };
-    setVehicles(updatedVehicles);
+  const handleFieldChange = (fieldName: string, value: any) => {
+    setFieldValues(prev => ({ ...prev, [fieldName]: value }));
+    if (fieldErrors[fieldName]) {
+      setFieldErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[fieldName];
+        return newErrors;
+      });
+    }
   };
 
-  const validateVehicles = () => {
+  const validateCustomFields = () => {
     const errors: Record<string, string> = {};
-    const currentVehicle = vehicles[selectedVehicleIndex];
-    
-    if (!currentVehicle.make) errors.make = 'Make is required';
-    if (!currentVehicle.model) errors.model = 'Model is required';
-    if (!currentVehicle.yearOfMake) errors.yearOfMake = 'Year is required';
-    if (!currentVehicle.plateNumber) errors.plateNumber = 'Plate number is required';
-    if (!currentVehicle.vehicleValue || currentVehicle.vehicleValue < 100000) errors.vehicleValue = 'Value must be at least ETB 100,000';
-    
-    setVehicleErrors(errors);
+    customFields.forEach(field => {
+      if (field.required) {
+        const value = fieldValues[field.name];
+        if (value === undefined || value === null || (typeof value === 'string' && value.trim() === '')) {
+          errors[field.name] = `${field.label} is required`;
+        }
+      }
+    });
+    setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
+  // ----------------------------------------------------------------------------
+  // Render field helper
+  // ----------------------------------------------------------------------------
+  const renderField = (field: CustomField) => {
+    const value = fieldValues[field.name] ?? '';
+    const error = fieldErrors[field.name];
+
+    switch (field.type) {
+      case 'text':
+      case 'number':
+        return (
+          <Input
+            type={field.type}
+            placeholder={field.placeholder || field.label}
+            value={value}
+            onChange={e => handleFieldChange(field.name, e.target.value)}
+            className={error ? 'border-red-500' : ''}
+          />
+        );
+      case 'date':
+        return (
+          <Input
+            type="date"
+            value={value}
+            onChange={e => handleFieldChange(field.name, e.target.value)}
+            className={error ? 'border-red-500' : ''}
+          />
+        );
+      case 'select':
+        return (
+          <Select value={value} onValueChange={(val) => handleFieldChange(field.name, val)}>
+            <SelectTrigger className={error ? 'border-red-500' : ''}>
+              <SelectValue placeholder="Select..." />
+            </SelectTrigger>
+            <SelectContent>
+              {field.options?.map(opt => (
+                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        );
+      case 'textarea':
+        return (
+          <Textarea
+            placeholder={field.placeholder || field.label}
+            value={value}
+            onChange={e => handleFieldChange(field.name, e.target.value)}
+            className={error ? 'border-red-500' : ''}
+          />
+        );
+      case 'checkbox':
+        return (
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={!!value}
+              onChange={e => handleFieldChange(field.name, e.target.checked)}
+              className="h-4 w-4"
+            />
+            <Label>{field.label}</Label>
+          </div>
+        );
+      default:
+        return <Input value={value} onChange={e => handleFieldChange(field.name, e.target.value)} />;
+    }
+  };
+
+  // ----------------------------------------------------------------------------
+  // Submission
+  // ----------------------------------------------------------------------------
   const copyPolicyNumber = () => {
     if (createdPolicyNumber) {
       navigator.clipboard.writeText(createdPolicyNumber);
@@ -243,27 +445,18 @@ export default function BuyNewPolicyPage() {
       toast.error('Please select a product and enter coverage amount');
       return;
     }
-
     if (!premiumResult) {
       toast.error('Please wait for premium calculation');
       return;
     }
-
     if (!agreedToTerms) {
       toast.error('Please agree to the terms and conditions');
       return;
     }
-
-    let allVehiclesValid = true;
-    for (let i = 0; i < vehicles.length; i++) {
-      setSelectedVehicleIndex(i);
-      if (!validateVehicles()) {
-        allVehiclesValid = false;
-        toast.error(`Please complete all fields for Vehicle ${i + 1}`);
-        break;
-      }
+    if (!validateCustomFields()) {
+      toast.error('Please fill in all required fields');
+      return;
     }
-    if (!allVehiclesValid) return;
 
     setLoading(true);
     try {
@@ -273,20 +466,16 @@ export default function BuyNewPolicyPage() {
         premiumFrequency: formData.termMonths === 12 ? 'ANNUALLY' : formData.termMonths === 3 ? 'QUARTERLY' : 'MONTHLY',
         effectiveDate: formData.effectiveDate,
         expirationDate: new Date(new Date(formData.effectiveDate).setFullYear(new Date(formData.effectiveDate).getFullYear() + 1)).toISOString().split('T')[0],
-        productDetails: formData.productDetails,
-        vehicles: vehicles,
-        selectedPerils: selectedPerils,
-        selectedRiders: selectedRiders
+        productDetails: fieldValues,
+        selectedPerils,
+        selectedRiders,
       };
-      
+
       const response = await axiosInstance.post('/policies', payload);
-      
       setCreatedPolicyId(response.data.policyId);
       setCreatedPolicyNumber(response.data.policyNumber);
-      setSubmissionComplete(true); // Mark submission as complete
-      
+      setSubmissionComplete(true);
       toast.success('Policy application submitted successfully!');
-      
     } catch (error: any) {
       console.error('Failed to create policy:', error);
       toast.error(error.response?.data?.error || 'Failed to submit policy application');
@@ -305,9 +494,10 @@ export default function BuyNewPolicyPage() {
   };
 
   const selectedProduct = products.find(p => p.code === formData.productType);
-  const currentVehicle = vehicles[selectedVehicleIndex];
 
-  // If submission is complete, show success page with policy number
+  // ----------------------------------------------------------------------------
+  // Success page (unchanged from earlier correct version)
+  // ----------------------------------------------------------------------------
   if (submissionComplete) {
     return (
       <div className="space-y-6">
@@ -320,41 +510,27 @@ export default function BuyNewPolicyPage() {
             <div className="h-16 w-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="h-8 w-8 text-green-600" />
             </div>
-            
             <h2 className="text-2xl font-bold text-green-800 mb-2">Application Submitted Successfully!</h2>
             <p className="text-green-700 mb-6">Your policy application has been received and is pending review.</p>
-            
             <div className="bg-white rounded-lg p-6 max-w-md mx-auto mb-6">
               <p className="text-sm text-gray-500 mb-2">Your Policy Number</p>
               <div className="flex items-center justify-center gap-3">
                 <p className="text-2xl font-bold text-[#1A3E6F]">{createdPolicyNumber}</p>
-                <button 
-                  onClick={copyPolicyNumber}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  title="Copy policy number"
-                >
+                <button onClick={copyPolicyNumber} className="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="Copy policy number">
                   <Copy className="h-5 w-5 text-gray-500" />
                 </button>
               </div>
               <p className="text-xs text-gray-400 mt-2">Please save this policy number for future reference</p>
             </div>
-            
             <div className="flex gap-4 justify-center">
-              <Button onClick={handleViewPolicies} className="bg-[#1A3E6F] hover:bg-[#153358]">
-                View My Policies
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => setShowDocuments(true)}
-              >
-                <FileText className="mr-2 h-4 w-4" />
-                View Policy Documents
+              <Button onClick={handleViewPolicies} className="bg-[#1A3E6F] hover:bg-[#153358]">View My Policies</Button>
+              <Button variant="outline" onClick={() => setShowDocuments(true)}>
+                <FileText className="mr-2 h-4 w-4" /> View Policy Documents
               </Button>
             </div>
           </CardContent>
         </Card>
-        
-        {/* Policy Documents Modal */}
+
         {createdPolicyId && (
           <PolicyDocuments policyId={createdPolicyId} policyNumber={createdPolicyNumber} open={showDocuments} onClose={handleDocumentsClose} />
         )}
@@ -362,6 +538,9 @@ export default function BuyNewPolicyPage() {
     );
   }
 
+  // ----------------------------------------------------------------------------
+  // Main render
+  // ----------------------------------------------------------------------------
   return (
     <div className="space-y-6">
       <Button variant="ghost" onClick={() => navigate('/customer/policies')} className="p-0 hover:bg-transparent">
@@ -421,7 +600,7 @@ export default function BuyNewPolicyPage() {
               <CardContent className="space-y-4">
                 <div>
                   <Label>Coverage Amount (ETB)</Label>
-                  <Input 
+                  <Input
                     type="number"
                     value={formData.coverageAmount}
                     onChange={(e) => setFormData({ ...formData, coverageAmount: parseInt(e.target.value) })}
@@ -432,7 +611,7 @@ export default function BuyNewPolicyPage() {
                 </div>
                 <div>
                   <Label>Term (Months)</Label>
-                  <select 
+                  <select
                     className="w-full rounded-lg border border-gray-200 p-2"
                     value={formData.termMonths}
                     onChange={(e) => setFormData({ ...formData, termMonths: parseInt(e.target.value) })}
@@ -445,7 +624,7 @@ export default function BuyNewPolicyPage() {
                 </div>
                 <div>
                   <Label>Effective Date</Label>
-                  <Input 
+                  <Input
                     type="date"
                     value={formData.effectiveDate}
                     onChange={(e) => setFormData({ ...formData, effectiveDate: e.target.value })}
@@ -455,199 +634,98 @@ export default function BuyNewPolicyPage() {
               </CardContent>
             </Card>
 
-            {/* Vehicles Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Car className="h-5 w-5" />
-                  Vehicles Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                  <Label className="text-sm font-medium flex items-center gap-2 text-blue-800">
-                    <Info className="h-4 w-4" />
-                    How many vehicles do you want to insure?
-                  </Label>
-                  <div className="flex items-center gap-4 mt-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setVehicleCount(Math.max(1, vehicleCount - 1))}
-                      disabled={vehicleCount <= 1}
-                    >
-                      <Minus className="h-4 w-4" />
-                    </Button>
-                    <span className="text-3xl font-bold min-w-[80px] text-center text-blue-600">
-                      {vehicleCount}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setVehicleCount(Math.min(5, vehicleCount + 1))}
-                      disabled={vehicleCount >= 5}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                    <span className="text-base font-medium text-gray-700">
-                      {vehicleCount === 1 ? 'Vehicle' : 'Vehicles'}
-                    </span>
-                  </div>
-                </div>
-
-                {vehicleCount > 1 && (
-                  <div>
-                    <Label>Select Vehicle to Edit</Label>
-                    <Select value={selectedVehicleIndex.toString()} onValueChange={(val) => setSelectedVehicleIndex(parseInt(val))}>
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Select vehicle" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {vehicles.map((_, idx) => (
-                          <SelectItem key={idx} value={idx.toString()}>
-                            Vehicle {idx + 1} {vehicles[idx].make && vehicles[idx].model ? `- ${vehicles[idx].make} ${vehicles[idx].model}` : ''}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                <div className="border-t pt-4">
-                  <h4 className="font-medium mb-4">Vehicle {selectedVehicleIndex + 1} Details</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label>Make *</Label>
-                      <Input value={currentVehicle.make} onChange={(e) => handleVehicleChange('make', e.target.value)} placeholder="e.g., Toyota" />
-                      {vehicleErrors.make && <p className="text-xs text-red-500 mt-1">{vehicleErrors.make}</p>}
-                    </div>
-                    <div>
-                      <Label>Model *</Label>
-                      <Input value={currentVehicle.model} onChange={(e) => handleVehicleChange('model', e.target.value)} placeholder="e.g., Camry" />
-                      {vehicleErrors.model && <p className="text-xs text-red-500 mt-1">{vehicleErrors.model}</p>}
-                    </div>
-                    <div>
-                      <Label>Year *</Label>
-                      <Input type="number" value={currentVehicle.yearOfMake} onChange={(e) => handleVehicleChange('yearOfMake', e.target.value)} placeholder="e.g., 2023" />
-                      {vehicleErrors.yearOfMake && <p className="text-xs text-red-500 mt-1">{vehicleErrors.yearOfMake}</p>}
-                    </div>
-                    <div>
-                      <Label>Vehicle Type</Label>
-                      <Select value={currentVehicle.vehicleType} onValueChange={(val) => handleVehicleChange('vehicleType', val)}>
-                        <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
-                        <SelectContent>{vehicleTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Usage</Label>
-                      <Select value={currentVehicle.usage} onValueChange={(val) => handleVehicleChange('usage', val)}>
-                        <SelectTrigger><SelectValue placeholder="Select usage" /></SelectTrigger>
-                        <SelectContent>{usageOptions.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Plate Number *</Label>
-                      <Input value={currentVehicle.plateNumber} onChange={(e) => handleVehicleChange('plateNumber', e.target.value)} placeholder="e.g., AA-1234" />
-                      {vehicleErrors.plateNumber && <p className="text-xs text-red-500 mt-1">{vehicleErrors.plateNumber}</p>}
-                    </div>
-                    <div>
-                      <Label>Engine Number</Label>
-                      <Input value={currentVehicle.engineNumber} onChange={(e) => handleVehicleChange('engineNumber', e.target.value)} placeholder="Engine number" />
-                    </div>
-                    <div>
-                      <Label>Chassis Number</Label>
-                      <Input value={currentVehicle.chassisNumber} onChange={(e) => handleVehicleChange('chassisNumber', e.target.value)} placeholder="Chassis number" />
-                    </div>
-                    <div>
-                      <Label>Vehicle Value (ETB) *</Label>
-                      <Input type="number" value={currentVehicle.vehicleValue || ''} onChange={(e) => handleVehicleChange('vehicleValue', parseFloat(e.target.value))} placeholder="Minimum ETB 100,000" />
-                      {vehicleErrors.vehicleValue && <p className="text-xs text-red-500 mt-1">{vehicleErrors.vehicleValue}</p>}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Perils Section */}
-            {availablePerils.length > 0 && (
+            {/* Dynamic Custom Fields */}
+            {fetchingFields ? (
+              <Card>
+                <CardContent className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-blue-600 mr-2" />
+                  <span>Loading product details...</span>
+                </CardContent>
+              </Card>
+            ) : customFields.length > 0 ? (
               <Card>
                 <CardHeader>
-                  <CardTitle>Perils Coverage</CardTitle>
-                  <CardDescription>Select which perils you want to be covered for</CardDescription>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Info className="h-5 w-5" />
+                    Policy Details
+                  </CardTitle>
+                  <CardDescription>
+                    Fill in the required information for your {selectedProduct.name} policy
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
-                    {availablePerils.map((peril) => (
-                      <div key={peril.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div>
-                          <p className="font-medium">{peril.perilName}</p>
-                          <p className="text-sm text-gray-500">{peril.description}</p>
-                          <p className="text-xs text-blue-600">
-                            Premium: {peril.calculationType === 'PERCENTAGE' 
-                              ? `${(peril.premiumRate * 100).toFixed(2)}% of coverage` 
-                              : `ETB ${peril.premiumRate.toLocaleString()}`}
-                          </p>
-                        </div>
-                        <Switch
-                          checked={selectedPerils.includes(peril.id)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedPerils([...selectedPerils, peril.id]);
-                            } else {
-                              setSelectedPerils(selectedPerils.filter(id => id !== peril.id));
-                            }
-                          }}
-                          disabled={peril.isDefault}
-                        />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {customFields.map(field => (
+                      <div key={field.name} className={field.type === 'textarea' ? 'col-span-full' : ''}>
+                        <Label className={field.required ? "after:content-['*'] after:ml-0.5 after:text-red-500" : ""}>
+                          {field.label}
+                        </Label>
+                        {renderField(field)}
+                        {fieldErrors[field.name] && (
+                          <p className="text-xs text-red-500 mt-1">{fieldErrors[field.name]}</p>
+                        )}
                       </div>
                     ))}
                   </div>
                 </CardContent>
               </Card>
+            ) : (
+              <Card>
+                <CardContent className="py-8 text-center text-gray-500">
+                  No additional details required for this product.
+                </CardContent>
+              </Card>
             )}
 
-            {/* Riders Section */}
+            {/* Perils Section (Optional) */}
+            {availablePerils.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Perils Coverage</CardTitle>
+                  <CardDescription>
+                    Select which perils you want to be covered for (optional)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <MultiSelect
+                    placeholder="No perils selected..."
+                    options={availablePerils.map(p => ({
+                      label: `${p.perilName} (${p.calculationType === 'PERCENTAGE' ? (p.premiumRate * 100).toFixed(2) + '%' : 'ETB ' + p.premiumRate.toLocaleString()})`,
+                      value: p.id,
+                    }))}
+                    selected={selectedPerils}
+                    onChange={setSelectedPerils}
+                  />
+             
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Riders Section (Optional) */}
             {availableRiders.length > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle>Optional Riders</CardTitle>
-                  <CardDescription>Enhance your coverage with optional riders</CardDescription>
+                  <CardDescription>
+                    Enhance your coverage with optional riders (optional)
+                  </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {availableRiders.map((rider) => (
-                      <div key={rider.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div>
-                          <p className="font-medium">{rider.riderName}</p>
-                          <p className="text-sm text-gray-500">{rider.description}</p>
-                          <p className="text-xs text-blue-600">
-                            Premium: {rider.calculationType === 'PERCENTAGE' 
-                              ? `${(rider.premiumRate * 100).toFixed(2)}% of coverage` 
-                              : `ETB ${rider.premiumRate.toLocaleString()}`}
-                            {rider.maxLimit && ` (Max: ETB ${rider.maxLimit.toLocaleString()})`}
-                          </p>
-                        </div>
-                        <Switch
-                          checked={selectedRiders.includes(rider.id)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedRiders([...selectedRiders, rider.id]);
-                            } else {
-                              setSelectedRiders(selectedRiders.filter(id => id !== rider.id));
-                            }
-                          }}
-                        />
-                      </div>
-                    ))}
-                  </div>
+                <CardContent className="space-y-4">
+                  <MultiSelect
+                    placeholder="No riders selected..."
+                    options={availableRiders.map(r => ({
+                      label: `${r.riderName} (${r.calculationType === 'PERCENTAGE' ? (r.premiumRate * 100).toFixed(2) + '%' : 'ETB ' + r.premiumRate.toLocaleString()})`,
+                      value: r.id,
+                    }))}
+                    selected={selectedRiders}
+                    onChange={setSelectedRiders}
+                  />
                 </CardContent>
               </Card>
             )}
           </div>
 
-          {/* Premium Summary */}
+          {/* Premium Summary (unchanged) */}
           <div>
             <Card className="sticky top-6">
               <CardHeader>
@@ -666,21 +744,18 @@ export default function BuyNewPolicyPage() {
                         <span className="text-gray-600">Basic Premium:</span>
                         <span className="font-medium">ETB {premiumResult.basicPremium?.toLocaleString()}</span>
                       </div>
-                      
                       {premiumResult.perilPremium > 0 && (
                         <div className="flex justify-between text-sm text-gray-600">
                           <span>Perils Premium:</span>
                           <span>ETB {premiumResult.perilPremium?.toLocaleString()}</span>
                         </div>
                       )}
-                      
                       {premiumResult.riderPremium > 0 && (
                         <div className="flex justify-between text-sm text-gray-600">
                           <span>Riders Premium:</span>
                           <span>ETB {premiumResult.riderPremium?.toLocaleString()}</span>
                         </div>
                       )}
-                      
                       <div className="flex justify-between text-sm text-gray-600">
                         <span>VAT (15%):</span>
                         <span>ETB {premiumResult.vatAmount?.toLocaleString()}</span>
@@ -689,7 +764,6 @@ export default function BuyNewPolicyPage() {
                         <span>DRR (1%):</span>
                         <span>ETB {premiumResult.drrAmount?.toLocaleString()}</span>
                       </div>
-                      
                       <div className="flex justify-between font-bold pt-2 border-t mt-2">
                         <span>Total Premium ({formData.termMonths} months):</span>
                         <span className="text-blue-600">ETB {premiumResult.totalPremium?.toLocaleString()}</span>
@@ -699,7 +773,6 @@ export default function BuyNewPolicyPage() {
                         <span className="font-semibold">ETB {premiumResult.monthlyPremium?.toLocaleString()}</span>
                       </div>
                     </div>
-                    
                     <Button className="w-full mt-4" onClick={() => setStep(3)}>
                       Continue to Review
                     </Button>
@@ -735,14 +808,19 @@ export default function BuyNewPolicyPage() {
                   </div>
                 </div>
 
-                {vehicles.length > 0 && (
+                {/* Custom fields in review */}
+                {customFields.length > 0 && (
                   <div className="bg-gray-50 rounded-lg p-4">
-                    <h4 className="font-medium mb-2">Vehicles Covered ({vehicles.length})</h4>
-                    <div className="space-y-2">
-                      {vehicles.map((vehicle, idx) => (
-                        <div key={idx} className="border-t pt-2 first:border-t-0 first:pt-0">
-                          <p className="font-medium">Vehicle {idx + 1}: {vehicle.make} {vehicle.model} ({vehicle.yearOfMake})</p>
-                          <p className="text-sm text-gray-600">Plate: {vehicle.plateNumber} | Value: ETB {vehicle.vehicleValue?.toLocaleString()}</p>
+                    <h4 className="font-medium mb-2">Additional Details</h4>
+                    <div className="space-y-2 text-sm">
+                      {customFields.map(field => (
+                        <div key={field.name} className="flex justify-between">
+                          <span className="text-gray-600">{field.label}:</span>
+                          <span>
+                            {field.type === 'checkbox'
+                              ? fieldValues[field.name] ? 'Yes' : 'No'
+                              : fieldValues[field.name] || 'N/A'}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -754,7 +832,9 @@ export default function BuyNewPolicyPage() {
                     <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0" />
                     <div>
                       <p className="text-sm font-medium text-yellow-800">Before You Proceed</p>
-                      <p className="text-xs text-yellow-700 mt-1">Please review the policy documents carefully. By purchasing this policy, you agree to all terms, conditions, exclusions, and disclaimers.</p>
+                      <p className="text-xs text-yellow-700 mt-1">
+                        Please review the policy documents carefully. By purchasing this policy, you agree to all terms, conditions, exclusions, and disclaimers.
+                      </p>
                       <button onClick={() => setShowDocuments(true)} className="text-xs text-blue-600 hover:underline mt-2 flex items-center gap-1">
                         <Eye className="h-3 w-3" /> View Policy Documents
                       </button>
@@ -763,7 +843,13 @@ export default function BuyNewPolicyPage() {
                 </div>
 
                 <div className="flex items-start gap-3 mt-4">
-                  <input type="checkbox" id="agreeToTerms" checked={agreedToTerms} onChange={(e) => setAgreedToTerms(e.target.checked)} className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                  <input
+                    type="checkbox"
+                    id="agreeToTerms"
+                    checked={agreedToTerms}
+                    onChange={(e) => setAgreedToTerms(e.target.checked)}
+                    className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
                   <label htmlFor="agreeToTerms" className="text-sm text-gray-700">
                     I confirm that I have read, understood, and agree to be bound by the Policy Documents.
                   </label>
@@ -795,13 +881,15 @@ export default function BuyNewPolicyPage() {
                     <span className="font-semibold">ETB {premiumResult.monthlyPremium?.toLocaleString()}</span>
                   </div>
                 </div>
-                
+
                 <Button onClick={handleSubmit} disabled={loading || !agreedToTerms} className="w-full bg-green-600 hover:bg-green-700">
                   {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
                   {loading ? 'Processing...' : 'Confirm & Purchase'}
                 </Button>
-                
-                <Button variant="outline" className="w-full" onClick={() => setStep(2)}>Back to Edit</Button>
+
+                <Button variant="outline" className="w-full" onClick={() => setStep(2)}>
+                  Back to Edit
+                </Button>
               </CardContent>
             </Card>
           </div>

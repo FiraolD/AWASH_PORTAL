@@ -120,6 +120,7 @@
     "data-uri-to-buffer": "^4.0.1",
     "date-fns": "^4.1.0",
     "date-fns-jalali": "^4.1.0-0",
+    "debounce": "^3.0.0",
     "debug": "^4.4.3",
     "decimal.js-light": "^2.5.1",
     "deep-is": "^0.1.4",

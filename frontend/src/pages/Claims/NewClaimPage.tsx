@@ -1,893 +1,903 @@
-﻿import * as React from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Upload, X, FileText, AlertCircle, Plus, Minus, User, Car, Camera, MapPin, Calendar, Clock, FileCheck, Users, Flag, Cloud, Sun, Umbrella, Wind, CheckCircle, Copy, Download, Home, Phone, Mail, Check } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import {
+  ArrowLeft, FileText, AlertCircle, Loader2, CheckCircle, Shield,
+  Calendar, ClipboardList, Car, Heart, Flame, Plane, User, FileCheck,
+  Hospital, Plus, Info, Users, UserCheck
+} from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
+import { Badge } from '../../components/ui/badge';
+import axiosInstance from '../../lib/axios';
 import { useAuthStore } from '../../stores/authStore';
-import { usePolicyStore } from '../../stores/policyStore';
-import axios from 'axios';
 import { toast } from 'sonner';
+import { formatCurrency } from '../../lib/utils';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
-
-const natureOfLossOptions = [
-    'Accident - Collision',
-    'Accident - Rollover',
-    'Theft',
-    'Vandalism',
-    'Fire',
-    'Flood',
-    'Earthquake',
-    'Storm Damage',
-    'Burglary',
-    'Medical Emergency',
-    'Death',
-    'Other'
-];
-
-const roadConditionsOptions = [
-    'Dry',
-    'Wet',
-    'Icy',
-    'Snowy',
-    'Muddy',
-    'Under Construction',
-    'Poor Lighting',
-    'Rough Road',
-    'Slippery'
-];
-
-const weatherConditionsOptions = [
-    'Clear',
-    'Rainy',
-    'Foggy',
-    'Snowy',
-    'Stormy',
-    'Windy',
-    'Cloudy',
-    'Hail'
-];
-
-const responsiblePartyOptions = [
-    'Claimant',
-    'Third Party',
-    'Both',
-    'Unknown',
-    'Under Investigation'
-];
-
-interface InjuredPerson {
-    name: string;
-    age: number;
-    injuryType: string;
-    hospitalName: string;
+// ----------------------------------------------------------------------------
+// Types
+// ----------------------------------------------------------------------------
+interface PolicyBeneficiary {
+  id: string;
+  fullName: string;
+  relationship: string;
+  percentage?: number;
 }
 
+interface Policy {
+  id: string;
+  policyNumber: string;
+  type: string;
+  productName: string;
+  coverageAmount: number;
+  effectiveDate: string;
+  expirationDate: string;
+  status: string;
+  productId?: string;
+  productCode?: string;
+  policyHolderName?: string;
+  beneficiaries?: PolicyBeneficiary[];
+}
+
+interface CustomField {
+  name: string;
+  label: string;
+  type: 'text' | 'number' | 'date' | 'select' | 'textarea' | 'checkbox';
+  required: boolean;
+  options?: string[];
+  placeholder?: string;
+  section?: string;
+}
+
+// ----------------------------------------------------------------------------
+// Default fields by product type (fallback if backend returns nothing)
+// ----------------------------------------------------------------------------
+const DEFAULT_FIELDS_BY_TYPE: Record<string, CustomField[]> = {
+  MOTOR: [
+    { name: 'vehicle_make', label: 'Vehicle Make', type: 'text', required: true, section: 'Vehicle' },
+    { name: 'vehicle_model', label: 'Vehicle Model', type: 'text', required: true, section: 'Vehicle' },
+    { name: 'vehicle_year', label: 'Vehicle Year', type: 'number', required: true, section: 'Vehicle' },
+    { name: 'plate_number', label: 'Plate Number', type: 'text', required: true, section: 'Vehicle' },
+    { name: 'engine_number', label: 'Engine Number', type: 'text', required: false, section: 'Vehicle' },
+    { name: 'chassis_number', label: 'Chassis Number', type: 'text', required: false, section: 'Vehicle' },
+    { name: 'driver_name', label: 'Driver Full Name', type: 'text', required: true, section: 'Driver' },
+    { name: 'driver_license', label: 'Driver License Number', type: 'text', required: true, section: 'Driver' },
+    { name: 'accident_location', label: 'Accident Location', type: 'text', required: true, section: 'Incident' },
+    { name: 'road_conditions', label: 'Road Conditions', type: 'select', required: false, options: ['Dry', 'Wet', 'Icy', 'Gravel', 'Other'], section: 'Incident' },
+    { name: 'weather_conditions', label: 'Weather Conditions', type: 'select', required: false, options: ['Clear', 'Rain', 'Snow', 'Fog', 'Other'], section: 'Incident' },
+    { name: 'damage_description', label: 'Damage Description', type: 'textarea', required: true, section: 'Incident' },
+    { name: 'witness_name', label: 'Witness Name', type: 'text', required: false, section: 'Witness' },
+    { name: 'witness_phone', label: 'Witness Phone', type: 'text', required: false, section: 'Witness' },
+  ],
+  HEALTH: [
+    { name: 'patient_name', label: 'Patient Full Name', type: 'text', required: true, section: 'Patient' },
+    { name: 'patient_age', label: 'Patient Age', type: 'number', required: true, section: 'Patient' },
+    { name: 'patient_gender', label: 'Patient Gender', type: 'select', required: true, options: ['Male', 'Female', 'Other'], section: 'Patient' },
+    { name: 'diagnosis', label: 'Diagnosis / Condition', type: 'textarea', required: true, section: 'Medical' },
+    { name: 'admission_date', label: 'Admission Date', type: 'date', required: false, section: 'Medical' },
+    { name: 'discharge_date', label: 'Discharge Date', type: 'date', required: false, section: 'Medical' },
+    { name: 'treatment_type', label: 'Treatment Type', type: 'select', required: true, options: ['Inpatient', 'Outpatient', 'Emergency', 'Surgery', 'Consultation', 'Maternity', 'Other'], section: 'Medical' },
+    { name: 'medical_expenses', label: 'Estimated Medical Expenses (ETB)', type: 'number', required: false, section: 'Financial' },
+    { name: 'pre_existing_conditions', label: 'Pre-existing Conditions', type: 'textarea', required: false, section: 'Medical' },
+    { name: 'attending_physician', label: 'Attending Physician Name', type: 'text', required: false, section: 'Medical' },
+  ],
+  FIRE: [
+    { name: 'property_address', label: 'Property Address', type: 'text', required: true, section: 'Property' },
+    { name: 'property_type', label: 'Property Type', type: 'select', required: true, options: ['Residential', 'Commercial', 'Industrial', 'Warehouse', 'Other'], section: 'Property' },
+    { name: 'fire_date', label: 'Date of Fire Incident', type: 'date', required: true, section: 'Incident' },
+    { name: 'fire_cause', label: 'Suspected Cause', type: 'select', required: false, options: ['Electrical', 'Gas Leak', 'Arson', 'Natural', 'Unknown', 'Other'], section: 'Incident' },
+    { name: 'damaged_areas', label: 'Damaged Areas / Rooms', type: 'textarea', required: true, section: 'Incident' },
+    { name: 'fire_department_report', label: 'Fire Department Report Number', type: 'text', required: false, section: 'Incident' },
+    { name: 'estimated_loss', label: 'Estimated Loss (ETB)', type: 'number', required: true, section: 'Financial' },
+    { name: 'police_report', label: 'Police Report Number', type: 'text', required: false, section: 'Incident' },
+  ],
+  TRAVEL: [
+    { name: 'destination', label: 'Travel Destination', type: 'text', required: true, section: 'Travel' },
+    { name: 'travel_date', label: 'Travel Start Date', type: 'date', required: true, section: 'Travel' },
+    { name: 'return_date', label: 'Return Date', type: 'date', required: true, section: 'Travel' },
+    { name: 'incident_type', label: 'Incident Type', type: 'select', required: true, options: ['Flight Cancellation', 'Lost Baggage', 'Medical Emergency', 'Trip Interruption', 'Passport Loss', 'Theft', 'Other'], section: 'Incident' },
+    { name: 'incident_location', label: 'Incident Location (City/Country)', type: 'text', required: true, section: 'Incident' },
+    { name: 'claim_amount', label: 'Claim Amount (ETB)', type: 'number', required: true, section: 'Financial' },
+    { name: 'supporting_documents', label: 'Supporting Documents Description', type: 'textarea', required: false, section: 'Documents' },
+  ],
+  LIFE: [
+    { name: 'insured_name', label: 'Insured Person Full Name', type: 'text', required: true, section: 'Personal' },
+    { name: 'insured_dob', label: 'Date of Birth', type: 'date', required: true, section: 'Personal' },
+    { name: 'insured_gender', label: 'Gender', type: 'select', required: true, options: ['Male', 'Female', 'Other'], section: 'Personal' },
+    { name: 'event_type', label: 'Event Type', type: 'select', required: true, options: ['Death', 'Critical Illness', 'Disability', 'Maturity'], section: 'Event' },
+    { name: 'event_date', label: 'Event Date', type: 'date', required: true, section: 'Event' },
+    { name: 'cause_of_event', label: 'Cause / Details', type: 'textarea', required: true, section: 'Event' },
+    { name: 'beneficiary_name', label: 'Beneficiary Full Name', type: 'text', required: true, section: 'Beneficiary' },
+    { name: 'beneficiary_relationship', label: 'Relationship to Insured', type: 'text', required: true, section: 'Beneficiary' },
+    { name: 'beneficiary_phone', label: 'Beneficiary Phone', type: 'text', required: false, section: 'Beneficiary' },
+  ],
+};
+
+const INSURANCE_ICONS: Record<string, any> = {
+  MOTOR: Car,
+  HEALTH: Heart,
+  FIRE: Flame,
+  TRAVEL: Plane,
+  LIFE: User,
+  default: Shield,
+};
+
+// ----------------------------------------------------------------------------
+// Main Component
+// ----------------------------------------------------------------------------
 export default function NewClaimPage() {
-    const navigate = useNavigate();
-    const { token } = useAuthStore();
-    const { policies, fetchPolicies } = usePolicyStore();
-    const [loading, setLoading] = React.useState(false);
-    const [submitted, setSubmitted] = React.useState(false);
-    const [documents, setDocuments] = React.useState<File[]>([]);
-    const [injuredPersons, setInjuredPersons] = React.useState<InjuredPerson[]>([]);
-    const [showDriverInfo, setShowDriverInfo] = React.useState(false);
-    const [showWitnessInfo, setShowWitnessInfo] = React.useState(false);
-    const [showEnvironmentalInfo, setShowEnvironmentalInfo] = React.useState(false);
-    const [submittedClaimNumber, setSubmittedClaimNumber] = React.useState('');
-    const [copied, setCopied] = React.useState(false);
-    
-    const [formData, setFormData] = React.useState({
-        policyId: '',
-        productType: '',
-        productCode: '',
-        riskItem: '',
-        accidentPlace: '',
-        accidentDate: '',
-        accidentTime: '',
-        reportingDate: new Date().toISOString().split('T')[0],
-        reportingTime: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
-        natureOfLoss: '',
-        briefDescription: '',
-        estimatedAmount: '',
-        
-        // Witness Information
-        witnessName: '',
-        witnessPhone: '',
-        witnessStatement: '',
-        
-        // Driver Information
-        driverFullName: '',
-        driverAge: '',
-        driverOccupation: '',
-        driverLicenseNumber: '',
-        driverLicenseIssueDate: '',
-        driverLicenseExpiryDate: '',
-        
-        // Damage Details
-        vehicleDamageDetails: '',
-        
-        // Environmental Conditions
-        roadConditions: '',
-        weatherConditions: '',
-        responsibleParty: ''
-    });
+  const navigate = useNavigate();
+  const { user } = useAuthStore();
 
-    React.useEffect(() => {
-        fetchPolicies();
-    }, []);
+  // Core states
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [step, setStep] = useState(1);
+  const [submissionComplete, setSubmissionComplete] = useState(false);
+  const [createdClaimNumber, setCreatedClaimNumber] = useState('');
 
-    const getAuthHeaders = () => {
-        const stored = localStorage.getItem('awash-auth-storage');
-        let authToken = token;
-        if (!authToken && stored) {
-            const parsed = JSON.parse(stored);
-            authToken = parsed.state?.token;
-        }
-        return { Authorization: `Bearer ${authToken}` };
-    };
+  // Policies
+  const [policies, setPolicies] = useState<Policy[]>([]);
+  const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null);
 
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) {
-            setDocuments([...documents, ...Array.from(e.target.files)]);
-        }
-    };
+  // Dynamic custom fields
+  const [customFields, setCustomFields] = useState<CustomField[]>([]);
+  const [fieldValues, setFieldValues] = useState<Record<string, any>>({});
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-    const removeDocument = (index: number) => {
-        setDocuments(documents.filter((_, i) => i !== index));
-    };
+  // Common fields
+  const [incidentDate, setIncidentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [incidentDescription, setIncidentDescription] = useState('');
+  const [estimatedAmount, setEstimatedAmount] = useState<number>(0);
 
-    const addInjuredPerson = () => {
-        setInjuredPersons([...injuredPersons, { name: '', age: 0, injuryType: '', hospitalName: '' }]);
-    };
+  // Hospital fields (Health insurance)
+  const [hospitalList, setHospitalList] = useState<string[]>([]);
+  const [loadingHospitals, setLoadingHospitals] = useState(false);
+  const [selectedHospital, setSelectedHospital] = useState('');
+  const [otherHospital, setOtherHospital] = useState('');
+  const [showOtherHospital, setShowOtherHospital] = useState(false);
 
-    const removeInjuredPerson = (index: number) => {
-        setInjuredPersons(injuredPersons.filter((_, i) => i !== index));
-    };
+  // Beneficiary fields
+  const [selectedBeneficiary, setSelectedBeneficiary] = useState('');
+  const [claimForSelf, setClaimForSelf] = useState(true);
 
-    const updateInjuredPerson = (index: number, field: keyof InjuredPerson, value: any) => {
-        const updated = [...injuredPersons];
-        updated[index] = { ...updated[index], [field]: value };
-        setInjuredPersons(updated);
-    };
+  // ----------------------------------------------------------------------------
+  // Fetch active policies
+  // ----------------------------------------------------------------------------
+  useEffect(() => {
+    fetchPolicies();
+  }, []);
 
-    const copyToClipboard = () => {
-        navigator.clipboard.writeText(submittedClaimNumber);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-        toast.success('Claim number copied!');
-    };
-    // Add this helper function at the top of NewClaimPage.tsx
-const extractProductCodeFromPolicyNumber = (policyNumber: string): string => {
-    if (!policyNumber) return 'GEN';
-    const parts = policyNumber.split('/');
-    if (parts.length >= 2) {
-        return parts[1]; // Return the product code part
+  const fetchPolicies = async () => {
+    try {
+      const res = await axiosInstance.get('/policies/my-policies');
+      const activePolicies = (res.data || []).filter((p: Policy) => p.status === 'ACTIVE');
+      setPolicies(activePolicies);
+    } catch (error) {
+      toast.error('Failed to load policies');
     }
-    return 'GEN';
-};
+  };
 
-// Then when a policy is selected, extract the product code:
-const handlePolicySelect = (policy: any) => {
-    const productCode = extractProductCodeFromPolicyNumber(policy.policyNumber);
+  // ----------------------------------------------------------------------------
+  // Fetch custom fields for the selected policy's product
+  // ----------------------------------------------------------------------------
+  const fetchFieldsForPolicy = async (policy: Policy) => {
+    setLoading(true);
+    try {
+      const res = await axiosInstance.get(`/products/${policy.productId || policy.productCode}`);
+      const product = res.data;
+      
+      if (product.customFields && product.customFields.length > 0) {
+        setCustomFields(product.customFields);
+        setLoading(false);
+        return;
+      }
+      if (product.fields && product.fields.length > 0) {
+        setCustomFields(product.fields);
+        setLoading(false);
+        return;
+      }
+    } catch {
+      console.warn('Could not fetch fields from backend, using defaults');
+    }
+
+    const defaults = DEFAULT_FIELDS_BY_TYPE[policy.type] || [];
+    setCustomFields(defaults);
     
-    setFormData({
-        ...formData,
-        policyId: policy.id,
-        productType: policy.type,
-        productCode: productCode  // Use extracted product code from policy number
+    if (defaults.length === 0) {
+      toast.info('No specific fields required for this product type');
+    }
+    setLoading(false);
+  };
+
+  // ----------------------------------------------------------------------------
+  // Fetch hospitals (for Health insurance)
+  // ----------------------------------------------------------------------------
+  const fetchHospitals = async () => {
+    setLoadingHospitals(true);
+    try {
+      const res = await axiosInstance.get('/settings/hospitals');
+      const hospitals = res.data || [];
+      setHospitalList(hospitals);
+    } catch (error) {
+      console.error('Failed to fetch hospitals:', error);
+      setHospitalList([
+        'Tikur Anbessa Specialized Hospital',
+        "St. Paul's Hospital Millennium Medical College",
+        'Yekatit 12 Hospital Medical College',
+        'Zewditu Memorial Hospital',
+        'Alert Hospital',
+        'Menelik II Referral Hospital',
+        'Gandhi Memorial Hospital',
+        'Betezata General Hospital',
+        'Hayat Hospital',
+        'Korean Hospital',
+        'Landmark General Hospital',
+        'Nordic Medical Center',
+        'Myungsung Christian Medical Center',
+        'Bethzatha Hospital',
+        'St. Gabriel General Hospital',
+      ]);
+    } finally {
+      setLoadingHospitals(false);
+    }
+  };
+
+  // ----------------------------------------------------------------------------
+  // Handle policy selection
+  // ----------------------------------------------------------------------------
+  const handlePolicySelect = async (policy: Policy) => {
+    setSelectedPolicy(policy);
+    setFieldValues({});
+    setFieldErrors({});
+    setEstimatedAmount(policy.coverageAmount || 0);
+    
+    // Auto-populate policy holder name
+    if (policy.policyHolderName) {
+      setFieldValues(prev => ({
+        ...prev,
+        patient_name: policy.policyHolderName,
+        insured_name: policy.policyHolderName,
+        driver_name: policy.policyHolderName,
+        claimant_name: policy.policyHolderName,
+      }));
+    }
+
+    // Reset beneficiary selection
+    setSelectedBeneficiary('');
+    setClaimForSelf(true);
+    
+    // Fetch hospitals for Health insurance
+    if (policy.type === 'HEALTH') {
+      await fetchHospitals();
+      setSelectedHospital('');
+      setOtherHospital('');
+      setShowOtherHospital(false);
+    }
+    
+    await fetchFieldsForPolicy(policy);
+    setStep(2);
+  };
+
+  // ----------------------------------------------------------------------------
+  // Field handlers
+  // ----------------------------------------------------------------------------
+  const handleFieldChange = (fieldName: string, value: any) => {
+    setFieldValues(prev => ({ ...prev, [fieldName]: value }));
+    if (fieldErrors[fieldName]) {
+      setFieldErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[fieldName];
+        return newErrors;
+      });
+    }
+  };
+
+  // ----------------------------------------------------------------------------
+  // Beneficiary handlers
+  // ----------------------------------------------------------------------------
+  const handleClaimForChange = (isSelf: boolean) => {
+    setClaimForSelf(isSelf);
+    if (isSelf) {
+      setSelectedBeneficiary('');
+      if (selectedPolicy?.policyHolderName) {
+        handleFieldChange('patient_name', selectedPolicy.policyHolderName);
+        handleFieldChange('insured_name', selectedPolicy.policyHolderName);
+      }
+    } else {
+      handleFieldChange('patient_name', '');
+      handleFieldChange('insured_name', '');
+    }
+  };
+
+  const handleBeneficiarySelect = (beneficiaryId: string) => {
+    setSelectedBeneficiary(beneficiaryId);
+    if (beneficiaryId && selectedPolicy?.beneficiaries) {
+      const beneficiary = selectedPolicy.beneficiaries.find(b => b.id === beneficiaryId);
+      if (beneficiary) {
+        handleFieldChange('patient_name', beneficiary.fullName);
+        handleFieldChange('insured_name', beneficiary.fullName);
+        handleFieldChange('beneficiary_name', beneficiary.fullName);
+        handleFieldChange('beneficiary_relationship', beneficiary.relationship);
+      }
+    }
+  };
+
+  // ----------------------------------------------------------------------------
+  // Validation
+  // ----------------------------------------------------------------------------
+  const validateFields = () => {
+    const errors: Record<string, string> = {};
+    
+    if (!incidentDate) errors.incidentDate = 'Incident date is required';
+    if (!incidentDescription || incidentDescription.trim().length < 10) {
+      errors.incidentDescription = 'Please provide a detailed description (min 10 characters)';
+    }
+
+    customFields.forEach(field => {
+      if (field.required) {
+        const value = fieldValues[field.name];
+        if (value === undefined || value === null || (typeof value === 'string' && value.trim() === '')) {
+          errors[field.name] = `${field.label} is required`;
+        }
+      }
     });
-};
 
-    const getSelectedPolicy = () => {
-        return policies?.find((p: any) => p.id === formData.policyId);
-    };
+    if (selectedPolicy?.type === 'HEALTH') {
+      const hospitalValue = showOtherHospital ? otherHospital : selectedHospital;
+      if (!hospitalValue || hospitalValue.trim() === '') {
+        errors['hospital_name'] = 'Hospital / clinic name is required';
+      }
+    }
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        
-        if (!formData.policyId || !formData.accidentPlace || !formData.accidentDate || !formData.natureOfLoss) {
-            toast.error('Please fill all required fields');
-            return;
-        }
+    // Validate beneficiary selection
+    if (!claimForSelf && selectedPolicy?.beneficiaries && selectedPolicy.beneficiaries.length > 0) {
+      if (!selectedBeneficiary) {
+        errors['beneficiary'] = 'Please select a beneficiary';
+      }
+    }
 
-        setLoading(true);
-        try {
-            const selectedPolicy = getSelectedPolicy();
-            const productCode = selectedPolicy?.type === 'AUTO' ? 'AUTO' : 
-                               selectedPolicy?.type === 'HOME' ? 'HOME' : 
-                               selectedPolicy?.type === 'LIFE' ? 'LIFE' : 
-                               selectedPolicy?.type === 'HEALTH' ? 'HLTH' : 'GEN';
-            
-            const payload = {
-                policyId: formData.policyId,
-                productType: formData.productType,
-                productCode: productCode,
-                riskItem: formData.riskItem,
-                incidentDate: formData.accidentDate,
-                timeOfAccident: formData.accidentTime,
-                incidentDescription: formData.briefDescription,
-                location: formData.accidentPlace,
-                estimatedAmount: formData.estimatedAmount || null,
-                natureOfLoss: formData.natureOfLoss,
-                
-                // Witness Information
-                witnessName: formData.witnessName,
-                witnessPhone: formData.witnessPhone,
-                witnessStatement: formData.witnessStatement,
-                
-                // Driver Information
-                driverFullName: formData.driverFullName,
-                driverAge: formData.driverAge ? parseInt(formData.driverAge) : null,
-                driverOccupation: formData.driverOccupation,
-                driverLicenseNumber: formData.driverLicenseNumber,
-                driverLicenseIssueDate: formData.driverLicenseIssueDate,
-                driverLicenseExpiryDate: formData.driverLicenseExpiryDate,
-                
-                // Damage Details
-                vehicleDamageDetails: formData.vehicleDamageDetails,
-                
-                // Injured Persons
-                injuredPersons: injuredPersons,
-                
-                // Environmental Conditions
-                roadConditions: formData.roadConditions,
-                weatherConditions: formData.weatherConditions,
-                responsibleParty: formData.responsibleParty
-            };
-            
-            const response = await axios.post(`${API_URL}/claims`, payload, {
-                headers: getAuthHeaders()
-            });
-            
-            const claimId = response.data.claimId;
-            const claimNumber = response.data.claimNumber;
-            
-            // Upload documents if any
-            if (documents.length > 0) {
-                const formDataUpload = new FormData();
-                documents.forEach((doc) => {
-                    formDataUpload.append('documents', doc);
-                });
-                
-                try {
-                    await axios.post(`${API_URL}/claims/${claimId}/documents`, formDataUpload, {
-                        headers: {
-                            ...getAuthHeaders(),
-                            'Content-Type': 'multipart/form-data'
-                        }
-                    });
-                } catch (uploadError) {
-                    console.error('Failed to upload documents:', uploadError);
-                }
-            }
-            
-            setSubmittedClaimNumber(claimNumber);
-            setSubmitted(true);
-            
-        } catch (error) {
-            console.error('Failed to create claim:', error);
-            toast.error('Failed to submit claim');
-        } finally {
-            setLoading(false);
-        }
-    };
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
-    const selectedPolicy = getSelectedPolicy();
+  // ----------------------------------------------------------------------------
+  // Render a single custom field
+  // ----------------------------------------------------------------------------
+  const renderField = (field: CustomField) => {
+    const value = fieldValues[field.name] ?? '';
+    const error = fieldErrors[field.name];
 
-    // Success Screen
-    if (submitted) {
+    switch (field.type) {
+      case 'text':
+      case 'number':
         return (
-            <div className="space-y-6">
-                <Button variant="ghost" onClick={() => navigate('/customer/claims')} className="p-0 hover:bg-transparent">
-                    <ArrowLeft className="mr-2 h-4 w-4" /> Back to Claims
-                </Button>
-
-                <div className="max-w-2xl mx-auto">
-                    <Card className="border-green-200 shadow-xl">
-                        <CardContent className="p-8 text-center">
-                            <div className="h-20 w-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                                <CheckCircle className="h-10 w-10 text-green-600" />
-                            </div>
-                            
-                            <h2 className="text-2xl font-bold text-green-800 mb-2">Claim Submitted Successfully!</h2>
-                            <p className="text-green-700 mb-6">Your claim has been received and is being processed.</p>
-                            
-                            {/* Claim Reference Number */}
-                            <div className="bg-gray-50 rounded-lg p-6 mb-6">
-                                <p className="text-sm text-gray-500 mb-2">Claim Reference Number</p>
-                                <div className="flex items-center justify-center gap-3">
-                                    <p className="text-2xl font-bold text-[#1A3E6F] font-mono tracking-wider">
-                                        {submittedClaimNumber}
-                                    </p>
-                                    <button 
-                                        onClick={copyToClipboard}
-                                        className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
-                                        title="Copy claim number"
-                                    >
-                                        {copied ? <Check className="h-5 w-5 text-green-600" /> : <Copy className="h-5 w-5 text-gray-500" />}
-                                    </button>
-                                </div>
-                                <p className="text-xs text-gray-400 mt-2">Please save this reference number for future tracking</p>
-                            </div>
-                            
-                            {/* Important Messages */}
-                            <div className="bg-blue-50 rounded-lg p-4 mb-6 text-left">
-                                <h3 className="font-semibold text-blue-800 mb-2 flex items-center gap-2">
-                                    <Clock className="h-4 w-4" />
-                                    What happens next?
-                                </h3>
-                                <ul className="space-y-2 text-sm text-blue-700">
-                                    <li className="flex items-start gap-2">
-                                        <CheckCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                                        <span>A claims officer will be assigned to your case within 24 hours</span>
-                                    </li>
-                                    <li className="flex items-start gap-2">
-                                        <CheckCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                                        <span>You will receive an email confirmation with your claim details</span>
-                                    </li>
-                                    <li className="flex items-start gap-2">
-                                        <CheckCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                                        <span>Our team may contact you for additional information if needed</span>
-                                    </li>
-                                    <li className="flex items-start gap-2">
-                                        <CheckCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                                        <span>You can track your claim status in the Claims section</span>
-                                    </li>
-                                </ul>
-                            </div>
-                            
-                            {/* Contact Information */}
-                            <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
-                                <h3 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
-                                    <Phone className="h-4 w-4" />
-                                    Need assistance?
-                                </h3>
-                                <p className="text-sm text-gray-600">
-                                    Contact our claims support team at <strong>+251-11-XXX-XXXX</strong> or email <strong>claims@awashinsurance.com</strong>
-                                </p>
-                            </div>
-                            
-                            {/* Action Buttons */}
-                            <div className="flex gap-4 justify-center">
-                                <Button 
-                                    onClick={() => navigate('/claims')} 
-                                    className="bg-[#1A3E6F] hover:bg-[#153358]"
-                                >
-                                    View My Claims
-                                </Button>
-                                <Button 
-                                    variant="outline" 
-                                    onClick={() => window.print()}
-                                >
-                                    <Download className="mr-2 h-4 w-4" />
-                                    Save Reference
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            </div>
+          <Input
+            type={field.type}
+            placeholder={field.placeholder || field.label}
+            value={value}
+            onChange={e => handleFieldChange(field.name, e.target.value)}
+            className={error ? 'border-red-500' : ''}
+          />
         );
+      case 'date':
+        return (
+          <Input
+            type="date"
+            value={value}
+            onChange={e => handleFieldChange(field.name, e.target.value)}
+            className={error ? 'border-red-500' : ''}
+          />
+        );
+      case 'select':
+        return (
+          <Select value={value} onValueChange={(val) => handleFieldChange(field.name, val)}>
+            <SelectTrigger className={error ? 'border-red-500' : ''}>
+              <SelectValue placeholder="Select..." />
+            </SelectTrigger>
+            <SelectContent>
+              {(field.options || []).map(opt => (
+                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        );
+      case 'textarea':
+        return (
+          <Textarea
+            placeholder={field.placeholder || field.label}
+            value={value}
+            onChange={e => handleFieldChange(field.name, e.target.value)}
+            className={error ? 'border-red-500' : ''}
+            rows={3}
+          />
+        );
+      case 'checkbox':
+        return (
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={!!value}
+              onChange={e => handleFieldChange(field.name, e.target.checked)}
+              className="h-4 w-4"
+            />
+            <Label>{field.label}</Label>
+          </div>
+        );
+      default:
+        return <Input value={value} onChange={e => handleFieldChange(field.name, e.target.value)} />;
     }
+  };
+
+  // ----------------------------------------------------------------------------
+  // Render beneficiary selector
+  // ----------------------------------------------------------------------------
+  const renderBeneficiarySelector = () => {
+    const beneficiaries = selectedPolicy?.beneficiaries || [];
+    
+    if (beneficiaries.length === 0) return null;
 
     return (
-        <div className="space-y-6">
-            <Button variant="ghost" onClick={() => navigate('/customer/claims')} className="p-0 hover:bg-transparent">
-                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Claims
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            Claim For
+          </CardTitle>
+          <CardDescription>
+            Select who this claim is being filed for
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-4">
+            <Button
+              type="button"
+              variant={claimForSelf ? 'default' : 'outline'}
+              onClick={() => handleClaimForChange(true)}
+              className="flex-1"
+            >
+              <UserCheck className="h-4 w-4 mr-2" />
+              Myself (Policy Holder)
             </Button>
+            <Button
+              type="button"
+              variant={!claimForSelf ? 'default' : 'outline'}
+              onClick={() => handleClaimForChange(false)}
+              className="flex-1"
+            >
+              <Users className="h-4 w-4 mr-2" />
+              Beneficiary
+            </Button>
+          </div>
 
+          {!claimForSelf && (
             <div>
-                <h1 className="text-3xl font-bold text-[#1A3E6F]">File a New Claim</h1>
-                <p className="text-gray-500 mt-1">Please provide accurate information about the incident</p>
+              <Label>Select Beneficiary <span className="text-red-500">*</span></Label>
+              <Select value={selectedBeneficiary} onValueChange={handleBeneficiarySelect}>
+                <SelectTrigger className={fieldErrors['beneficiary'] ? 'border-red-500' : ''}>
+                  <SelectValue placeholder="Choose a beneficiary..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {beneficiaries.map(ben => (
+                    <SelectItem key={ben.id} value={ben.id}>
+                      {ben.fullName} ({ben.relationship})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {fieldErrors['beneficiary'] && (
+                <p className="text-xs text-red-500 mt-1">{fieldErrors['beneficiary']}</p>
+              )}
             </div>
+          )}
 
-            <form onSubmit={handleSubmit}>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="lg:col-span-2 space-y-6">
-                        {/* Policy Information */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Policy Information</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label>Select Policy *</Label>
-                                        <select 
-                                            className="w-full rounded-lg border border-gray-200 p-2"
-                                            value={formData.policyId}
-                                            onChange={(e) => {
-                                                const selectedPolicy = policies?.find((p: any) => p.id === e.target.value);
-                                                setFormData({
-                                                    ...formData,
-                                                    policyId: e.target.value,
-                                                    productType: selectedPolicy?.type || '',
-                                                });
-                                            }}
-                                            required
-                                        >
-                                            <option value="">Select a policy</option>
-                                            {policies?.map((policy: any) => (
-                                                <option key={policy.id} value={policy.id}>
-                                                    {policy.policyNumber} - {policy.type} (ETB {policy.coverageAmount?.toLocaleString()})
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Product Type</Label>
-                                        <Input 
-                                            value={formData.productType}
-                                            disabled
-                                            className="bg-gray-50"
-                                            placeholder="Auto-filled from policy"
-                                        />
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Risk Item (if multiple items in policy)</Label>
-                                    <Input 
-                                        value={formData.riskItem}
-                                        onChange={(e) => setFormData({...formData, riskItem: e.target.value})}
-                                        placeholder="Specify which insured item this claim relates to"
-                                    />
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* Accident/Incident Details */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Accident/Incident Details</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label>Place of Accident *</Label>
-                                        <Input 
-                                            value={formData.accidentPlace}
-                                            onChange={(e) => setFormData({...formData, accidentPlace: e.target.value})}
-                                            placeholder="e.g., Bole Road, Addis Ababa"
-                                            required
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Date of Accident *</Label>
-                                        <Input 
-                                            type="date"
-                                            value={formData.accidentDate}
-                                            onChange={(e) => setFormData({...formData, accidentDate: e.target.value})}
-                                            required
-                                            max={new Date().toISOString().split('T')[0]}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Time of Accident</Label>
-                                        <Input 
-                                            type="time"
-                                            value={formData.accidentTime}
-                                            onChange={(e) => setFormData({...formData, accidentTime: e.target.value})}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Nature of Loss *</Label>
-                                        <select 
-                                            className="w-full rounded-lg border border-gray-200 p-2"
-                                            value={formData.natureOfLoss}
-                                            onChange={(e) => setFormData({...formData, natureOfLoss: e.target.value})}
-                                            required
-                                        >
-                                            <option value="">Select nature of loss</option>
-                                            {natureOfLossOptions.map(option => (
-                                                <option key={option} value={option}>{option}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Estimated Amount (ETB)</Label>
-                                    <Input 
-                                        type="number"
-                                        value={formData.estimatedAmount}
-                                        onChange={(e) => setFormData({...formData, estimatedAmount: e.target.value})}
-                                        placeholder="Optional estimated claim amount"
-                                        min={0}
-                                        step={1000}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Brief Description *</Label>
-                                    <Textarea 
-                                        value={formData.briefDescription}
-                                        onChange={(e) => setFormData({...formData, briefDescription: e.target.value})}
-                                        placeholder="Please provide a detailed description of what happened..."
-                                        rows={4}
-                                        required
-                                    />
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* Driver Information - Toggle Section */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle 
-                                    className="cursor-pointer flex justify-between items-center"
-                                    onClick={() => setShowDriverInfo(!showDriverInfo)}
-                                >
-                                    <span className="flex items-center gap-2">
-                                        <Car className="h-5 w-5" />
-                                        Driver Information (if applicable)
-                                    </span>
-                                    <span>{showDriverInfo ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}</span>
-                                </CardTitle>
-                            </CardHeader>
-                            {showDriverInfo && (
-                                <CardContent className="space-y-4">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label>Driver Full Name</Label>
-                                            <Input 
-                                                value={formData.driverFullName}
-                                                onChange={(e) => setFormData({...formData, driverFullName: e.target.value})}
-                                                placeholder="Full name of the driver"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Driver Age</Label>
-                                            <Input 
-                                                type="number"
-                                                value={formData.driverAge}
-                                                onChange={(e) => setFormData({...formData, driverAge: e.target.value})}
-                                                placeholder="Age"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Driver Occupation</Label>
-                                            <Input 
-                                                value={formData.driverOccupation}
-                                                onChange={(e) => setFormData({...formData, driverOccupation: e.target.value})}
-                                                placeholder="Occupation"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Driver License Number</Label>
-                                            <Input 
-                                                value={formData.driverLicenseNumber}
-                                                onChange={(e) => setFormData({...formData, driverLicenseNumber: e.target.value})}
-                                                placeholder="License number"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>License Issue Date</Label>
-                                            <Input 
-                                                type="date"
-                                                value={formData.driverLicenseIssueDate}
-                                                onChange={(e) => setFormData({...formData, driverLicenseIssueDate: e.target.value})}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>License Expiry Date</Label>
-                                            <Input 
-                                                type="date"
-                                                value={formData.driverLicenseExpiryDate}
-                                                onChange={(e) => setFormData({...formData, driverLicenseExpiryDate: e.target.value})}
-                                            />
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            )}
-                        </Card>
-
-                        {/* Vehicle Damage Details */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Damage Details</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label>Details of Damage to the Vehicle/Property</Label>
-                                    <Textarea 
-                                        value={formData.vehicleDamageDetails}
-                                        onChange={(e) => setFormData({...formData, vehicleDamageDetails: e.target.value})}
-                                        placeholder="Describe the extent of damage to the vehicle or property..."
-                                        rows={3}
-                                    />
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* Injured Persons Section */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex justify-between items-center">
-                                    <span className="flex items-center gap-2">
-                                        <Users className="h-5 w-5" />
-                                        Injured Persons
-                                    </span>
-                                    <Button type="button" variant="outline" size="sm" onClick={addInjuredPerson}>
-                                        <Plus className="h-4 w-4 mr-1" /> Add Person
-                                    </Button>
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                {injuredPersons.length === 0 ? (
-                                    <p className="text-gray-500 text-sm text-center py-4">No injured persons added. Click "Add Person" to add.</p>
-                                ) : (
-                                    injuredPersons.map((person, idx) => (
-                                        <div key={idx} className="border p-4 rounded-lg space-y-3 relative">
-                                            <Button 
-                                                type="button"
-                                                variant="ghost" 
-                                                size="sm"
-                                                className="absolute top-2 right-2"
-                                                onClick={() => removeInjuredPerson(idx)}
-                                            >
-                                                <X className="h-4 w-4 text-red-500" />
-                                            </Button>
-                                            <h4 className="font-medium">Person {idx + 1}</h4>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                <div>
-                                                    <Label>Full Name</Label>
-                                                    <Input 
-                                                        placeholder="Full name" 
-                                                        value={person.name} 
-                                                        onChange={(e) => updateInjuredPerson(idx, 'name', e.target.value)} 
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <Label>Age</Label>
-                                                    <Input 
-                                                        type="number" 
-                                                        placeholder="Age" 
-                                                        value={person.age} 
-                                                        onChange={(e) => updateInjuredPerson(idx, 'age', parseInt(e.target.value))} 
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <Label>Injury Type</Label>
-                                                    <Input 
-                                                        placeholder="Type of injury" 
-                                                        value={person.injuryType} 
-                                                        onChange={(e) => updateInjuredPerson(idx, 'injuryType', e.target.value)} 
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <Label>Hospital Name</Label>
-                                                    <Input 
-                                                        placeholder="Hospital where treated" 
-                                                        value={person.hospitalName} 
-                                                        onChange={(e) => updateInjuredPerson(idx, 'hospitalName', e.target.value)} 
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                            </CardContent>
-                        </Card>
-
-                        {/* Witness Information - Toggle Section */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle 
-                                    className="cursor-pointer flex justify-between items-center"
-                                    onClick={() => setShowWitnessInfo(!showWitnessInfo)}
-                                >
-                                    <span className="flex items-center gap-2">
-                                        <Users className="h-5 w-5" />
-                                        Witness Information (if any)
-                                    </span>
-                                    <span>{showWitnessInfo ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}</span>
-                                </CardTitle>
-                            </CardHeader>
-                            {showWitnessInfo && (
-                                <CardContent className="space-y-4">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label>Witness Name</Label>
-                                            <Input 
-                                                value={formData.witnessName}
-                                                onChange={(e) => setFormData({...formData, witnessName: e.target.value})}
-                                                placeholder="Name of witness"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Witness Phone</Label>
-                                            <Input 
-                                                value={formData.witnessPhone}
-                                                onChange={(e) => setFormData({...formData, witnessPhone: e.target.value})}
-                                                placeholder="Phone number"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Witness Statement</Label>
-                                        <Textarea 
-                                            value={formData.witnessStatement}
-                                            onChange={(e) => setFormData({...formData, witnessStatement: e.target.value})}
-                                            placeholder="What did the witness say?"
-                                            rows={2}
-                                        />
-                                    </div>
-                                </CardContent>
-                            )}
-                        </Card>
-
-                        {/* Environmental Conditions - Toggle Section */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle 
-                                    className="cursor-pointer flex justify-between items-center"
-                                    onClick={() => setShowEnvironmentalInfo(!showEnvironmentalInfo)}
-                                >
-                                    <span className="flex items-center gap-2">
-                                        <Cloud className="h-5 w-5" />
-                                        Environmental Conditions
-                                    </span>
-                                    <span>{showEnvironmentalInfo ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}</span>
-                                </CardTitle>
-                            </CardHeader>
-                            {showEnvironmentalInfo && (
-                                <CardContent className="space-y-4">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label>Road Conditions</Label>
-                                            <select 
-                                                className="w-full rounded-lg border border-gray-200 p-2"
-                                                value={formData.roadConditions}
-                                                onChange={(e) => setFormData({...formData, roadConditions: e.target.value})}
-                                            >
-                                                <option value="">Select road conditions</option>
-                                                {roadConditionsOptions.map(option => (
-                                                    <option key={option} value={option}>{option}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Weather Conditions</Label>
-                                            <select 
-                                                className="w-full rounded-lg border border-gray-200 p-2"
-                                                value={formData.weatherConditions}
-                                                onChange={(e) => setFormData({...formData, weatherConditions: e.target.value})}
-                                            >
-                                                <option value="">Select weather conditions</option>
-                                                {weatherConditionsOptions.map(option => (
-                                                    <option key={option} value={option}>{option}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Who is in your opinion responsible?</Label>
-                                        <select 
-                                            className="w-full rounded-lg border border-gray-200 p-2"
-                                            value={formData.responsibleParty}
-                                            onChange={(e) => setFormData({...formData, responsibleParty: e.target.value})}
-                                        >
-                                            <option value="">Select responsible party</option>
-                                            {responsiblePartyOptions.map(option => (
-                                                <option key={option} value={option}>{option}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </CardContent>
-                            )}
-                        </Card>
-
-                        {/* Documents */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Supporting Documents</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center">
-                                    <input
-                                        type="file"
-                                        id="file-upload"
-                                        multiple
-                                        className="hidden"
-                                        onChange={handleFileUpload}
-                                    />
-                                    <label htmlFor="file-upload">
-                                        <Button 
-                                            type="button"
-                                            variant="outline" 
-                                            onClick={() => document.getElementById('file-upload')?.click()}
-                                        >
-                                            <Upload className="mr-2 h-4 w-4" /> Upload Documents
-                                        </Button>
-                                    </label>
-                                    <p className="text-xs text-gray-500 mt-2">
-                                        Upload photos, police reports, or other evidence (max 10MB each)
-                                    </p>
-                                </div>
-                                
-                                {documents.length > 0 && (
-                                    <div className="space-y-2">
-                                        <Label>Uploaded Files ({documents.length})</Label>
-                                        {documents.map((doc, index) => (
-                                            <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                                                <div className="flex items-center gap-2">
-                                                    <FileText className="h-4 w-4 text-gray-500" />
-                                                    <span className="text-sm">{doc.name}</span>
-                                                    <span className="text-xs text-gray-400">
-                                                        ({(doc.size / 1024).toFixed(1)} KB)
-                                                    </span>
-                                                </div>
-                                                <Button 
-                                                    type="button"
-                                                    variant="ghost" 
-                                                    size="sm"
-                                                    onClick={() => removeDocument(index)}
-                                                >
-                                                    <X className="h-4 w-4 text-red-500" />
-                                                </Button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    {/* Sidebar */}
-                    <div className="space-y-6">
-                        <Card className="bg-blue-50 border-blue-100">
-                            <CardContent className="p-4">
-                                <div className="flex gap-3">
-                                    <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
-                                    <div>
-                                        <p className="text-sm font-semibold text-blue-800">Important Information</p>
-                                        <p className="text-xs text-blue-700 mt-1">
-                                            â€¢ Provide accurate information to expedite your claim<br />
-                                            â€¢ Upload clear photos of the damage<br />
-                                            â€¢ A claim officer will contact you within 48 hours<br />
-                                            â€¢ Keep your policy number handy for reference<br />
-                                            â€¢ Police report is required for theft or vandalism claims
-                                        </p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardContent className="p-4">
-                                <div className="space-y-2">
-                                    <p className="text-sm font-semibold text-gray-700">Reporting Information</p>
-                                    <p className="text-xs text-gray-500">Reporting Date: {formData.reportingDate}</p>
-                                    <p className="text-xs text-gray-500">Reporting Time: {formData.reportingTime}</p>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {selectedPolicy && (
-                            <Card>
-                                <CardContent className="p-4">
-                                    <div className="space-y-2">
-                                        <p className="text-sm font-semibold text-gray-700">Selected Policy Summary</p>
-                                        <p className="text-xs text-gray-500">Policy: {selectedPolicy.policyNumber}</p>
-                                        <p className="text-xs text-gray-500">Type: {selectedPolicy.type}</p>
-                                        <p className="text-xs text-gray-500">Coverage: ETB {selectedPolicy.coverageAmount?.toLocaleString()}</p>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        <Button 
-                            type="submit" 
-                            className="w-full bg-[#1A3E6F]"
-                            disabled={loading}
-                        >
-                            {loading ? 'Submitting...' : 'Submit Claim'}
-                        </Button>
-                    </div>
-                </div>
-            </form>
-        </div>
+          <div className="bg-gray-50 p-3 rounded-lg text-sm">
+            <p className="text-gray-500">Claim is being filed for:</p>
+            <p className="font-medium">
+              {claimForSelf
+                ? selectedPolicy?.policyHolderName || 'Policy Holder'
+                : selectedBeneficiary
+                  ? selectedPolicy?.beneficiaries?.find(b => b.id === selectedBeneficiary)?.fullName
+                  : 'Select a beneficiary'}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     );
+  };
+
+  // ----------------------------------------------------------------------------
+  // Render hospital dropdown
+  // ----------------------------------------------------------------------------
+  const renderHospitalField = () => {
+    return (
+      <div className="space-y-3">
+        <Label className="text-base font-semibold">
+          Hospital / Clinic Name <span className="text-red-500">*</span>
+        </Label>
+        
+        {loadingHospitals ? (
+          <div className="flex items-center gap-2 text-sm text-gray-500 py-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading hospital list...
+          </div>
+        ) : (
+          <>
+            <Select 
+              value={selectedHospital} 
+              onValueChange={(val) => {
+                setSelectedHospital(val);
+                setShowOtherHospital(val === 'OTHER');
+                if (val !== 'OTHER') {
+                  setOtherHospital('');
+                  handleFieldChange('hospital_name', val);
+                } else {
+                  handleFieldChange('hospital_name', '');
+                }
+              }}
+            >
+              <SelectTrigger className={fieldErrors['hospital_name'] ? 'border-red-500' : ''}>
+                <SelectValue placeholder="Select hospital / clinic..." />
+              </SelectTrigger>
+              <SelectContent className="max-h-[300px]">
+                {hospitalList.map((hospital) => (
+                  <SelectItem key={hospital} value={hospital}>
+                    {hospital}
+                  </SelectItem>
+                ))}
+                <SelectItem value="OTHER" className="text-blue-600 font-medium border-t">
+                  <span className="flex items-center gap-2">
+                    <Plus className="h-4 w-4" />
+                    Other (specify below)
+                  </span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+
+            {showOtherHospital && (
+              <div className="mt-3">
+                <Label>Please specify hospital name <span className="text-red-500">*</span></Label>
+                <Input
+                  placeholder="Enter hospital / clinic name..."
+                  value={otherHospital}
+                  onChange={(e) => {
+                    setOtherHospital(e.target.value);
+                    handleFieldChange('hospital_name', e.target.value);
+                  }}
+                  className="mt-1"
+                />
+              </div>
+            )}
+          </>
+        )}
+        
+        {fieldErrors['hospital_name'] && (
+          <p className="text-xs text-red-500 mt-1">{fieldErrors['hospital_name']}</p>
+        )}
+      </div>
+    );
+  };
+
+  // ----------------------------------------------------------------------------
+  // Render custom fields grouped by section
+  // ----------------------------------------------------------------------------
+  const renderCustomFieldsGrouped = () => {
+    const fieldsToRender = customFields.filter(field => {
+      if (selectedPolicy?.type === 'HEALTH' && field.name === 'hospital_name') {
+        return false;
+      }
+      return true;
+    });
+
+    if (fieldsToRender.length === 0) {
+      return (
+        <Card>
+          <CardContent className="py-8 text-center text-gray-500">
+            <Info className="h-10 w-10 mx-auto mb-2 text-gray-300" />
+            <p>No additional fields required for this claim type.</p>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    const groups: Record<string, CustomField[]> = {};
+    fieldsToRender.forEach(field => {
+      const section = field.section || 'General';
+      if (!groups[section]) groups[section] = [];
+      groups[section].push(field);
+    });
+
+    return Object.entries(groups).map(([section, fields]) => (
+      <Card key={section}>
+        <CardHeader>
+          <CardTitle className="text-lg capitalize">
+            {section === 'General' ? 'Additional Details' : `${section} Information`}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {fields.map(field => (
+              <div key={field.name} className={field.type === 'textarea' ? 'col-span-full' : ''}>
+                <Label className={field.required ? "after:content-['*'] after:ml-0.5 after:text-red-500" : ""}>
+                  {field.label}
+                </Label>
+                {renderField(field)}
+                {fieldErrors[field.name] && (
+                  <p className="text-xs text-red-500 mt-1">{fieldErrors[field.name]}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    ));
+  };
+
+  // ----------------------------------------------------------------------------
+  // Submit claim
+  // ----------------------------------------------------------------------------
+  const handleSubmit = async () => {
+    if (!selectedPolicy) return;
+    if (!validateFields()) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        policyId: selectedPolicy.id,
+        incidentDate,
+        incidentDescription,
+        estimatedAmount: estimatedAmount || 0,
+        natureOfLoss: selectedPolicy.type,
+        claimFor: claimForSelf ? 'self' : 'beneficiary',
+        beneficiaryId: claimForSelf ? null : selectedBeneficiary,
+        fieldValues: {
+          ...fieldValues,
+          ...(selectedPolicy.type === 'HEALTH' && {
+            hospital_name: showOtherHospital ? otherHospital : selectedHospital
+          })
+        },
+      };
+
+      const res = await axiosInstance.post('/claims', payload);
+      setCreatedClaimNumber(res.data.claimNumber || '');
+      setSubmissionComplete(true);
+      toast.success('Claim submitted successfully!');
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to submit claim');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ----------------------------------------------------------------------------
+  // Product type icon
+  // ----------------------------------------------------------------------------
+  const ProductIcon = selectedPolicy
+    ? (INSURANCE_ICONS[selectedPolicy.type] || INSURANCE_ICONS.default)
+    : Shield;
+
+  // ============================================================================
+  // SUCCESS SCREEN
+  // ============================================================================
+  if (submissionComplete) {
+    return (
+      <div className="space-y-6">
+        <Button variant="ghost" onClick={() => navigate('/customer/policies')} className="p-0">
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Policies
+        </Button>
+        <Card className="border-green-200 bg-green-50">
+          <CardContent className="p-8 text-center">
+            <div className="h-16 w-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="h-8 w-8 text-green-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-green-800 mb-2">Claim Submitted Successfully!</h2>
+            <p className="text-green-700 mb-6">Your claim has been registered and is being processed.</p>
+            <div className="bg-white rounded-lg p-6 max-w-md mx-auto mb-6">
+              <p className="text-sm text-gray-500 mb-2">Your Claim Number</p>
+              <p className="text-2xl font-bold text-[#1A3E6F]">{createdClaimNumber}</p>
+              <p className="text-xs text-gray-400 mt-2">Please save this number for future reference</p>
+            </div>
+            <Button onClick={() => navigate('/customer/claims')} className="bg-[#1A3E6F]">
+              View My Claims
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // MAIN RENDER
+  // ============================================================================
+  return (
+    <div className="space-y-6">
+      <Button variant="ghost" onClick={() => navigate('/customer/policies')} className="p-0">
+        <ArrowLeft className="mr-2 h-4 w-4" /> Back to Policies
+      </Button>
+
+      <div>
+        <h1 className="text-3xl font-bold text-[#1A3E6F]">Register a New Claim</h1>
+        <p className="text-gray-500 mt-1">Submit a claim for your active policy</p>
+      </div>
+
+      {/* ================================================================ */}
+      {/* STEP 1: SELECT POLICY */}
+      {/* ================================================================ */}
+      {step === 1 && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold">Select an Active Policy</h2>
+          {policies.length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-12">
+                <FileText className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500">No active policies found</p>
+                <Button className="mt-4" onClick={() => navigate('/customer/buy-policy')}>
+                  Buy a Policy
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {policies.map(policy => {
+                const Icon = INSURANCE_ICONS[policy.type] || INSURANCE_ICONS.default;
+                return (
+                  <Card
+                    key={policy.id}
+                    className="cursor-pointer hover:shadow-lg transition-all hover:border-blue-300"
+                    onClick={() => handlePolicySelect(policy)}
+                  >
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                          <Icon className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="font-semibold">{policy.policyNumber}</p>
+                          <Badge className="bg-green-100 text-green-800">{policy.productName}</Badge>
+                        </div>
+                      </div>
+                      <div className="text-sm space-y-1">
+                        <p><span className="text-gray-500">Coverage:</span> {formatCurrency(policy.coverageAmount)}</p>
+                        <p><span className="text-gray-500">Type:</span> {policy.type}</p>
+                        <p><span className="text-gray-500">Valid Until:</span> {new Date(policy.expirationDate).toLocaleDateString()}</p>
+                        {policy.policyHolderName && (
+                          <p><span className="text-gray-500">Policy Holder:</span> {policy.policyHolderName}</p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ================================================================ */}
+      {/* STEP 2: FILL CLAIM FORM */}
+      {/* ================================================================ */}
+      {step === 2 && selectedPolicy && (
+        <div className="space-y-6">
+          {/* Policy info banner */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="outline" size="sm" onClick={() => setStep(1)}>
+              ← Change Policy
+            </Button>
+            <Badge className="bg-blue-100 text-blue-800 text-sm">
+              <ProductIcon className="h-3 w-3 mr-1" />
+              {selectedPolicy.productName}
+            </Badge>
+            <span className="text-sm text-gray-500">
+              Policy: {selectedPolicy.policyNumber}
+            </span>
+            {selectedPolicy.policyHolderName && (
+              <span className="text-sm text-gray-500">
+                | Holder: {selectedPolicy.policyHolderName}
+              </span>
+            )}
+          </div>
+
+          {/* Beneficiary Selector */}
+          {renderBeneficiarySelector()}
+
+          {/* Common Incident Details */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ClipboardList className="h-5 w-5" />
+                Incident Details
+              </CardTitle>
+              <CardDescription>
+                Provide the basic information about what happened
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Incident Date <span className="text-red-500">*</span></Label>
+                  <Input
+                    type="date"
+                    value={incidentDate}
+                    onChange={(e) => setIncidentDate(e.target.value)}
+                    max={new Date().toISOString().split('T')[0]}
+                    className={fieldErrors.incidentDate ? 'border-red-500' : ''}
+                  />
+                  {fieldErrors.incidentDate && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.incidentDate}</p>
+                  )}
+                </div>
+                <div>
+                  <Label>Estimated Claim Amount (ETB)</Label>
+                  <Input
+                    type="number"
+                    value={estimatedAmount || ''}
+                    onChange={(e) => setEstimatedAmount(parseFloat(e.target.value))}
+                    placeholder="Auto-filled from policy coverage"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Policy coverage: {formatCurrency(selectedPolicy.coverageAmount)}
+                  </p>
+                </div>
+              </div>
+              <div>
+                <Label>Incident Description <span className="text-red-500">*</span></Label>
+                <Textarea
+                  value={incidentDescription}
+                  onChange={(e) => setIncidentDescription(e.target.value)}
+                  placeholder="Describe what happened in detail (min. 10 characters)..."
+                  rows={4}
+                  className={fieldErrors.incidentDescription ? 'border-red-500' : ''}
+                />
+                {fieldErrors.incidentDescription && (
+                  <p className="text-xs text-red-500 mt-1">{fieldErrors.incidentDescription}</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Hospital Dropdown for Health Insurance */}
+          {selectedPolicy.type === 'HEALTH' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Hospital className="h-5 w-5 text-red-500" />
+                  Medical Facility
+                </CardTitle>
+                <CardDescription>
+                  Select the hospital or clinic where treatment was received
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {renderHospitalField()}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Dynamic Custom Fields (grouped by section) */}
+          {renderCustomFieldsGrouped()}
+
+          {/* Submit Buttons */}
+          <div className="flex gap-4 justify-end">
+            <Button variant="outline" onClick={() => setStep(1)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSubmit} disabled={submitting} className="bg-blue-600 hover:bg-blue-700">
+              {submitting ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <FileCheck className="h-4 w-4 mr-2" />
+              )}
+              {submitting ? 'Submitting...' : 'Submit Claim'}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

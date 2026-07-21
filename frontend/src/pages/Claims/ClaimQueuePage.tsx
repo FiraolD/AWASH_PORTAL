@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../componen
 import { useAuthStore } from '../../stores/authStore';
 import axios from 'axios';
 import { toast } from 'sonner';
+import axiosInstance from '../../lib/axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
@@ -58,10 +59,12 @@ export default function ClaimQueuePage() {
     try {
       setLoading(true);
       // 🔥 Use /my-assigned to get only claims assigned to the current officer
-      const claimsRes = await axios.get(`${API_URL}/claims/my-assigned`, { 
-        headers: getAuthHeaders() 
-      });
-      
+    
+const claimsRes = await axiosInstance.get('/claims/my-assigned');
+console.log('Raw my-assigned response:', claimsRes.data);   // <-- add this
+
+// Ensure we get an array (it may be nested in a property like "claims" or "data")
+
       // Calculate stats from assigned claims
       const claimsData = claimsRes.data || [];
       const statsData = {

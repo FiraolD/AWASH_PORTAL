@@ -236,7 +236,21 @@ router.get('/pending-review', authenticate, authorize(...CLAIM_ROLES), async (re
 });
 
 // GET /stats/summary – Summary statistics
-router.get('/stats/summary', authenticate, authorize(...CLAIM_ROLES), async (req, res) => {
+router.get('/stats/summary', authenticate, authorize(  'CLAIM_OFFICER',
+  'CLAIM_OFFICER_I',
+  'CLAIM_OFFICER_II',
+  'SENIOR_CLAIM_OFFICER',
+  'SUPERVISOR_CLAIMS',
+  'MANAGER_CLAIMS',
+  'HEAD_CLAIMS',
+  'CLAIMS_ADMIN',
+  'MASTER_ADMIN',
+  'SYSTEM_ADMIN',
+  'SUPER_ADMIN',
+  'CEO',
+  'COO',
+  'CFO',
+  'ADMIN',), async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT 
@@ -601,13 +615,7 @@ router.post('/', authenticate, async (req, res) => {
     });
   }
 });
-
-router.post(
-  '/:id/review',
-  authenticate,
-  authorize(...CLAIM_ROLES),
-  validateBody(reviewSchema),
-  async (req: AuthRequest, res: Response) => {
+router.post('/:id/review', authenticate,  authorize(...CLAIM_ROLES), validateBody(reviewSchema),  async (req: AuthRequest, res: Response) => {
     try {
       const { id } = req.params;
       const userId = req.user!.id;
@@ -828,16 +836,32 @@ router.get('/:id/documents/:documentId/download', authenticate, async (req, res)
     res.status(500).json({ error: 'Failed to download document' });
   }
 });
+
 router.get('/search', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const { q } = req.query;
-    if (!q) {
-      return res.status(400).json({ error: 'Search query is required' });
+    const { query } = req.query;   // match frontend's `params: { query }`
+    if (!query || query.trim().length < 3) {
+      return res.status(400).json({ error: 'Search query must be at least 3 characters' });
     }
 
+    const searchTerm = `%${query.trim()}%`;
+
     const result = await pool.query(
-      `SELECT c.id, c."claimNumber", c.status, c."incidentDate", c."estimatedAmount",
-              p."policyNumber", u."firstName", u."lastName"
+      `SELECT 
+          c.id, 
+          c."claimNumber", 
+          c.status, 
+          c."incidentDate", 
+          c."estimatedAmount",
+          c."natureOfLoss",
+          c."submittedDate",
+          c."incidentDescription",
+          c."location",
+          c."approvedAmount",
+          c."assignedOfficer",
+          c."officerRemarks",
+          p."policyNumber",
+          CONCAT(u."firstName", ' ', u."lastName") AS "customerName"
        FROM claims c
        JOIN policies p ON p.id = c."policyId"
        JOIN users u ON u.id = c."userId"
@@ -845,10 +869,12 @@ router.get('/search', authenticate, async (req: AuthRequest, res: Response) => {
           OR p."policyNumber" ILIKE $1
           OR u."firstName" ILIKE $1
           OR u."lastName" ILIKE $1
+          OR c."natureOfLoss" ILIKE $1
        ORDER BY c."submittedDate" DESC
        LIMIT 50`,
-      [`%${q}%`]
+      [searchTerm]
     );
+
     res.json(result.rows);
   } catch (error) {
     console.error('Claim search error:', error);
@@ -856,7 +882,27 @@ router.get('/search', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-
+// In claims.routes.ts
+router.get('/my-claims', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user.id;
+    const result = await pool.query(
+      `SELECT 
+          c.id, c."claimNumber", c.status, c."incidentDate", c."estimatedAmount",
+          c."approvedAmount", c."natureOfLoss", c."submittedDate", c."incidentDescription",
+          c."location", p."policyNumber", p."type" as "productType"
+       FROM claims c
+       JOIN policies p ON p.id = c."policyId"
+       WHERE p."userId" = $1
+       ORDER BY c."submittedDate" DESC`,
+      [userId]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Fetch my claims error:', error);
+    res.status(500).json({ error: 'Failed to fetch claims' });
+  }
+});
 // =============================================
 // 3. GET CLAIM BY ID (must be AFTER all specific routes)
 // =============================================

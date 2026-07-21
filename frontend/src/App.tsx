@@ -7,6 +7,8 @@ import MainLayout from './components/layout/MainLayout';
 import { RoleGuard } from './components/layout/RoleGuard';
 import DashboardRouter from './pages/Dashboard/DashboardRouter';
 import BuyNewPolicyPage from './pages/Customer/BuyNewPolicyPage';
+import ClaimsPage from './pages/Customer/ClaimsPage';
+import NewClaimPage from './pages/claims/NewClaimPage';
 import FinalApprovalQueue from './pages/Underwriting/FinalApprovalQueue';
 
 
@@ -50,10 +52,8 @@ const UnifiedUnderwritingDashboard = React.lazy(() => import('./pages/Underwriti
 // ============================================
 const ClaimQueuePage = React.lazy(() => import('./pages/Claims/ClaimQueuePage'));
 const ActiveClaimsPage = React.lazy(() => import('./pages/Claims/ActiveClaimsPage'));
-const ClaimsOfficerDashboard = React.lazy(() => import('./pages/Claims/ClaimsOfficerDashboard'));
 const ClaimOfficerReview = React.lazy(() => import('./pages/Claims/ClaimOfficerReview'));
-const ClaimsManagerDashboard = React.lazy(() => import('./pages/Claims/ClaimsManagerDashboard'));
-const ClaimsAdminDashboard = React.lazy(() => import('./pages/Claims/ClaimsAdminDashboard'));
+const UnifiedClaimsDashboard = React.lazy(() => import('./pages/Claims/UnifiedClaimsDashboard'));
 
 // ============================================
 // CUSTOMER PAGES
@@ -344,7 +344,7 @@ export default function App() {
                   UserRole.SUPERVISOR_CLAIMS,
                 ]}
               >
-                <ClaimQueuePage />
+                <UnifiedClaimsDashboard />
               </RoleGuard>
             }
           />
@@ -381,7 +381,7 @@ export default function App() {
                   UserRole.CLAIM_OFFICER_II,
                 ]}
               >
-                <CustomerNewClaimPage />
+                <UnifiedClaimsDashboard />
               </RoleGuard>
             }
           />
@@ -402,7 +402,7 @@ export default function App() {
                   UserRole.SUPERVISOR_CLAIMS,
                 ]}
               >
-                <CustomerClaimsPage />
+                <UnifiedClaimsDashboard />
               </RoleGuard>
             }
           />
@@ -425,7 +425,7 @@ export default function App() {
                   UserRole.CUSTOMER,
                 ]}
               >
-                <ClaimDetailsPage />
+                <UnifiedClaimsDashboard />
               </RoleGuard>
             }
           />
@@ -435,7 +435,7 @@ export default function App() {
             path="claims-manager-dashboard"
             element={
               <RoleGuard allowedRoles={[UserRole.CLAIMS_ADMIN, UserRole.MANAGER_CLAIMS, UserRole.HEAD_CLAIMS]}>
-                <ClaimsManagerDashboard />
+                <UnifiedClaimsDashboard />
               </RoleGuard>
             }
           />
@@ -443,7 +443,23 @@ export default function App() {
             path="claims-admin-dashboard"
             element={
               <RoleGuard allowedRoles={[UserRole.CLAIMS_ADMIN]}>
-                <ClaimsAdminDashboard />
+                <UnifiedClaimsDashboard />
+              </RoleGuard>
+            }
+          />
+          <Route 
+            path="claim-officer-review/:id"
+            element={
+              <RoleGuard allowedRoles={[UserRole.CLAIM_OFFICER, UserRole.CLAIM_OFFICER_I, UserRole.CLAIM_OFFICER_II, UserRole.SENIOR_CLAIM_OFFICER]}>
+                <UnifiedClaimsDashboard/>
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="Unified-Claims-Dashboard"
+            element={
+              <RoleGuard allowedRoles={[UserRole.CLAIMS_ADMIN, UserRole.MANAGER_CLAIMS, UserRole.HEAD_CLAIMS]}>
+                <UnifiedClaimsDashboard />
               </RoleGuard>
             }
           />
@@ -451,74 +467,89 @@ export default function App() {
             path="claims-officer-dashboard"
             element={
               <RoleGuard allowedRoles={[UserRole.CLAIM_OFFICER_I, UserRole.CLAIM_OFFICER_II, UserRole.SENIOR_CLAIM_OFFICER]}>
-                <ClaimsOfficerDashboard />
+                <UnifiedClaimsDashboard />
               </RoleGuard>
             }
           />
 
-          {/* ==================== CUSTOMER ROUTES ==================== */}
-          <Route path="customer">
-            <Route path="dashboard" element={
-              <RoleGuard allowedRoles={[UserRole.CUSTOMER]}>
-                <CustomerDashboardPage />
-              </RoleGuard>
-            } />
-            <Route path="policies" element={
-              <RoleGuard allowedRoles={[UserRole.CUSTOMER]}>
-                <CustomerPoliciesPage />
-              </RoleGuard>
-            } />
-            <Route path="policies/new" element={
-              <RoleGuard allowedRoles={[UserRole.CUSTOMER]}>
-                <BuyNewPolicyPage />
-              </RoleGuard>
-            } />
-            <Route path="policies/:id" element={
-              <RoleGuard allowedRoles={[UserRole.CUSTOMER]}>
-                <PolicyDetailsPage />
-              </RoleGuard>
-            } />
-            <Route path="claims" element={
-              <RoleGuard allowedRoles={[UserRole.CUSTOMER]}>
-                <CustomerClaimsPage />
-              </RoleGuard>
-            } />
-            <Route path="claims/new" element={
-              <RoleGuard allowedRoles={[UserRole.CUSTOMER]}>
-                <CustomerNewClaimPage />
-              </RoleGuard>
-            } />
-            <Route path="claims/:id" element={
-              <RoleGuard allowedRoles={[UserRole.CUSTOMER]}>
-                <ClaimDetailsPage />
-              </RoleGuard>
-            } />
-            <Route path="payments" element={
-              <RoleGuard allowedRoles={[UserRole.CUSTOMER]}>
-                <CustomerPaymentsPage />
-              </RoleGuard>
-            } />
-            <Route path="profile" element={
-              <RoleGuard allowedRoles={[UserRole.CUSTOMER]}>
-                <CustomerProfilePage />
-              </RoleGuard>
-            } />
-            <Route path="documents" element={
-              <RoleGuard allowedRoles={[UserRole.CUSTOMER]}>
-                <CustomerDocumentsPage />
-              </RoleGuard>
-            } />
-            <Route path="support" element={
-              <RoleGuard allowedRoles={[UserRole.CUSTOMER]}>
-                <CustomerSupportPage />
-              </RoleGuard>
-            } />
-            <Route path="policy-offers" element={
-              <RoleGuard allowedRoles={[UserRole.CUSTOMER]}>
-                <CustomerPolicyDecisions />
-              </RoleGuard>
-            } />
-          </Route>
+         {/* ==================== CUSTOMER ROUTES ==================== */}
+<Route path="customer">
+  {/* Dashboard */}
+  <Route path="dashboard" element={
+    <RoleGuard allowedRoles={[UserRole.CUSTOMER]}>
+      <CustomerDashboardPage />
+    </RoleGuard>
+  } />
+  
+  {/* Policies */}
+  <Route path="policies" element={
+    <RoleGuard allowedRoles={[UserRole.CUSTOMER]}>
+      <CustomerPoliciesPage />
+    </RoleGuard>
+  } />
+  <Route path="policies/new" element={
+    <RoleGuard allowedRoles={[UserRole.CUSTOMER]}>
+      <BuyNewPolicyPage />
+    </RoleGuard>
+  } />
+  <Route path="policies/:id" element={
+    <RoleGuard allowedRoles={[UserRole.CUSTOMER]}>
+      <PolicyDetailsPage />
+    </RoleGuard>
+  } />
+  
+  {/* Claims */}
+  <Route path="claims" element={
+    <RoleGuard allowedRoles={[UserRole.CUSTOMER]}>
+      <ClaimsPage />
+    </RoleGuard>
+  } />
+  <Route path="claims/new" element={
+    <RoleGuard allowedRoles={[UserRole.CUSTOMER]}>
+      <NewClaimPage />
+    </RoleGuard>
+  } />
+  <Route path="claims/:id" element={
+    <RoleGuard allowedRoles={[UserRole.CUSTOMER]}>
+      <ClaimDetailsPage />
+    </RoleGuard>
+  } />
+  
+  {/* Payments */}
+  <Route path="payments" element={
+    <RoleGuard allowedRoles={[UserRole.CUSTOMER]}>
+      <CustomerPaymentsPage />
+    </RoleGuard>
+  } />
+  
+  {/* Profile */}
+  <Route path="profile" element={
+    <RoleGuard allowedRoles={[UserRole.CUSTOMER]}>
+      <CustomerProfilePage />
+    </RoleGuard>
+  } />
+  
+  {/* Documents */}
+  <Route path="documents" element={
+    <RoleGuard allowedRoles={[UserRole.CUSTOMER]}>
+      <CustomerDocumentsPage />
+    </RoleGuard>
+  } />
+  
+  {/* Support */}
+  <Route path="support" element={
+    <RoleGuard allowedRoles={[UserRole.CUSTOMER]}>
+      <CustomerSupportPage />
+    </RoleGuard>
+  } />
+  
+  {/* Policy Offers / Decisions (from underwriting) */}
+  <Route path="policy-offers" element={
+    <RoleGuard allowedRoles={[UserRole.CUSTOMER]}>
+      <CustomerPolicyDecisions />
+    </RoleGuard>
+  } />
+</Route>
 
           {/* ==================== SHARED ROUTES (staff) ==================== */}
           <Route

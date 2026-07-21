@@ -34,8 +34,7 @@ export function hasPermission(role: string | undefined, allowedRoles: UserRole[]
 export const navigationConfig = {
   items: [
     // ==================== SHARED ROUTES ====================
-    //{ title: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard', roles: [UserRole.MASTER_ADMIN, UserRole.CUSTOMER_ADMIN, UserRole.CEO] },
-    
+   
     // ==================== MASTER ADMIN ====================
     {title: 'Dashboard', href: '/master-admin-dashboard', icon: 'LayoutDashboard', roles: [UserRole.MASTER_ADMIN]},
     { title: 'User Management', href: '/admin/users', icon: 'Users', roles: [UserRole.MASTER_ADMIN] },
@@ -87,43 +86,9 @@ export const navigationConfig = {
     },
 
     // ==================== CLAIMS ROUTES (corrected hrefs) ====================
+ 
     { 
-      title: 'Dashboard', 
-      href: '/claims-manager-dashboard',  // unified manager/admin dashboard
-      icon: 'FileText', 
-      roles: [UserRole.MANAGER_CLAIMS, UserRole.HEAD_CLAIMS, UserRole.CLAIMS_ADMIN] 
-    },
-    //itle: 'Claim Statistics', href: '/claims/stats', icon: 'BarChart3', roles: [UserRole.MANAGER_CLAIMS, UserRole.HEAD_CLAIMS, UserRole.CLAIMS_ADMIN]},
-    {title: 'Dashboard', href: '/claims/stats/summary', icon: 'Users', roles: [UserRole.CLAIM_OFFICER, UserRole.CLAIM_OFFICER_I, UserRole.CLAIM_OFFICER_II, UserRole.SENIOR_CLAIM_OFFICER, UserRole.SUPERVISOR_CLAIMS]},
-    { 
-      title: 'Claim Queue', 
-      href: '/claims/queue',   // FIXED: was '/claimQueuepage'
-      icon: 'List', 
-      roles: [
-        UserRole.CLAIMS_ADMIN, 
-        UserRole.CLAIM_OFFICER, 
-        UserRole.CLAIM_OFFICER_I, 
-        UserRole.CLAIM_OFFICER_II,
-        UserRole.SENIOR_CLAIM_OFFICER, 
-        UserRole.SUPERVISOR_CLAIMS, 
-        UserRole.MANAGER_CLAIMS, 
-        UserRole.HEAD_CLAIMS
-      ] 
-    },
-    { 
-      title: 'Active Claims', 
-      href: '/claims/active', 
-      icon: 'Activity', 
-      roles: [
-        UserRole.CLAIMS_ADMIN, 
-        UserRole.SENIOR_CLAIM_OFFICER, 
-        UserRole.SUPERVISOR_CLAIMS, 
-        //UserRole.MANAGER_CLAIMS, 
-        UserRole.HEAD_CLAIMS
-      ] 
-    },
-    { 
-      title: 'All Claims', 
+      title: 'Claims Dashboard', 
       href: '/claims', 
       icon: 'Shield', 
       roles: [

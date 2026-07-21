@@ -221,7 +221,33 @@ router.post('/maintenance/run', authenticate, authorize(...SETTINGS_ROLES), asyn
     res.status(500).json({ error: 'Failed to run maintenance tasks' });
   }
 });
-
+// GET list of hospitals (public endpoint - no auth required for claim form)
+router.get('/hospitals', async (req: Request, res: Response) => {
+  try {
+    const result = await pool.query(
+      `SELECT hospital_name 
+       FROM hospital_list 
+       WHERE is_active = true 
+       ORDER BY hospital_name ASC`
+    );
+    res.json(result.rows.map((row: any) => row.hospital_name));
+  } catch (error) {
+    console.error('Fetch hospitals error:', error);
+    // Return fallback list if database query fails
+    res.json([
+      "Tikur Anbessa Specialized Hospital",
+      "St. Paul's Hospital Millennium Medical College",
+      "Yekatit 12 Hospital Medical College",
+      "Zewditu Memorial Hospital",
+      "Alert Hospital",
+      "Menelik II Referral Hospital",
+      "Gandhi Memorial Hospital",
+      "Betezata General Hospital",
+      "Hayat Hospital",
+      "Korean Hospital"
+    ]);
+  }
+});
 // =============================================
 // GET /public – Public settings (no auth)
 // =============================================
