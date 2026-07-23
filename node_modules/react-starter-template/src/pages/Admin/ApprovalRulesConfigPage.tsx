@@ -2,14 +2,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Edit2, Trash2, Save, X, Shield, CheckCircle, Users, ArrowUp, ArrowDown } from 'lucide-react';
 import { toast } from 'sonner';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Label } from '../../components/ui/label';
-import { Badge } from '../../components/ui/badge';
-import { Switch } from '../../components/ui/switch';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
+import { Label } from '../../components/ui/Label';
+import { Badge } from '../../components/ui/Badge';
+import { Switch } from '../../components/ui/Switch';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/Tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/Select';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { apiClient } from '../../api/client';
 

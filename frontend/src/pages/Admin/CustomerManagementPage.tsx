@@ -1,10 +1,10 @@
 import * as React from 'react';
 import { Users, Search, RefreshCw, Mail, Phone, MapPin, MoreVertical, Ban, CheckCircle, Eye } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Badge } from '../../components/ui/badge';
-import { Avatar, AvatarFallback } from '../../components/ui/avatar';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
+import { Badge } from '../../components/ui/Badge';
+import { Avatar, AvatarFallback } from '../../components/ui/Avatar';
 import { useAuthStore } from '../../stores/authStore';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -13,13 +13,13 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '../../components/ui/dropdown-menu';
+} from '../../components/ui/Dropdown-menu';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '../../components/ui/dialog';
+} from '../../components/ui/Dialog';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 

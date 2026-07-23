@@ -5,9 +5,9 @@ import {
   RefreshCw, TrendingUp, Clock, CheckCircle, AlertCircle, 
   Box
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { Badge } from '../../components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import { Badge } from '../../components/ui/Badge';
 import { useAuthStore } from '../../stores/authStore';
 import axios from 'axios';
 import { toast } from 'sonner';

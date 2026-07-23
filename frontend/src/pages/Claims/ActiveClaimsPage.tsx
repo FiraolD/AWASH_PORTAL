@@ -1,9 +1,9 @@
 import * as React from 'react';
 import { Search, Eye, MessageCircle, Clock, RefreshCw } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Badge } from '../../components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
+import { Badge } from '../../components/ui/Badge';
 import { Progress } from '../../components/ui/progress';
 import { useAuthStore } from '../../stores/authStore';
 import axios from 'axios';

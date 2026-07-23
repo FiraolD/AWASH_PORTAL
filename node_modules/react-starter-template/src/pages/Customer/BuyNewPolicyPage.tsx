@@ -4,13 +4,13 @@ import {
   ArrowLeft, Shield, DollarSign, Calendar, AlertCircle, Loader2,
   CheckCircle, FileText, Eye, Copy, Info, ChevronDown
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Label } from '../../components/ui/label';
-import { Switch } from '../../components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
-import { Textarea } from '../../components/ui/textarea';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
+import { Label } from '../../components/ui/Label';
+import { Switch } from '../../components/ui/Switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/Select';
+import { Textarea } from '../../components/ui/Textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '../../components/ui/popover';
 import { Checkbox } from '../../components/ui/checkbox';
 import { useAuthStore } from '../../stores/authStore';

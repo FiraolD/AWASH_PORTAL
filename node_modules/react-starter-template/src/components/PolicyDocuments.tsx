@@ -1,8 +1,8 @@
 ﻿import React, { useEffect, useState } from 'react';
 import axios from 'axios'; // â† ADD THIS IMPORT
 import { Download, Eye, FileText, Trash2, Upload } from 'lucide-react';
-import { Button } from '../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../components/ui/Button';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { useAuthStore } from '../stores/authStore';
 import { toast } from 'sonner';
 

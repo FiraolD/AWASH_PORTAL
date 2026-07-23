@@ -1,11 +1,11 @@
 import * as React from 'react';
 import { Users, Plus, Edit2, Trash2, RefreshCw, DollarSign, Package } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Label } from '../../components/ui/label';
-import { Badge } from '../../components/ui/badge';
-import { Switch } from '../../components/ui/switch';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
+import { Label } from '../../components/ui/Label';
+import { Badge } from '../../components/ui/Badge';
+import { Switch } from '../../components/ui/Switch';
 import { useAuthStore } from '../../stores/authStore';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -15,14 +15,14 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '../../components/ui/dialog';
+} from '../../components/ui/Dialog';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../../components/ui/select';
+} from '../../components/ui/Select';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 

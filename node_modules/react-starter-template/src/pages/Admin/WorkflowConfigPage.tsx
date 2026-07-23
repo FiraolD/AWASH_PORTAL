@@ -16,12 +16,12 @@ import {
   CheckCircle,
   Shield
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Label } from '../../components/ui/label';
-import { Badge } from '../../components/ui/badge';
-import { Switch } from '../../components/ui/switch';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
+import { Label } from '../../components/ui/Label';
+import { Badge } from '../../components/ui/Badge';
+import { Switch } from '../../components/ui/Switch';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/tabs';
 import { useAuthStore } from '../../stores/authStore';
 import { hasPermission } from '../../lib/utils/rolePermissions';
@@ -34,7 +34,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../../components/ui/select';
+} from '../../components/ui/Select';
 
 import {
   Dialog,
@@ -42,7 +42,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,  // Add this line
-} from '../../components/ui/dialog';
+} from '../../components/ui/Dialog';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 

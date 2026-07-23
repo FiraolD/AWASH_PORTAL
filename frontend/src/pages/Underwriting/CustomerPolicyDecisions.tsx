@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircle, XCircle, MessageSquare, DollarSign, Calendar, AlertCircle, Loader2 } from 'lucide-react';
-import { Card, CardContent } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { Textarea } from '../../components/ui/textarea';
-import { Badge } from '../../components/ui/badge';
+import { Card, CardContent } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import { Textarea } from '../../components/ui/Textarea';
+import { Badge } from '../../components/ui/Badge';
 import axiosInstance from '../../lib/axios';
 import { toast } from 'sonner';
 

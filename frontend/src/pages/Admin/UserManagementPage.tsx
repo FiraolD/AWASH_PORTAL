@@ -1,9 +1,9 @@
 import * as React from 'react';
 import { Search, Ban, CheckCircle, Plus, RefreshCw } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Badge } from '../../components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
+import { Badge } from '../../components/ui/Badge';
 import { useAuthStore } from '../../stores/authStore';
 import { UserRole } from '../../types';
 import { useState, useEffect } from 'react';
@@ -15,8 +15,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '../../components/ui/dialog';
-import { Label } from '../../components/ui/label';
+} from '../../components/ui/Dialog';
+import { Label } from '../../components/ui/Label';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 

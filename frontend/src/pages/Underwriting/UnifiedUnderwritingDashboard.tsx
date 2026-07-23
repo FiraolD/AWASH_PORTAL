@@ -8,15 +8,15 @@ import {
   ChevronDown, ChevronUp, Package, ShieldCheck, Info, AlertCircle,
   Plus, Minus, Search, Filter, RefreshCw, Download
 } from 'lucide-react';
-import { Card, CardContent } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { Badge } from '../../components/ui/badge';
+import { Card, CardContent } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import { Badge } from '../../components/ui/Badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
-import { Input } from '../../components/ui/input';
-import { Label } from '../../components/ui/label';
-import { Textarea } from '../../components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/Dialog';
+import { Input } from '../../components/ui/Input';
+import { Label } from '../../components/ui/Label';
+import { Textarea } from '../../components/ui/Textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/Select';
 import axiosInstance from '../../lib/axios';
 import { useAuthStore } from '../../stores/authStore';
 import { toast } from 'sonner';

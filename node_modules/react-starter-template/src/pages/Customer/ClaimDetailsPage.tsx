@@ -6,11 +6,11 @@ import {
   Key, Hash, Wrench, Truck, Briefcase, CreditCard, Home, Loader2, Copy, Check,
   Shield, RefreshCw, MessageSquare, FileCheck
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { Badge } from '../../components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import { Badge } from '../../components/ui/Badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
-import { Separator } from '../../components/ui/separator';
+import { Separator } from '../../components/ui/Separator';
 import { useAuthStore } from '../../stores/authStore';
 import { toast } from 'sonner';
 import axiosInstance from '../../lib/axios';

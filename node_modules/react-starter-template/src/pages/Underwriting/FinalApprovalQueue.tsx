@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircle, XCircle, Eye, MessageSquare, DollarSign, User, Loader2, Calendar, FileText, AlertCircle } from 'lucide-react';
-import { Card, CardContent } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { Badge } from '../../components/ui/badge';
-import { Textarea } from '../../components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
+import { Card, CardContent } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import { Badge } from '../../components/ui/Badge';
+import { Textarea } from '../../components/ui/Textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/Dialog';
 import axiosInstance from '../../lib/axios';
 import { useAuthStore } from '../../stores/authStore';
 import { toast } from 'sonner';

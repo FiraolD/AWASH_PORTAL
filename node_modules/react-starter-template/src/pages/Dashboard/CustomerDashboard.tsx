@@ -5,9 +5,9 @@ import {
   CheckCircle, Clock, ChevronRight, CreditCard, Headphones,
   FileCheck, TrendingUp, Calendar
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { Badge } from '../../components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import { Badge } from '../../components/ui/Badge';
 import axiosInstance from '../../lib/axios';
 import { useAuthStore } from '../../stores/authStore';
 import { toast } from 'sonner';

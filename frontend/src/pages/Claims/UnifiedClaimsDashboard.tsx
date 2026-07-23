@@ -3,12 +3,12 @@ import {
   FileText, Clock, CheckCircle, XCircle, AlertCircle, RefreshCw, Loader2,
   Search, Eye, ClipboardList, Activity, DollarSign, User
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Badge } from '../../components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
+import { Badge } from '../../components/ui/Badge';
 import { ScrollArea } from '../../components/ui/scroll-area';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/Dialog';
 import axiosInstance from '../../lib/axios';
 import { useAuthStore } from '../../stores/authStore';
 import { toast } from 'sonner';

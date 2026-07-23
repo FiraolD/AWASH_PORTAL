@@ -1,11 +1,11 @@
 import * as React from 'react';
 import { Package, Plus, Edit2, Trash2, Eye, RefreshCw, X, Check } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Label } from '../../components/ui/label';
-import { Badge } from '../../components/ui/badge';
-import { Switch } from '../../components/ui/switch';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
+import { Label } from '../../components/ui/Label';
+import { Badge } from '../../components/ui/Badge';
+import { Switch } from '../../components/ui/Switch';
 import axiosInstance from '../../lib/axios';
 import { toast } from 'sonner';
 import {
@@ -14,14 +14,14 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '../../components/ui/dialog';
+} from '../../components/ui/Dialog';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../../components/ui/select';
+} from '../../components/ui/Select';
 
 interface Product {
   id: string;

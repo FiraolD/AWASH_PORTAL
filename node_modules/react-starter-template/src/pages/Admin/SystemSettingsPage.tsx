@@ -1,10 +1,10 @@
 import * as React from 'react';
 import { Settings, Globe, Bell, Shield, Database, Mail, Phone, Lock, Save, RefreshCw, AlertCircle, Download, HardDrive } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { Switch } from '../../components/ui/switch';
-import { Input } from '../../components/ui/input';
-import { Label } from '../../components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import { Switch } from '../../components/ui/Switch';
+import { Input } from '../../components/ui/Input';
+import { Label } from '../../components/ui/Label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/tabs';
 import { useAuthStore } from '../../stores/authStore';
 import { useState, useEffect } from 'react';

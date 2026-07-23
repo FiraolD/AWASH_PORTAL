@@ -2,7 +2,7 @@ import * as React from 'react';
 import { Menu, Bell, Search, Settings, HelpCircle, ShieldCheck } from 'lucide-react';
 import { useUIStore } from '../../stores/uiStore';
 import { useAuthStore } from '../../stores/authStore';
-import { Button } from '../ui/button';
+import { Button } from '../ui/Button';
 
 const Header = () => {
   const { setSidebarOpen } = useUIStore();

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Search, Filter, Download, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
 import axios from 'axios';
 import { toast } from 'sonner';
 
