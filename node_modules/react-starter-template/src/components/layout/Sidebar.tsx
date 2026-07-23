@@ -1,5 +1,10 @@
 import * as React from 'react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import {
+  NavLink,
+  useLocation,
+  useNavigate,
+  type NavLinkRenderProps,
+} from 'react-router-dom';
 import {
   LayoutDashboard, FileText, Shield, CreditCard, Users, Settings,
   HelpCircle, User, LogOut, Menu, ChevronLeft, ChevronRight,
@@ -130,7 +135,7 @@ const Sidebar = () => {
                   <NavLink
                     key={item.href}
                     to={item.href}
-                    className={({ isActive }) => cn(
+                    className={({ isActive }: NavLinkRenderProps) =>cn(
                       'group relative flex items-center justify-between rounded-xl px-4 py-3.5 transition-all duration-200',
                       isActive 
                         ? 'bg-white text-[#1A3E6F] shadow-lg shadow-black/10' 
