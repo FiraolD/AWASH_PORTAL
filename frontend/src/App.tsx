@@ -8,7 +8,7 @@ import { RoleGuard } from './components/layout/RoleGuard';
 import DashboardRouter from './pages/Dashboard/DashboardRouter';
 import BuyNewPolicyPage from './pages/Customer/BuyNewPolicyPage';
 import ClaimsPage from './pages/Customer/ClaimsPage';
-import NewClaimPage from './pages/claims/NewClaimPage';
+import NewClaimPage from './pages/Claims/NewClaimPage';
 import FinalApprovalQueue from './pages/Underwriting/FinalApprovalQueue';
 
 
