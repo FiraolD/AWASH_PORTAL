@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from '../../components/ui/Select';
 import { Textarea } from '../../components/ui/Textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/Tabs';
 import axiosInstance from '../../lib/axios';
 
 interface Product {

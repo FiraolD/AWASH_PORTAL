@@ -5,7 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { Switch } from '../../components/ui/Switch';
 import { Input } from '../../components/ui/Input';
 import { Label } from '../../components/ui/Label';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/Tabs';
 import { useAuthStore } from '../../stores/authStore';
 import { useState, useEffect } from 'react';
 import axios from 'axios';

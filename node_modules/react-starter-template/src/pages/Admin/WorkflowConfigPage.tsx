@@ -22,7 +22,7 @@ import { Input } from '../../components/ui/Input';
 import { Label } from '../../components/ui/Label';
 import { Badge } from '../../components/ui/Badge';
 import { Switch } from '../../components/ui/Switch';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/Tabs';
 import { useAuthStore } from '../../stores/authStore';
 import { hasPermission } from '../../lib/utils/rolePermissions';
 import { UserRole } from '../../types';
