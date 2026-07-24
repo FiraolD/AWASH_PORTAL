@@ -1,6 +1,5 @@
-import { Router } from 'express';
 import pool from '../../lib/db.js';
-import { authenticate, authorize } from '../middleware/auth.middleware.js';
+import { authenticate, authorize, AuthRequest } from '../middleware/auth.middleware.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -15,7 +14,7 @@ const reviewSchema = z.object({
 });
 
 
-const router = Router();
+const router = router();
 router.use(authenticate);
 
 // Configure multer for file uploads

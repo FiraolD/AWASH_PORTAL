@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Response } from 'express';
 import pool from '../../lib/db.js';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
 

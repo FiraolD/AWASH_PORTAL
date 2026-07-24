@@ -95,7 +95,7 @@ export const ROLE_GROUPS = {
     ROLES.SYSTEM_ADMIN,
     ROLES.SUPER_ADMIN,
     ROLES.CEO,
-    ROLES.COCO,
+    ROLES.COO,
     ROLES.CFO,
     ROLES.ADMIN,
   ],

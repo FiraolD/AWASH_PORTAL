@@ -1,45 +1,208 @@
+// src/middleware/auth.middleware.ts
 import jwt from 'jsonwebtoken';
-import pool from '../../lib/db.js';
-import { getJwtSecret } from '../../lib/security.js';
+import pool from '../../lib/db.js'; // ✅ Added .js extension
+// ---------------------------------------------------------------------------
+// Role definitions (centralized)
+// ---------------------------------------------------------------------------
+export const ROLES = {
+    // Customer
+    CUSTOMER: 'CUSTOMER',
+    // Customer Admin / Support
+    CUSTOMER_ADMIN: 'CUSTOMER_ADMIN',
+    CUSTOMER_SUPPORT: 'CUSTOMER_SUPPORT',
+    CUSTOMER_RELATION_OFFICER: 'CUSTOMER_RELATION_OFFICER',
+    // Underwriting
+    UNDERWRITER_I: 'UNDERWRITER_I',
+    UNDERWRITER_II: 'UNDERWRITER_II',
+    SENIOR_UNDERWRITER: 'SENIOR_UNDERWRITER',
+    UNDERWRITING_MANAGER: 'UNDERWRITING_MANAGER',
+    HEAD_UNDERWRITING: 'HEAD_UNDERWRITING',
+    UNDERWRITING_ADMIN: 'UNDERWRITING_ADMIN',
+    // Claims
+    CLAIM_OFFICER: 'CLAIM_OFFICER',
+    CLAIM_OFFICER_I: 'CLAIM_OFFICER_I',
+    CLAIM_OFFICER_II: 'CLAIM_OFFICER_II',
+    SENIOR_CLAIM_OFFICER: 'SENIOR_CLAIM_OFFICER',
+    SUPERVISOR_CLAIMS: 'SUPERVISOR_CLAIMS',
+    MANAGER_CLAIMS: 'MANAGER_CLAIMS',
+    HEAD_CLAIMS: 'HEAD_CLAIMS',
+    CLAIMS_ADMIN: 'CLAIMS_ADMIN',
+    // Master Admin / Executives
+    MASTER_ADMIN: 'MASTER_ADMIN',
+    SYSTEM_ADMIN: 'SYSTEM_ADMIN',
+    SUPER_ADMIN: 'SUPER_ADMIN',
+    CEO: 'CEO',
+    COO: 'COO', // ✅ Fixed
+    CFO: 'CFO',
+    ADMIN: 'ADMIN',
+};
+// ---------------------------------------------------------------------------
+// Role groups (for convenience)
+// ---------------------------------------------------------------------------
+export const ROLE_GROUPS = {
+    // All claims staff
+    CLAIMS_STAFF: [
+        ROLES.CLAIM_OFFICER,
+        ROLES.CLAIM_OFFICER_I,
+        ROLES.CLAIM_OFFICER_II,
+        ROLES.SENIOR_CLAIM_OFFICER,
+        ROLES.SUPERVISOR_CLAIMS,
+        ROLES.MANAGER_CLAIMS,
+        ROLES.HEAD_CLAIMS,
+        ROLES.CLAIMS_ADMIN,
+    ],
+    // Claims officers (reviewers – cannot approve/reject)
+    CLAIMS_REVIEWERS: [
+        ROLES.CLAIM_OFFICER,
+        ROLES.CLAIM_OFFICER_I,
+        ROLES.CLAIM_OFFICER_II,
+        ROLES.SENIOR_CLAIM_OFFICER,
+    ],
+    // Claims approvers (can approve/reject)
+    CLAIMS_APPROVERS: [
+        ROLES.SUPERVISOR_CLAIMS,
+        ROLES.MANAGER_CLAIMS,
+        ROLES.HEAD_CLAIMS,
+        ROLES.CLAIMS_ADMIN,
+    ],
+    // Admin / Executives
+    EXECUTIVES: [
+        ROLES.MASTER_ADMIN,
+        ROLES.SYSTEM_ADMIN,
+        ROLES.SUPER_ADMIN,
+        ROLES.CEO,
+        ROLES.COO, // ✅ Fixed
+        ROLES.CFO,
+        ROLES.ADMIN,
+    ],
+    // Underwriting staff
+    UNDERWRITING_STAFF: [
+        ROLES.UNDERWRITER_I,
+        ROLES.UNDERWRITER_II,
+        ROLES.SENIOR_UNDERWRITER,
+        ROLES.UNDERWRITING_MANAGER,
+        ROLES.HEAD_UNDERWRITING,
+        ROLES.UNDERWRITING_ADMIN,
+    ],
+    // Customer-facing roles
+    CUSTOMER_FACING: [
+        ROLES.CUSTOMER,
+        ROLES.CUSTOMER_ADMIN,
+        ROLES.CUSTOMER_SUPPORT,
+        ROLES.CUSTOMER_RELATION_OFFICER,
+    ],
+    // All authenticated users (everyone)
+    ALL_AUTHENTICATED: Object.values(ROLES),
+};
+// ---------------------------------------------------------------------------
+// JWT Authentication Middleware
+// ---------------------------------------------------------------------------
 export const authenticate = async (req, res, next) => {
     try {
         const authHeader = req.headers.authorization;
-        if (!authHeader) {
-            return res.status(401).json({ error: 'No authorization header' });
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            res.status(401).json({ error: 'Access denied. No token provided.' });
+            return;
         }
-        const token = authHeader.replace('Bearer ', '');
+        const token = authHeader.split(' ')[1];
         if (!token) {
-            return res.status(401).json({ error: 'No token provided' });
+            res.status(401).json({ error: 'Access denied. No token provided.' });
+            return;
         }
-        // Verify the token
-        const decoded = jwt.verify(token, getJwtSecret());
-        // Get user from database
-        const result = await pool.query('SELECT id, email, role, "firstName", "lastName" FROM users WHERE id = $1 AND status = $2', [decoded.id, 'ACTIVE']);
-        if (result.rows.length === 0) {
-            return res.status(401).json({ error: 'User not found or inactive' });
+        const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+        const decoded = jwt.verify(token, JWT_SECRET);
+        const userResult = await pool.query(`SELECT id, email, role, "firstName", "lastName", "isActive" 
+       FROM users WHERE id = $1`, [decoded.id]);
+        if (userResult.rows.length === 0) {
+            res.status(401).json({ error: 'User not found.' });
+            return;
         }
-        req.user = result.rows[0];
+        const user = userResult.rows[0];
+        if (!user.isActive) {
+            res.status(403).json({ error: 'Account is deactivated. Contact admin.' });
+            return;
+        }
+        req.user = {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            firstName: user.firstName,
+            lastName: user.lastName,
+        };
+        console.log(`[AUTH] User authenticated: ${user.email} (${user.role})`);
         next();
     }
     catch (error) {
-        console.error('Token verification failed:', error.message);
         if (error.name === 'JsonWebTokenError') {
-            return res.status(401).json({ error: 'Invalid token' });
+            res.status(401).json({ error: 'Invalid token.' });
+            return;
         }
         if (error.name === 'TokenExpiredError') {
-            return res.status(401).json({ error: 'Token expired' });
+            res.status(401).json({ error: 'Token expired.' });
+            return;
         }
-        return res.status(401).json({ error: 'Authentication failed' });
+        console.error('[AUTH] Authentication error:', error);
+        res.status(500).json({ error: 'Internal server error.' });
     }
 };
-export const authorize = (...roles) => {
+// ---------------------------------------------------------------------------
+// Role Authorization Middleware
+// ---------------------------------------------------------------------------
+export const authorize = (...allowedRoles) => {
     return (req, res, next) => {
-        if (!req.user) {
-            return res.status(401).json({ error: 'Unauthorized' });
+        const userRole = req.user?.role;
+        if (!userRole) {
+            console.log('[AUTHORIZE] No user role found – access denied');
+            res.status(401).json({ error: 'Authentication required.' });
+            return;
         }
-        if (!roles.includes(req.user.role)) {
-            return res.status(403).json({ error: 'Insufficient permissions' });
+        console.log(`[AUTHORIZE] User role: ${userRole}`);
+        console.log(`[AUTHORIZE] Allowed roles: [${allowedRoles.join(', ')}]`);
+        const isAllowed = allowedRoles.includes(userRole);
+        if (!isAllowed) {
+            console.log(`[AUTHORIZE] ACCESS DENIED – ${userRole} not in allowed list`);
+            res.status(403).json({
+                error: 'Insufficient permissions',
+                userRole,
+                requiredRoles: allowedRoles,
+            });
+            return;
         }
+        console.log(`[AUTHORIZE] ACCESS GRANTED – ${userRole}`);
         next();
     };
+};
+// Convenience middleware
+export const authorizeClaimsStaff = authorize(...ROLE_GROUPS.CLAIMS_STAFF);
+export const authorizeClaimsApprovers = authorize(...ROLE_GROUPS.CLAIMS_APPROVERS, ...ROLE_GROUPS.EXECUTIVES);
+export const authorizeClaimsReviewers = authorize(...ROLE_GROUPS.CLAIMS_REVIEWERS);
+export const authorizeClaimsAll = authorize(...ROLE_GROUPS.CLAIMS_STAFF, ...ROLE_GROUPS.EXECUTIVES);
+export const authorizeExecutives = authorize(...ROLE_GROUPS.EXECUTIVES);
+export const authorizeCustomer = authorize(ROLES.CUSTOMER);
+export const authorizeAny = authorize(...ROLE_GROUPS.ALL_AUTHENTICATED);
+export const softAuthenticate = async (req, res, next) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            next();
+            return;
+        }
+        const token = authHeader.split(' ')[1];
+        const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+        const decoded = jwt.verify(token, JWT_SECRET);
+        const userResult = await pool.query(`SELECT id, email, role, "firstName", "lastName" FROM users WHERE id = $1`, [decoded.id]);
+        if (userResult.rows.length > 0) {
+            req.user = {
+                id: userResult.rows[0].id,
+                email: userResult.rows[0].email,
+                role: userResult.rows[0].role,
+                firstName: userResult.rows[0].firstName,
+                lastName: userResult.rows[0].lastName,
+            };
+        }
+    }
+    catch {
+        // Invalid token – continue without user
+    }
+    next();
 };

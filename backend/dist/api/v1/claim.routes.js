@@ -1,4 +1,3 @@
-import { Router } from 'express';
 import pool from '../../lib/db.js';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
 import multer from 'multer';
@@ -12,7 +11,7 @@ const reviewSchema = z.object({
     approvedAmount: z.number().optional(),
     notes: z.string().optional(),
 });
-const router = Router();
+const router = router();
 router.use(authenticate);
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -221,7 +220,7 @@ router.get('/pending-review', authenticate, authorize(...CLAIM_ROLES), async (re
     }
 });
 // GET /stats/summary – Summary statistics
-router.get('/stats/summary', authenticate, authorize(...CLAIM_ROLES), async (req, res) => {
+router.get('/stats/summary', authenticate, authorize('CLAIM_OFFICER', 'CLAIM_OFFICER_I', 'CLAIM_OFFICER_II', 'SENIOR_CLAIM_OFFICER', 'SUPERVISOR_CLAIMS', 'MANAGER_CLAIMS', 'HEAD_CLAIMS', 'CLAIMS_ADMIN', 'MASTER_ADMIN', 'SYSTEM_ADMIN', 'SUPER_ADMIN', 'CEO', 'COO', 'CFO', 'ADMIN'), async (req, res) => {
     try {
         const result = await pool.query(`
       SELECT 
@@ -756,6 +755,25 @@ router.get('/search', authenticate, async (req, res) => {
     catch (error) {
         console.error('Claim search error:', error);
         res.status(500).json({ error: 'Search failed' });
+    }
+});
+// In claims.routes.ts
+router.get('/my-claims', authenticate, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const result = await pool.query(`SELECT 
+          c.id, c."claimNumber", c.status, c."incidentDate", c."estimatedAmount",
+          c."approvedAmount", c."natureOfLoss", c."submittedDate", c."incidentDescription",
+          c."location", p."policyNumber", p."type" as "productType"
+       FROM claims c
+       JOIN policies p ON p.id = c."policyId"
+       WHERE p."userId" = $1
+       ORDER BY c."submittedDate" DESC`, [userId]);
+        res.json(result.rows);
+    }
+    catch (error) {
+        console.error('Fetch my claims error:', error);
+        res.status(500).json({ error: 'Failed to fetch claims' });
     }
 });
 // =============================================
