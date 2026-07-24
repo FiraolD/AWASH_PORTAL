@@ -54,11 +54,11 @@ export default function LoginPage() {
         >
           <div className="text-center md:text-left">
             <div className="mb-6 inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-white shadow-xl p-2 border border-slate-100 overflow-hidden">
-              <img src={logoUrl} alt="Awash Insurance Logo" className="h-full w-full object-contain" />
+              <img src={logoUrl} alt="Logo" className="h-full w-full object-contain" />
             </div>
             <h2 className="text-3xl font-extrabold tracking-tight text-[#111827]">Welcome back</h2>
             <p className="mt-2 text-sm text-[#6B7280]">
-              "Where There Is Awash, There Is Peace Of Mind"
+              "With Smart Insurance, cover your risks and secure your future."
             </p>
           </div>
 
@@ -157,9 +157,9 @@ export default function LoginPage() {
              >
                <img src={logoUrl} alt="Awash Logo" className="h-24 w-auto" />
              </motion.div>
-            <h1 className="text-5xl font-extrabold leading-tight tracking-tight">We Flow With You.</h1>
+            <h1 className="text-5xl font-extrabold leading-tight tracking-tight">Smart Insurance for Smart life.</h1>
             <p className="text-xl text-blue-100/90 font-medium">
-              "Where There Is Awash, There Is Peace Of Mind"
+              "With Smart Insurance, cover your risks and secure your future."
             </p>
             <div className="flex justify-center gap-4 pt-4">
                <div className="h-1 w-12 bg-white/20 rounded-full"></div>
