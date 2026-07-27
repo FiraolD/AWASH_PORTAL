@@ -2,7 +2,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import pool from '../../lib/db';  // ✅ Added .js extension
+import pool from '../../lib/db.js';  // ✅ Added .js extension
 //import pool from '../config/database'
 
 // ---------------------------------------------------------------------------
