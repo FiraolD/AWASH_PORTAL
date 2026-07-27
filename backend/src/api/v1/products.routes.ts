@@ -28,7 +28,7 @@ const initProductFieldsTable = async () => {
 // ==================== PRODUCT CRUD ====================
 
 // Get all active products
-router.get('/', async (req, res) => {
+router.get('/', async (req: any, res: any) => {
   try {
     const result = await pool.query(`
       SELECT 
@@ -53,7 +53,7 @@ router.get('/', async (req, res) => {
 });
 
 // Get available products for purchase
-router.get('/available', async (req, res) => {
+router.get('/available', async (req: any, res: any) => {
   try {
     const result = await pool.query(`
       SELECT id, name, code, description, "isActive"
@@ -68,36 +68,115 @@ router.get('/available', async (req, res) => {
   }
 });
 
-// Get product by ID
-router.get('/:id', async (req, res) => {
+// ✅ FIXED: Get product by ID (was using '$1' as string literal, now uses parameterized query)
+// Also supports product code lookup as fallback
+router.get('/:id', async (req: any, res: any) => {
   try {
-    const result = await pool.query(`
-      SELECT * FROM products WHERE id = $1
-    `, [req.params.id]);
+    const { id } = req.params;
     
-    if (result.rows.length === 0) {
+    // Check if the parameter looks like a UUID
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    
+    let productResult;
+    if (isUUID) {
+      // Fetch by ID
+      productResult = await pool.query(
+        `SELECT * FROM products WHERE id = $1`,
+        [id]
+      );
+    } else {
+      // Fetch by product code (case-insensitive)
+      productResult = await pool.query(
+        `SELECT * FROM products WHERE UPPER(code) = UPPER($1) OR UPPER(name) = UPPER($1)`,
+        [id]
+      );
+    }
+    
+    if (productResult.rows.length === 0) {
       return res.status(404).json({ error: 'Product not found' });
     }
     
-    res.json(result.rows[0]);
+    const product = productResult.rows[0];
+    
+    // Fetch custom fields for this product
+    await initProductFieldsTable();
+    const fieldsResult = await pool.query(
+      `SELECT 
+        "fieldName" as name,
+        "fieldLabel" as label,
+        "fieldType" as type,
+        "isRequired" as required,
+        options,
+        "displayOrder"
+       FROM product_fields 
+       WHERE "productId" = $1 
+       ORDER BY "displayOrder" ASC`,
+      [product.id]
+    );
+    
+    // Format fields to match frontend CustomField interface
+    const customFields = fieldsResult.rows.map((field: any) => ({
+      name: field.name,
+      label: field.label,
+      type: field.type || 'text',
+      required: field.required || false,
+      options: field.options ? (typeof field.options === 'string' ? JSON.parse(field.options) : field.options) : [],
+    }));
+
+    res.json({
+      ...product,
+      customFields,
+    });
   } catch (error) {
     console.error('Failed to fetch product:', error);
     res.status(500).json({ error: 'Failed to fetch product' });
   }
 });
 
-// Get product by code
-router.get('/code/:code', async (req, res) => {
+// Get product by code (dedicated endpoint)
+router.get('/code/:code', async (req: any, res: any) => {
   try {
-    const result = await pool.query(`
-      SELECT * FROM products WHERE code = $1
-    `, [req.params.code.toUpperCase()]);
+    const { code } = req.params;
     
-    if (result.rows.length === 0) {
+    const productResult = await pool.query(
+      `SELECT * FROM products WHERE UPPER(code) = UPPER($1)`,
+      [code]
+    );
+    
+    if (productResult.rows.length === 0) {
       return res.status(404).json({ error: 'Product not found' });
     }
     
-    res.json(result.rows[0]);
+    const product = productResult.rows[0];
+    
+    // Fetch custom fields
+    await initProductFieldsTable();
+    const fieldsResult = await pool.query(
+      `SELECT 
+        "fieldName" as name,
+        "fieldLabel" as label,
+        "fieldType" as type,
+        "isRequired" as required,
+        options,
+        "displayOrder"
+       FROM product_fields 
+       WHERE "productId" = $1 
+       ORDER BY "displayOrder" ASC`,
+      [product.id]
+    );
+    
+    const customFields = fieldsResult.rows.map((field: any) => ({
+      name: field.name,
+      label: field.label,
+      type: field.type || 'text',
+      required: field.required || false,
+      options: field.options ? (typeof field.options === 'string' ? JSON.parse(field.options) : field.options) : [],
+    }));
+
+    res.json({
+      ...product,
+      customFields,
+    });
   } catch (error) {
     console.error('Failed to fetch product by code:', error);
     res.status(500).json({ error: 'Failed to fetch product' });
@@ -105,7 +184,7 @@ router.get('/code/:code', async (req, res) => {
 });
 
 // Create product (admin only)
-router.post('/', authenticate, authorize('MASTER_ADMIN'), async (req, res) => {
+router.post('/', authenticate, authorize('MASTER_ADMIN'), async (req: any, res: any) => {
   try {
     const { name, code, description, category, isActive, requiresApproval, approvalFlow } = req.body;
     
@@ -117,21 +196,20 @@ router.post('/', authenticate, authorize('MASTER_ADMIN'), async (req, res) => {
     
     const result = await pool.query(`
       INSERT INTO products (
-        id, 
-        name, 
-        code, 
-        description, 
-        category, 
-        "isActive", 
-        "requiresApproval", 
-        "approvalFlow", 
-        "createdAt", 
-        "updatedAt"
+        id, name, code, description, category, 
+        "isActive", "requiresApproval", "approvalFlow", "createdAt", "updatedAt"
       ) VALUES (
-        gen_random_uuid()::text, 
-        $1, $2, $3, $4, $5, $6, $7, NOW(), NOW()
+        gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, NOW(), NOW()
       ) RETURNING *
-    `, [name, code.toUpperCase(), description, category || null, isActive !== undefined ? isActive : true, requiresApproval || false, approvalFlow || null]);
+    `, [
+      name,
+      code.toUpperCase(),
+      description,
+      category || null,
+      isActive !== undefined ? isActive : true,
+      requiresApproval || false,
+      approvalFlow || null
+    ]);
     
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -141,7 +219,7 @@ router.post('/', authenticate, authorize('MASTER_ADMIN'), async (req, res) => {
 });
 
 // Update product
-router.put('/:id', authenticate, authorize('MASTER_ADMIN'), async (req, res) => {
+router.put('/:id', authenticate, authorize('MASTER_ADMIN'), async (req: any, res: any) => {
   try {
     const { name, description, category, isActive, requiresApproval, approvalFlow } = req.body;
     
@@ -170,7 +248,7 @@ router.put('/:id', authenticate, authorize('MASTER_ADMIN'), async (req, res) => 
 });
 
 // Delete product
-router.delete('/:id', authenticate, authorize('MASTER_ADMIN'), async (req, res) => {
+router.delete('/:id', authenticate, authorize('MASTER_ADMIN'), async (req: any, res: any) => {
   try {
     const result = await pool.query('DELETE FROM products WHERE id = $1 RETURNING id', [req.params.id]);
     
@@ -190,46 +268,49 @@ router.delete('/:id', authenticate, authorize('MASTER_ADMIN'), async (req, res) 
 
 // ==================== PRODUCT FIELDS ====================
 
-// Get product fields - Remove authentication for customers
-router.get('/:productId/fields', async (req, res) => {
+// Get product fields - No authentication required for customers
+router.get('/:productId/fields', async (req: any, res: any) => {
   try {
     await initProductFieldsTable();
     
     const result = await pool.query(`
       SELECT 
-        id,
-        "productId",
-        "fieldName",
-        "fieldLabel",
-        "fieldType",
-        "isRequired",
+        "fieldName" as name,
+        "fieldLabel" as label,
+        "fieldType" as type,
+        "isRequired" as required,
         options,
-        "fieldCategory",
         "displayOrder",
-        "placeholder",
-        "createdAt",
-        "updatedAt"
+        "placeholder"
       FROM product_fields 
       WHERE "productId" = $1 
       ORDER BY "displayOrder" ASC, "createdAt" ASC
     `, [req.params.productId]);
     
-    res.json(result.rows);
+    // Format options
+    const fields = result.rows.map((field: any) => ({
+      name: field.name,
+      label: field.label,
+      type: field.type || 'text',
+      required: field.required || false,
+      options: field.options ? (typeof field.options === 'string' ? JSON.parse(field.options) : field.options) : [],
+      placeholder: field.placeholder || '',
+    }));
+    
+    res.json(fields);
   } catch (error) {
     console.error('Failed to fetch product fields:', error);
     res.json([]);
   }
 });
 
-// Create product field
-router.post('/:productId/fields', authenticate, authorize('MASTER_ADMIN'), async (req, res) => {
+// Create product field (admin only)
+router.post('/:productId/fields', authenticate, authorize('MASTER_ADMIN'), async (req: any, res: any) => {
   try {
     await initProductFieldsTable();
     
     const { fieldName, fieldLabel, fieldType, isRequired, options, displayOrder } = req.body;
     const productId = req.params.productId;
-    
-    console.log('Creating product field:', { productId, fieldName, fieldLabel, fieldType });
     
     // Check if product exists
     const productExists = await pool.query('SELECT id FROM products WHERE id = $1', [productId]);
@@ -249,31 +330,30 @@ router.post('/:productId/fields', authenticate, authorize('MASTER_ADMIN'), async
     
     const result = await pool.query(`
       INSERT INTO product_fields (
-        id, 
-        "productId", 
-        "fieldName", 
-        "fieldLabel", 
-        "fieldType", 
-        "isRequired", 
-        options, 
-        "displayOrder", 
-        "createdAt", 
-        "updatedAt"
+        id, "productId", "fieldName", "fieldLabel", "fieldType", 
+        "isRequired", options, "displayOrder", "createdAt", "updatedAt"
       ) VALUES (
-        gen_random_uuid()::uuid, $1, $2, $3, $4, $5, $6, $7, NOW(), NOW()
+        gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, NOW(), NOW()
       ) RETURNING *
-    `, [productId, fieldName, fieldLabel, fieldType || 'text', isRequired || false, JSON.stringify(options || []), displayOrder || 0]);
+    `, [
+      productId,
+      fieldName,
+      fieldLabel,
+      fieldType || 'text',
+      isRequired || false,
+      JSON.stringify(options || []),
+      displayOrder || 0
+    ]);
     
-    console.log('Product field created:', result.rows[0]);
     res.status(201).json(result.rows[0]);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to create product field:', error);
     res.status(500).json({ error: 'Failed to create product field', details: error.message });
   }
 });
 
 // Update product field
-router.put('/:productId/fields/:fieldId', authenticate, authorize('MASTER_ADMIN'), async (req, res) => {
+router.put('/:productId/fields/:fieldId', authenticate, authorize('MASTER_ADMIN'), async (req: any, res: any) => {
   try {
     await initProductFieldsTable();
     
@@ -290,7 +370,16 @@ router.put('/:productId/fields/:fieldId', authenticate, authorize('MASTER_ADMIN'
           "updatedAt" = NOW()
       WHERE id = $7 AND "productId" = $8
       RETURNING *
-    `, [fieldName, fieldLabel, fieldType, isRequired, JSON.stringify(options || []), displayOrder, req.params.fieldId, req.params.productId]);
+    `, [
+      fieldName,
+      fieldLabel,
+      fieldType,
+      isRequired,
+      options ? JSON.stringify(options) : null,
+      displayOrder,
+      req.params.fieldId,
+      req.params.productId
+    ]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Product field not found' });
@@ -304,7 +393,7 @@ router.put('/:productId/fields/:fieldId', authenticate, authorize('MASTER_ADMIN'
 });
 
 // Delete product field
-router.delete('/:productId/fields/:fieldId', authenticate, authorize('MASTER_ADMIN'), async (req, res) => {
+router.delete('/:productId/fields/:fieldId', authenticate, authorize('MASTER_ADMIN'), async (req: any, res: any) => {
   try {
     await initProductFieldsTable();
     
@@ -324,80 +413,9 @@ router.delete('/:productId/fields/:fieldId', authenticate, authorize('MASTER_ADM
   }
 });
 
-// Get product configuration
-router.get('/:productId/config', async (req, res) => {
-  try {
-    const { productId } = req.params;
-    
-    // Get product to find its category
-    const productResult = await pool.query(
-      'SELECT code, "productCategory" FROM products WHERE id = $1',
-      [productId]
-    );
-    
-    if (productResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Product not found' });
-    }
-    
-    const product = productResult.rows[0];
-    const category = product.productCategory || 'GENERAL';
-    
-    // Get template for this category
-    const templateResult = await pool.query(`
-      SELECT * FROM product_config_templates 
-      WHERE "productCategory" = $1 AND "isActive" = true
-    `, [category]);
-    
-    if (templateResult.rows.length > 0) {
-      res.json(templateResult.rows[0]);
-    } else {
-      // Return default config
-      res.json({
-        templateName: 'General Insurance',
-        productCategory: 'GENERAL',
-        itemLabel: 'Item',
-        itemsLabel: 'Items',
-        allowMultipleItems: true,
-        minItems: 1,
-        maxItems: 10
-      });
-    }
-  } catch (error) {
-    console.error('Failed to fetch product config:', error);
-    res.status(500).json({ error: 'Failed to fetch product configuration' });
-  }
-});
-
-
-// Debug endpoint - check field categories
-router.get('/debug/fields/:productCode', async (req, res) => {
-  try {
-    const { productCode } = req.params;
-    const result = await pool.query(`
-      SELECT 
-        pf."fieldName",
-        pf."fieldLabel", 
-        pf."fieldCategory",
-        p.code
-      FROM product_fields pf
-      JOIN products p ON p.id = pf."productId"
-      WHERE p.code = $1
-    `, [productCode.toUpperCase()]);
-    
-    res.json({
-      productCode,
-      fields: result.rows,
-      count: result.rows.length
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-
 // ==================== SEED PRODUCTS ====================
 
-router.post('/seed', authenticate, authorize('MASTER_ADMIN'), async (req, res) => {
+router.post('/seed', authenticate, authorize('MASTER_ADMIN'), async (req: any, res: any) => {
   try {
     const products = [
       { name: 'Auto Insurance', code: 'AUTO', description: 'Comprehensive coverage for your vehicle', category: 'MOTOR' },
@@ -413,11 +431,8 @@ router.post('/seed', authenticate, authorize('MASTER_ADMIN'), async (req, res) =
       const existing = await pool.query('SELECT id FROM products WHERE code = $1', [product.code]);
       if (existing.rows.length === 0) {
         await pool.query(`
-          INSERT INTO products (
-            id, name, code, description, category, "isActive", "createdAt", "updatedAt"
-          ) VALUES (
-            gen_random_uuid()::text, $1, $2, $3, $4, true, NOW(), NOW()
-          )
+          INSERT INTO products (id, name, code, description, category, "isActive", "createdAt", "updatedAt")
+          VALUES (gen_random_uuid()::text, $1, $2, $3, $4, true, NOW(), NOW())
         `, [product.name, product.code, product.description, product.category]);
         inserted++;
       }

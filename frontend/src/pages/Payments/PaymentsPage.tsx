@@ -1,147 +1,175 @@
-import * as React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { 
-  CreditCard, 
-  Download, 
-  Calendar, 
-  Plus, 
-  ChevronRight, 
-  CheckCircle2, 
-  Smartphone,
-  Banknote
-} from 'lucide-react';
-import { motion } from 'framer-motion';
-import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
-import { Button } from '../../components/ui/Button';
-import { Badge } from '../../components/ui/Badge';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/Tabs';
-import { usePaymentStore } from '../../stores/paymentStore';
-import { usePolicyStore } from '../../stores/policyStore';
-import { cn } from '../../lib/utils';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
+import { Button } from '../../components/ui/button';
+import { Input } from '../../components/ui/input';
+import { Badge } from '../../components/ui/badge';
+import axiosInstance from '../../lib/axios';
+import { toast } from 'sonner';
+import { Loader2, Search, CheckCircle, Clock, XCircle, AlertCircle } from 'lucide-react';
+import { formatCurrency } from '../../lib/utils';
 
-export default function PaymentsPage() {
-  const navigate = useNavigate();
-  const { payments, paymentMethods } = usePaymentStore();
-  const { policies } = usePolicyStore();
+interface PaymentReference {
+  reference: string;
+  amount: number;
+  description: string;
+  status: string;
+  claimNumber?: string;
+  policyNumber?: string;
+  createdAt: string;
+  isExpired: boolean;
+  expiresAt: string;
+}
 
-  const getPolicyNumber = (id: string) => policies.find(p => p.id === id)?.policyNumber || 'N/A';
+export default function CustomerPaymentPage() {
+  const [searchParams] = useSearchParams();
+  const initialRef = searchParams.get('ref') || '';
+
+  const [reference, setReference] = useState(initialRef);
+  const [payment, setPayment] = useState<PaymentReference | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (initialRef) {
+      lookupPayment(initialRef);
+    }
+  }, [initialRef]);
+
+  const lookupPayment = async (ref?: string) => {
+    const refToUse = ref || reference;
+    if (!refToUse.trim()) {
+      setError('Please enter a reference number');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    try {
+      const res = await axiosInstance.get(`/payments/lookup/${refToUse.trim()}`);
+      setPayment(res.data);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Payment reference not found');
+      setPayment(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatusBadge = (status: string, isExpired: boolean) => {
+    if (isExpired) return <Badge className="bg-gray-100 text-gray-800"><Clock className="h-3 w-3 mr-1" /> Expired</Badge>;
+    
+    switch (status) {
+      case 'PENDING':
+        return <Badge className="bg-yellow-100 text-yellow-800"><Clock className="h-3 w-3 mr-1" /> Pending Payment</Badge>;
+      case 'PAID':
+        return <Badge className="bg-green-100 text-green-800"><CheckCircle className="h-3 w-3 mr-1" /> Paid</Badge>;
+      case 'FAILED':
+        return <Badge className="bg-red-100 text-red-800"><XCircle className="h-3 w-3 mr-1" /> Failed</Badge>;
+      default:
+        return <Badge className="bg-gray-100 text-gray-800">{status}</Badge>;
+    }
+  };
 
   return (
-    <div className="space-y-8 pb-20">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-[#1A3E6F]">Payments & Billing</h1>
-          <p className="text-gray-500">Manage your premium payments and billing history.</p>
-        </div>
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={() => navigate('/customer/payments/methods')}>
-            <CreditCard className="mr-2 h-4 w-4" /> Payment Methods
-          </Button>
-          <Button variant="default" onClick={() => navigate('/customer/payments')}>
-            Make a Payment
-          </Button>
-        </div>
+    <div className="space-y-6 max-w-2xl mx-auto">
+      <div>
+        <h1 className="text-3xl font-bold text-[#1A3E6F]">Make a Payment</h1>
+        <p className="text-gray-500 mt-1">Enter your payment reference number to view and pay</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-8">
-           <Card>
-             <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Recent Billing History</CardTitle>
-             </CardHeader>
-             <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead className="bg-gray-50 text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                      <tr>
-                        <th className="px-6 py-4">Transaction</th>
-                        <th className="px-6 py-4">Policy</th>
-                        <th className="px-6 py-4">Amount</th>
-                        <th className="px-6 py-4 text-right">Receipt</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 bg-white">
-                       {payments.map((payment) => (
-                         <tr key={payment.id} className="hover:bg-gray-50 transition-colors">
-                           <td className="px-6 py-4">
-                             <div className="flex items-center space-x-3">
-                               {payment.method.type === 'card' ? <CreditCard className="h-4 w-4" /> : <Banknote className="h-4 w-4" />}
-                               <div>
-                                 <p className="text-sm font-bold text-[#1A3E6F]">Premium Payment</p>
-                                 <p className="text-xs text-gray-500">{payment.date}</p>
-                               </div>
-                             </div>
-                           </td>
-                           <td className="px-6 py-4">
-                             <span className="font-mono text-xs text-gray-600">{getPolicyNumber(payment.policyId)}</span>
-                           </td>
-                           <td className="px-6 py-4">
-                             <span className="text-sm font-bold text-[#1A3E6F]">${payment.amount.toLocaleString()}</span>
-                           </td>
-                           <td className="px-6 py-4 text-right">
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-[#1A3E6F]">
-                                <Download className="h-4 w-4" />
-                              </Button>
-                           </td>
-                         </tr>
-                       ))}
-                    </tbody>
-                  </table>
-                </div>
-             </CardContent>
-           </Card>
-        </div>
+      {/* Reference Lookup */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <Input
+                placeholder="Enter payment reference number (e.g., AHO-20260115-0001)"
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && lookupPayment()}
+              />
+            </div>
+            <Button onClick={() => lookupPayment()} disabled={loading}>
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+              <span className="ml-2">Look Up</span>
+            </Button>
+          </div>
+          {error && (
+            <p className="text-sm text-red-500 mt-2 flex items-center gap-1">
+              <AlertCircle className="h-3 w-3" /> {error}
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
-        <div className="space-y-6">
-           <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-lg">Saved Methods</CardTitle>
-                <Button variant="ghost" size="icon" onClick={() => navigate('/customer/payments/methods')}>
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                 {paymentMethods.map((method) => (
-                   <div key={method.id} className={cn(
-                     "p-4 rounded-2xl border transition-all",
-                     method.isDefault ? "bg-[#1A3E6F] text-white border-none shadow-lg" : "bg-white text-[#1A3E6F]"
-                   )}>
-                      <div className="flex justify-between items-start">
-                         <div>
-                            <p className="text-xs font-bold uppercase opacity-60">{method.brand || method.type}</p>
-                            <p className="text-lg font-mono tracking-widest mt-1">\\u2022\\u2022\\u2022\\u2022 {method.last4}</p>
-                         </div>
-                         <div className={cn("rounded-lg p-1.5", method.isDefault ? "bg-white/20" : "bg-gray-100")}>
-                           {method.type === 'card' ? <CreditCard className="h-5 w-5" /> : <Banknote className="h-5 w-5" />}
-                         </div>
-                      </div>
-                      {method.isDefault && (
-                        <div className="mt-4 flex items-center text-xs font-bold text-yellow-400">
-                          <CheckCircle2 className="mr-1 h-3 w-3" /> Default Method
-                        </div>
-                      )}
-                   </div>
-                 ))}
-                 <Button variant="outline" className="w-full text-sm" onClick={() => navigate('/customer/payments/methods')}>
-                   Manage Methods <ChevronRight className="ml-1 h-4 w-4" />
-                 </Button>
-              </CardContent>
-           </Card>
+      {/* Payment Details */}
+      {payment && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Payment Details</CardTitle>
+            <CardDescription>Reference: {payment.reference}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex justify-between items-center">
+              <span>{getStatusBadge(payment.status, payment.isExpired)}</span>
+            </div>
 
-           <Card className="bg-[#E31E24] text-white overflow-hidden">
-             <CardContent className="p-6 relative">
-                <div className="relative z-10">
-                   <h3 className="font-bold text-lg">Auto-Pay Active</h3>
-                   <p className="text-sm text-blue-100 mt-1 leading-relaxed">Saving 5% on premiums.</p>
-                   <Button variant="outline" className="mt-4 border-white text-white hover:bg-white/10 w-full">
-                     Edit Settings
-                   </Button>
+            <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+              <div>
+                <p className="text-sm text-gray-500">Amount Due</p>
+                <p className="text-xl font-bold text-blue-600">{formatCurrency(payment.amount)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Description</p>
+                <p className="font-medium">{payment.description}</p>
+              </div>
+              {payment.claimNumber && (
+                <div>
+                  <p className="text-sm text-gray-500">Claim Number</p>
+                  <p className="font-medium">{payment.claimNumber}</p>
                 </div>
-                <Smartphone className="absolute -right-4 -bottom-4 h-24 w-24 text-white opacity-20" />
-             </CardContent>
-           </Card>
-        </div>
-      </div>
+              )}
+              {payment.policyNumber && (
+                <div>
+                  <p className="text-sm text-gray-500">Policy Number</p>
+                  <p className="font-medium">{payment.policyNumber}</p>
+                </div>
+              )}
+            </div>
+
+            {payment.status === 'PENDING' && !payment.isExpired && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm font-medium text-blue-800 mb-2">How to Pay</p>
+                <ol className="list-decimal list-inside text-sm text-blue-700 space-y-1">
+                  <li>Open your payment app (Telebirr, AwashBirr, or Bank app)</li>
+                  <li>Enter this reference number: <strong>{payment.reference}</strong></li>
+                  <li>Pay exactly: <strong>{formatCurrency(payment.amount)}</strong></li>
+                </ol>
+                <p className="text-xs text-blue-600 mt-2">
+                  Expires: {new Date(payment.expiresAt).toLocaleDateString()}
+                </p>
+              </div>
+            )}
+
+            {payment.status === 'PAID' && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                <CheckCircle className="h-8 w-8 text-green-600 mx-auto mb-2" />
+                <p className="text-green-700 font-medium">Payment Successful</p>
+                <p className="text-sm text-green-600">Thank you for your payment</p>
+              </div>
+            )}
+
+            {payment.isExpired && payment.status === 'PENDING' && (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
+                <Clock className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                <p className="text-gray-600 font-medium">Payment Reference Expired</p>
+                <p className="text-sm text-gray-500">Please contact support for a new reference</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

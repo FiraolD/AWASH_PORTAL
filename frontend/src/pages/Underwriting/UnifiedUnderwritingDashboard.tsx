@@ -1,408 +1,243 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { 
-  FileCheck, AlertTriangle, FileText, Clock, CheckCircle, XCircle,
-  Eye, DollarSign, MessageSquare, Send, Loader2, Shield, TrendingUp,
-  Activity, Award, Lock, Zap, Ban, ThumbsUp, User, Phone, Mail, 
-  Home, Car, Heart, Briefcase, Calendar as CalendarIcon, Building,
-  MapPin, Hash, Wrench, Key, Truck, Users, Flag, CreditCard,
-  ChevronDown, ChevronUp, Package, ShieldCheck, Info, AlertCircle,
-  Plus, Minus, Search, Filter, RefreshCw, Download
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  FileText, Clock, CheckCircle, XCircle, AlertCircle, RefreshCw, Loader2,
+  Search, Eye, ClipboardList, Activity, DollarSign, User, Shield, Car,
+  Heart, Flame, Plane, Users, BarChart3, Download, Ban, Send, ArrowLeft,
+  Copy
 } from 'lucide-react';
-import { Card, CardContent } from '../../components/ui/Card';
-import { Button } from '../../components/ui/Button';
-import { Badge } from '../../components/ui/Badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/Tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/Dialog';
-import { Input } from '../../components/ui/Input';
-import { Label } from '../../components/ui/Label';
-import { Textarea } from '../../components/ui/Textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/Select';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
+import { Button } from '../../components/ui/button';
+import { Input } from '../../components/ui/input';
+import { Label } from '../../components/ui/label';
+import { Badge } from '../../components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../components/ui/dialog';
+import { Textarea } from '../../components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
+import { ScrollArea } from '../../components/ui/scroll-area';
 import axiosInstance from '../../lib/axios';
 import { useAuthStore } from '../../stores/authStore';
 import { toast } from 'sonner';
 import { formatCurrency, formatDate } from '../../lib/utils';
+import PaymentReferenceGenerator from '../../components/PaymentReferenceGenerator';
 
-// ============================================
-// TYPES
-// ============================================
-
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 interface Policy {
   id: string;
   policyNumber: string;
+  userId: string;
+  productId: string;
   type: string;
-  coverageAmount: number;
-  premium: number;
-  adjustedPremium?: number;
-  totalPremium?: number;
+  productName: string;
   status: string;
-  customerName: string;
-  customerEmail: string;
-  customerPhone: string;
+  coverageAmount: number;
+  termMonths: number;
+  effectiveDate: string;
+  expirationDate: string;
+  premium: number;
+  premiumFrequency: string;
+  productDetails: any;
+  selectedPerils: any[];
+  selectedRiders: any[];
+  submittedDate: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  underwriterNotes?: string;
+  paymentReference?: string;
+  approvedBy?: string;
+  approvedAt?: string;
   createdAt: string;
   updatedAt: string;
-  effectiveDate?: string;
-  expirationDate?: string;
-  premiumFrequency?: string;
-  underwriterNotes?: string;
-  customerDecision?: string;
-  customerDecisionNotes?: string;
-  customerDecisionDate?: string;
-  approvalType?: string;
-  riskScore?: number;
-}
-
-interface PolicyDetail extends Policy {
-  customer: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-    phone: string;
-    address?: string;
-    dateOfBirth?: string;
-    occupation?: string;
-    nationality?: string;
-    idNumber?: string;
-  };
-  productDetails?: {
-    vehicles?: VehicleDetail[];
-    propertyType?: string;
-    propertyAddress?: string;
-    propertyValue?: number;
-    constructionType?: string;
-    yearBuilt?: number;
-    securityFeatures?: string[];
-    floorArea?: number;
-    numberOfRooms?: number;
-    healthConditions?: string[];
-    beneficiaries?: Array<{
-      name: string;
-      relationship: string;
-      percentage: number;
-      dateOfBirth?: string;
-    }>;
-    travelDestination?: string;
-    travelDates?: { from: string; to: string };
-    sumInsured?: number;
-    purpose?: string;
-    previousClaims?: Array<{
-      year: number;
-      amount: number;
-      description: string;
-    }>;
-  };
-  selectedPerils?: Array<{
-    id: string;
-    perilName: string;
-    description: string;
-    premium: number;
-  }>;
-  selectedRiders?: Array<{
-    id: string;
-    riderName: string;
-    description: string;
-    premium: number;
-    maxLimit?: number;
-  }>;
-  negotiationHistory?: Array<{
-    timestamp: string;
-    action: string;
-    notes: string;
-    from?: number;
-    to?: number;
-    underwriterName?: string;
-  }>;
-}
-
-interface RiskAssessment {
-  id: string;
-  policyNumber: string;
-  customerName: string;
-  coverageAmount: number;
-  riskScore: number;
-  riskLevel: string;
-  riskFactors: string[];
-  recommendation: string;
-}
-
-interface Endorsement {
-  id: string;
-  policyNumber: string;
-  customerName: string;
-  customerEmail: string;
-  type: string;
-  changes: any;
-  reason: string;
-  status: string;
-  submittedDate: string;
-}
-
-interface VehicleDetail {
-  id?: string;
-  make: string;
-  model: string;
-  year: number;
-  registrationNumber: string;
-  vehicleValue: number;
-  engineNumber?: string;
-  chassisNumber?: string;
-  plateNumber?: string;
-  fuelType?: string;
-  seatingCapacity?: number;
-  color?: string;
-  vehicleType?: string;
-  usage?: string;
+  customerName?: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  policyHolderName?: string;
 }
 
 interface DashboardStats {
-  pendingReviews: number;
-  pendingFinalApprovals: number;
-  pendingEndorsements: number;
-  policiesThisMonth: number;
-  totalActivePolicies: number;
-  approvalRate: number;
-  rejectedPolicies: number;
+  total: number;
+  submitted: number;
+  underReview: number;
+  reviewed: number;
+  pendingPayment: number;
+  paymentReceived: number;
+  active: number;
+  rejected: number;
+  avgProcessingDays: number;
 }
 
-// ============================================
-// PERMISSION HOOK
-// ============================================
-
-const useUnderwritingPermissions = (userRole: string) => {
-  const isOfficerLevel1 = userRole === 'UNDERWRITING_OFFICER_I';
-  const isOfficerLevel2 = userRole === 'UNDERWRITING_OFFICER_II';
-  const isSeniorOfficer = userRole === 'SENIOR_UNDERWRITING_OFFICER';
-  const isSupervisor = userRole === 'SUPERVISOR_UNDERWRITING';
-  const isManager = userRole === 'MANAGER_UNDERWRITING';
-  const isHead = userRole === 'HEAD_UNDERWRITING';
-  const isAdmin = userRole === 'UNDERWRITING_ADMIN' || userRole === 'MASTER_ADMIN';
-
-  return {
-    canViewAllTabs: true,
-    canAdjustPremium: true,
-    canDirectApprove: isSupervisor || isManager || isHead || isAdmin,
-    canReject: isSupervisor || isManager || isHead || isAdmin || isSeniorOfficer,
-    canApproveEndorsements: isSeniorOfficer || isManager || isHead || isAdmin,
-    canFinalApprove: isManager || isHead || isAdmin,
-    canBulkApprove: isManager || isHead || isAdmin,
-    canViewRiskAssessment: true,
-    isViewOnly: isOfficerLevel1,
-    isOfficer: isOfficerLevel1 || isOfficerLevel2,
-    isSenior: isSeniorOfficer,
-    isManager: isManager || isSupervisor,
-    isHead: isHead,
-    isAdmin: isAdmin,
-    roleDisplayName: getRoleDisplayName(userRole)
-  };
-};
-
-const getRoleDisplayName = (role: string): string => {
-  const map: Record<string, string> = {
-    'UNDERWRITING_OFFICER_I': 'Underwriting Officer I (View Only)',
-    'UNDERWRITING_OFFICER_II': 'Underwriting Officer II',
-    'SENIOR_UNDERWRITING_OFFICER': 'Senior Underwriting Officer',
-    'SUPERVISOR_UNDERWRITING': 'Supervisor Underwriting',
-    'MANAGER_UNDERWRITING': 'Underwriting Manager',
-    'HEAD_UNDERWRITING': 'Head of Underwriting',
-    'UNDERWRITING_ADMIN': 'Underwriting Administrator',
-    'MASTER_ADMIN': 'Master Administrator'
-  };
-  return map[role] || role || 'Underwriting Officer';
-};
-
-// ============================================
-// SECTION HEADER COMPONENT
-// ============================================
-
-const SectionHeader = ({ 
-  title, 
-  icon: Icon, 
-  section, 
-  count, 
-  bgColor = "bg-gray-50",
-  expanded,
-  onToggle
-}: any) => (
-  <button
-    onClick={() => onToggle(section)}
-    className={`w-full flex items-center justify-between p-3 ${bgColor} rounded-lg hover:bg-gray-100 transition-colors`}
-  >
-    <div className="flex items-center gap-2">
-      <Icon className="h-5 w-5 text-[#1A3E6F]" />
-      <span className="font-medium">{title}</span>
-      {count !== undefined && count > 0 && (
-        <Badge className="bg-[#1A3E6F] text-white ml-2">{count}</Badge>
-      )}
-    </div>
-    {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-  </button>
-);
-
-// ============================================
-// INFO ROW COMPONENT
-// ============================================
-
-const InfoRow = ({ label, value, icon: Icon }: any) => (
-  <div className="flex items-start gap-2 p-2 border-b last:border-0">
-    {Icon && <Icon className="h-4 w-4 text-gray-400 mt-0.5" />}
-    <div className="flex-1">
-      <p className="text-xs text-gray-500">{label}</p>
-      <p className="font-medium text-sm">{value || 'N/A'}</p>
-    </div>
-  </div>
-);
-
-// ============================================
-// STATUS BADGE HELPERS
-// ============================================
-
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 const getStatusBadge = (status: string) => {
   const badges: Record<string, { label: string; color: string }> = {
-    PENDING_UNDERWRITING: { label: 'Pending Review', color: 'bg-yellow-100 text-yellow-800' },
-    SUBMITTED: { label: 'Submitted', color: 'bg-blue-100 text-blue-800' },
-    UNDER_REVIEW: { label: 'Under Review', color: 'bg-purple-100 text-purple-800' },
-    AWAITING_CUSTOMER_APPROVAL: { label: 'Awaiting Customer', color: 'bg-orange-100 text-orange-800' },
-    PENDING_FINAL_APPROVAL: { label: 'Pending Final', color: 'bg-indigo-100 text-indigo-800' },
+    SUBMITTED: { label: 'Submitted', color: 'bg-yellow-100 text-yellow-800' },
+    UNDER_REVIEW: { label: 'Under Review', color: 'bg-blue-100 text-blue-800' },
+    REVIEWED: { label: 'Reviewed', color: 'bg-cyan-100 text-cyan-800' },
+    PENDING_PAYMENT: { label: 'Pending Payment', color: 'bg-orange-100 text-orange-800' },
+    PAYMENT_RECEIVED: { label: 'Payment Received', color: 'bg-emerald-100 text-emerald-800' },
+    APPROVED: { label: 'Approved', color: 'bg-green-100 text-green-800' },
     ACTIVE: { label: 'Active', color: 'bg-green-100 text-green-800' },
     REJECTED: { label: 'Rejected', color: 'bg-red-100 text-red-800' },
-    REJECTED_BY_CUSTOMER: { label: 'Rejected by Customer', color: 'bg-red-100 text-red-800' },
-    APPROVED: { label: 'Approved', color: 'bg-green-100 text-green-800' },
-    PAID: { label: 'Paid', color: 'bg-emerald-100 text-emerald-800' },
+    REQUIRES_MODIFICATION: { label: 'Requires Modification', color: 'bg-purple-100 text-purple-800' },
   };
   return badges[status] || { label: status || 'Unknown', color: 'bg-gray-100 text-gray-800' };
 };
 
-const getRiskBadge = (score: number, level: string) => {
-  if (score >= 70 || level === 'HIGH') {
-    return { label: 'High Risk', color: 'bg-red-100 text-red-800', icon: TrendingUp };
-  } else if (score >= 40 || level === 'MEDIUM') {
-    return { label: 'Medium Risk', color: 'bg-yellow-100 text-yellow-800', icon: AlertTriangle };
-  } else {
-    return { label: 'Low Risk', color: 'bg-green-100 text-green-800', icon: CheckCircle };
-  }
+const PRODUCT_ICONS: Record<string, any> = {
+  MOTOR: Car,
+  HEALTH: Heart,
+  FIRE: Flame,
+  TRAVEL: Plane,
+  LIFE: User,
+  default: Shield,
 };
 
-const getPolicyTypeIcon = (type: string) => {
-  const map: Record<string, any> = {
-    'MOTOR': Car, 'AUTO': Car, 'PROPERTY': Building, 'HOME': Home,
-    'LIFE': Heart, 'HEALTH': Heart, 'TRAVEL': Briefcase
+// ---------------------------------------------------------------------------
+// Permissions
+// ---------------------------------------------------------------------------
+const usePermissions = (userRole: string) => {
+  return useMemo(() => {
+    const isUnderwriter = ['UNDERWRITER_I', 'UNDERWRITER_II', 'SENIOR_UNDERWRITER'].includes(userRole);
+    const isSupervisor = userRole === 'SUPERVISOR_UNDERWRITING';
+    const isManager = userRole === 'UNDERWRITING_MANAGER';
+    const isHead = userRole === 'HEAD_UNDERWRITING';
+    const isAdmin = userRole === 'UNDERWRITING_ADMIN' || userRole === 'MASTER_ADMIN';
+
+    return {
+      isUnderwriter,
+      isSupervisor,
+      isManager,
+      isHead,
+      isAdmin,
+      canReview: isUnderwriter || isSupervisor || isManager || isHead || isAdmin,
+      canAdjustPremium: isUnderwriter || isSupervisor || isManager || isHead || isAdmin,
+      canApproveForPayment: isUnderwriter || isSupervisor || isManager || isHead || isAdmin,
+      canGeneratePayment: isSupervisor || isManager || isHead || isAdmin,
+      canFinalApprove: isSupervisor || isManager || isHead || isAdmin,
+      canReject: isSupervisor || isManager || isHead || isAdmin,
+      canViewTeamPerformance: isManager || isHead || isAdmin,
+      roleDisplayName: getRoleDisplayName(userRole),
+    };
+  }, [userRole]);
+};
+
+const getRoleDisplayName = (role: string): string => {
+  const map: Record<string, string> = {
+    UNDERWRITER_I: 'Underwriter I',
+    UNDERWRITER_II: 'Underwriter II',
+    SENIOR_UNDERWRITER: 'Senior Underwriter',
+    SUPERVISOR_UNDERWRITING: 'Supervisor Underwriting',
+    UNDERWRITING_MANAGER: 'Underwriting Manager',
+    HEAD_UNDERWRITING: 'Head of Underwriting',
+    UNDERWRITING_ADMIN: 'Underwriting Admin',
+    MASTER_ADMIN: 'Master Admin',
   };
-  return map[type?.toUpperCase()] || FileText;
+  return map[role] || role || 'Underwriting Staff';
 };
 
-// ============================================
-// MAIN COMPONENT
-// ============================================
-
+// ---------------------------------------------------------------------------
+// Main Component
+// ---------------------------------------------------------------------------
 export default function UnifiedUnderwritingDashboard() {
+  const navigate = useNavigate();
   const { user } = useAuthStore();
   const userRole = user?.role?.toUpperCase() || '';
-  const permissions = useUnderwritingPermissions(userRole);
+  const permissions = usePermissions(userRole);
 
-  // ===== State =====
+  // State
   const [activeTab, setActiveTab] = useState('queue');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  
-  // Data states
-  const [policies, setPolicies] = useState<Policy[]>([]);
-  const [riskAssessments, setRiskAssessments] = useState<RiskAssessment[]>([]);
-  const [endorsements, setEndorsements] = useState<Endorsement[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+
   const [stats, setStats] = useState<DashboardStats>({
-    pendingReviews: 0,
-    pendingFinalApprovals: 0,
-    pendingEndorsements: 0,
-    policiesThisMonth: 0,
-    totalActivePolicies: 0,
-    approvalRate: 0,
-    rejectedPolicies: 0
+    total: 0, submitted: 0, underReview: 0, reviewed: 0,
+    pendingPayment: 0, paymentReceived: 0, active: 0, rejected: 0,
+    avgProcessingDays: 0,
   });
+  const [policies, setPolicies] = useState<Policy[]>([]);
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
 
   // Modal states
   const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null);
-  const [policyDetails, setPolicyDetails] = useState<PolicyDetail | null>(null);
+  const [policyDetails, setPolicyDetails] = useState<Policy | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
-  const [selectedEndorsement, setSelectedEndorsement] = useState<Endorsement | null>(null);
-  
-  // Form states
-  const [adjustedPremium, setAdjustedPremium] = useState('');
-  const [underwriterNotes, setUnderwriterNotes] = useState('');
-  const [rejectReason, setRejectReason] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [actionType, setActionType] = useState<'adjust' | 'direct_approve' | 'reject' | 'final_approve'>('adjust');
-  
-  // UI states
-  const [expandedSections, setExpandedSections] = useState({
-    customerInfo: true,
-    riskInputs: true,
-    coverageDetails: true,
-    vehicles: true,
-    propertyDetails: true,
-    perils: true,
-    riders: true,
-    previousClaims: true,
-    reviewHistory: true
-  });
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
 
-  // ===== Data Fetching =====
+  // Review form
+  const [reviewData, setReviewData] = useState({
+    decision: 'APPROVE_FOR_PAYMENT',
+    adjustedPremium: '',
+    notes: '',
+  });
+  const [submitting, setSubmitting] = useState(false);
+
+  // --------------------------------------------------------------------------
+  // Fetch dashboard data
+  // --------------------------------------------------------------------------
   const fetchDashboardData = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
-      const [statsResult, policiesResult, riskResult, endorsementsResult] = await Promise.allSettled([
-        axiosInstance.get('/underwriting/stats'),
-        axiosInstance.get('/underwriting/pending-review'),
-        axiosInstance.get('/underwriting/risk-assessments'),
-        axiosInstance.get('/underwriting/endorsements')
+      // Fetch policies based on role
+      let endpoint = '/policies';
+      if (permissions.isUnderwriter) {
+        endpoint = '/policies/queue'; // SUBMITTED policies
+      } else if (permissions.canGeneratePayment) {
+        endpoint = '/policies/reviewed'; // REVIEWED policies
+      }
+
+      const [policiesRes, statsRes] = await Promise.all([
+        axiosInstance.get(endpoint),
+        axiosInstance.get('/policies/stats'),
       ]);
 
-      const fallbackStats: DashboardStats = {
-        pendingReviews: 0,
-        pendingFinalApprovals: 0,
-        pendingEndorsements: 0,
-        policiesThisMonth: 0,
-        totalActivePolicies: 0,
-        approvalRate: 0,
-        rejectedPolicies: 0
-      };
+      const policiesData = Array.isArray(policiesRes.data)
+        ? policiesRes.data
+        : (policiesRes.data?.policies || policiesRes.data?.data || []);
 
-      setStats(statsResult.status === 'fulfilled' ? (statsResult.value.data || fallbackStats) : fallbackStats);
-      setPolicies(policiesResult.status === 'fulfilled' && Array.isArray(policiesResult.value.data) ? policiesResult.value.data : []);
-      setRiskAssessments(riskResult.status === 'fulfilled' && Array.isArray(riskResult.value.data) ? riskResult.value.data : []);
-      setEndorsements(endorsementsResult.status === 'fulfilled' && Array.isArray(endorsementsResult.value.data) ? endorsementsResult.value.data : []);
+      setPolicies(policiesData.map((p: any) => ({
+        ...p,
+        customerName: p.customerName || p.policyHolderName || `${p.firstName || ''} ${p.lastName || ''}`.trim() || 'Unknown',
+      })));
 
-      const failedRequests = [statsResult, policiesResult, riskResult, endorsementsResult].filter((result) => result.status === 'rejected');
-      if (failedRequests.length > 0 && failedRequests.length === 4) {
-        toast.error('Failed to load dashboard data');
+      const s = statsRes.data || {};
+      setStats({
+        total: s.total || 0,
+        submitted: s.submitted || 0,
+        underReview: s.underReview || 0,
+        reviewed: s.reviewed || 0,
+        pendingPayment: s.pendingPayment || 0,
+        paymentReceived: s.paymentReceived || 0,
+        active: s.active || 0,
+        rejected: s.rejected || 0,
+        avgProcessingDays: s.avgProcessingDays || 0,
+      });
+
+      // Team performance
+      if (permissions.canViewTeamPerformance) {
+        try {
+          const teamRes = await axiosInstance.get('/policies/team-performance');
+          setTeamMembers(teamRes.data || []);
+        } catch { /* ignore */ }
       }
-
-    } catch (error: any) {
-      console.error('Failed to fetch dashboard data:', error);
-      if (error.response?.status === 403) {
-        toast.error('You don\'t have permission to access underwriting data');
-      } else {
-        toast.error('Failed to load dashboard data');
-      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to load dashboard');
+      toast.error('Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [permissions]);
 
-  const fetchPolicyDetails = async (policyId: string) => {
-    setLoadingDetails(true);
-    try {
-      const response = await axiosInstance.get(`/underwriting/policies/${policyId}`);
-      setPolicyDetails(response.data);
-    } catch (error) {
-      console.error('Failed to fetch policy details:', error);
-      toast.error('Failed to load policy details');
-    } finally {
-      setLoadingDetails(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
+  useEffect(() => { fetchDashboardData(); }, [fetchDashboardData]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -411,1066 +246,554 @@ export default function UnifiedUnderwritingDashboard() {
     toast.success('Dashboard refreshed');
   };
 
-  // ===== Action Handlers =====
-  const openActionModal = async (policy: Policy, type: 'adjust' | 'direct_approve' | 'reject' | 'final_approve') => {
-    setSelectedPolicy(policy);
-    setActionType(type);
-    setAdjustedPremium(policy.premium?.toString() || '');
-    setUnderwriterNotes('');
-    setRejectReason('');
-    await fetchPolicyDetails(policy.id);
-  };
-
-  const handleAdjustPremium = async () => {
-    if (!selectedPolicy) return;
-    
-    if (!adjustedPremium || parseFloat(adjustedPremium) <= 0) {
-      toast.error('Please enter a valid premium amount');
-      return;
-    }
-    
-    if (!underwriterNotes.trim()) {
-      toast.error('Please add notes explaining the premium adjustment');
-      return;
-    }
-    
-    setSubmitting(true);
+  // --------------------------------------------------------------------------
+  // Policy detail
+  // --------------------------------------------------------------------------
+  const fetchPolicyDetails = async (policyId: string) => {
+    setLoadingDetails(true);
     try {
-      await axiosInstance.post(`/underwriting/policies/${selectedPolicy.id}/adjust`, {
-        adjusted_premium: parseFloat(adjustedPremium),
-        underwriter_notes: underwriterNotes
-      });
-      
-      toast.success('Premium adjustment submitted! Customer will be notified.');
-      setSelectedPolicy(null);
-      setPolicyDetails(null);
-      setAdjustedPremium('');
-      setUnderwriterNotes('');
-      fetchDashboardData();
-    } catch (error) {
-      console.error('Failed to submit adjustment:', error);
-      toast.error('Failed to submit adjustment');
+      const res = await axiosInstance.get(`/policies/${policyId}`);
+      setPolicyDetails(res.data);
+    } catch {
+      toast.error('Failed to load policy details');
     } finally {
-      setSubmitting(false);
+      setLoadingDetails(false);
     }
   };
 
-  const handleDirectApprove = async () => {
+  const handleViewPolicy = async (policy: Policy) => {
+    setSelectedPolicy(policy);
+    await fetchPolicyDetails(policy.id);
+    setIsDetailsModalOpen(true);
+  };
+
+  const handleReviewPolicy = (policy: Policy) => {
+    setSelectedPolicy(policy);
+    setReviewData({
+      decision: 'APPROVE_FOR_PAYMENT',
+      adjustedPremium: policy.premium?.toString() || policy.coverageAmount?.toString() || '',
+      notes: '',
+    });
+    setIsReviewModalOpen(true);
+  };
+
+  // --------------------------------------------------------------------------
+  // Submit review
+  // --------------------------------------------------------------------------
+  const handleSubmitReview = async () => {
     if (!selectedPolicy) return;
-    
-    if (!underwriterNotes.trim()) {
-      toast.error('Please add approval notes before confirming');
-      return;
-    }
-    
+
     setSubmitting(true);
     try {
-      await axiosInstance.post(`/underwriting/policies/${selectedPolicy.id}/direct-approve`, {
-        comments: underwriterNotes
+      await axiosInstance.post(`/policies/${selectedPolicy.id}/review`, {
+        decision: reviewData.decision,
+        adjustedPremium: reviewData.adjustedPremium ? parseFloat(reviewData.adjustedPremium) : null,
+        notes: reviewData.notes,
       });
-      
-      toast.success('Policy approved successfully! Policy is now ACTIVE.');
+
+      toast.success('Review submitted successfully');
+      setIsReviewModalOpen(false);
       setSelectedPolicy(null);
-      setPolicyDetails(null);
-      setUnderwriterNotes('');
       fetchDashboardData();
     } catch (error: any) {
-      console.error('Failed to approve policy:', error);
-      toast.error(error.response?.data?.details || error.response?.data?.error || 'Failed to approve policy');
+      toast.error(error.response?.data?.error || 'Failed to submit review');
     } finally {
       setSubmitting(false);
     }
   };
 
+  // --------------------------------------------------------------------------
+  // Reject policy
+  // --------------------------------------------------------------------------
   const handleRejectPolicy = async () => {
     if (!selectedPolicy) return;
-    
-    if (!rejectReason.trim()) {
-      toast.error('Please provide a reason for rejection');
+    if (!reviewData.notes.trim()) {
+      toast.error('Please provide a rejection reason');
       return;
     }
-    
+
     setSubmitting(true);
     try {
-      await axiosInstance.post(`/underwriting/policies/${selectedPolicy.id}/reject`, {
-        reason: rejectReason,
-        comments: rejectReason
+      await axiosInstance.post(`/policies/${selectedPolicy.id}/review`, {
+        decision: 'REJECT',
+        notes: reviewData.notes,
       });
-      
-      toast.success('Policy rejected successfully.');
+
+      toast.success('Policy rejected');
+      setIsReviewModalOpen(false);
       setSelectedPolicy(null);
-      setPolicyDetails(null);
-      setRejectReason('');
       fetchDashboardData();
     } catch (error: any) {
-      console.error('Failed to reject policy:', error);
-      toast.error(error.response?.data?.details || error.response?.data?.error || 'Failed to reject policy');
+      toast.error(error.response?.data?.error || 'Failed to reject policy');
     } finally {
       setSubmitting(false);
     }
   };
 
+  // --------------------------------------------------------------------------
+  // Final approve (after payment received)
+  // --------------------------------------------------------------------------
   const handleFinalApprove = async () => {
     if (!selectedPolicy) return;
-    
-    if (!underwriterNotes.trim()) {
-      toast.error('Please add approval notes before confirming');
-      return;
-    }
-    
+
     setSubmitting(true);
     try {
-      await axiosInstance.post(`/underwriting/policies/${selectedPolicy.id}/final-approve`, {
-        notes: underwriterNotes
+      await axiosInstance.post(`/policies/${selectedPolicy.id}/final-approve`, {
+        notes: reviewData.notes,
       });
-      
-      toast.success('Policy fully approved and activated!');
+
+      toast.success('Policy activated successfully');
+      setIsReviewModalOpen(false);
       setSelectedPolicy(null);
-      setPolicyDetails(null);
-      setUnderwriterNotes('');
       fetchDashboardData();
     } catch (error: any) {
-      console.error('Failed to final approve policy:', error);
-      toast.error(error.response?.data?.error || 'Failed to approve policy');
+      toast.error(error.response?.data?.error || 'Failed to activate policy');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleApproveEndorsement = async (id: string) => {
-    try {
-      await axiosInstance.post(`/underwriting/endorsements/${id}/approve`, {});
-      toast.success('Endorsement approved successfully');
-      fetchDashboardData();
-    } catch (error) {
-      console.error('Failed to approve endorsement:', error);
-      toast.error('Failed to approve endorsement');
+  // --------------------------------------------------------------------------
+  // Filtering
+  // --------------------------------------------------------------------------
+  const filteredPolicies = policies.filter(policy => {
+    const matchesSearch =
+      policy.policyNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      policy.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      policy.type?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || policy.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  // --------------------------------------------------------------------------
+  // Render helpers
+  // --------------------------------------------------------------------------
+  const renderStatsCards = () => (
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
+      {[
+        { label: 'Submitted', value: stats.submitted, icon: Clock, color: 'text-yellow-600', bg: 'bg-yellow-100' },
+        { label: 'Under Review', value: stats.underReview, icon: Activity, color: 'text-blue-600', bg: 'bg-blue-100' },
+        { label: 'Reviewed', value: stats.reviewed, icon: FileText, color: 'text-cyan-600', bg: 'bg-cyan-100' },
+        { label: 'Pending Payment', value: stats.pendingPayment, icon: DollarSign, color: 'text-orange-600', bg: 'bg-orange-100' },
+        { label: 'Payment Received', value: stats.paymentReceived, icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-100' },
+        { label: 'Active', value: stats.active, icon: Shield, color: 'text-green-600', bg: 'bg-green-100' },
+        { label: 'Rejected', value: stats.rejected, icon: XCircle, color: 'text-red-600', bg: 'bg-red-100' },
+        { label: 'Total', value: stats.total, icon: BarChart3, color: 'text-gray-600', bg: 'bg-gray-100' },
+      ].map((card, idx) => (
+        <Card key={idx} className="hover:shadow-md transition-shadow">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500">{card.label}</p>
+                <p className="text-xl font-bold">{card.value}</p>
+              </div>
+              <div className={`h-8 w-8 rounded-lg ${card.bg} flex items-center justify-center`}>
+                <card.icon className={`h-4 w-4 ${card.color}`} />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+
+  const renderPolicyList = (policyList: Policy[]) => {
+    if (!policyList || policyList.length === 0) {
+      return (
+        <Card>
+          <CardContent className="text-center py-12">
+            <FileText className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-500">No policies found</p>
+          </CardContent>
+        </Card>
+      );
     }
+
+    return (
+      <div className="space-y-3">
+        {policyList.map((policy) => {
+          const status = getStatusBadge(policy.status);
+          const ProductIcon = PRODUCT_ICONS[policy.type] || PRODUCT_ICONS.default;
+
+          return (
+            <Card key={policy.id} className="hover:shadow-lg transition-all duration-200 border-l-4"
+              style={{
+                borderLeftColor: status.color.includes('yellow') ? '#eab308' :
+                  status.color.includes('blue') ? '#3b82f6' :
+                  status.color.includes('cyan') ? '#06b6d4' :
+                  status.color.includes('orange') ? '#f97316' :
+                  status.color.includes('emerald') ? '#10b981' :
+                  status.color.includes('green') ? '#22c55e' :
+                  status.color.includes('red') ? '#ef4444' : '#6b7280',
+              }}
+            >
+              <CardContent className="p-4">
+                <div className="flex justify-between items-start flex-wrap gap-4">
+                  <div className="space-y-2 flex-1 min-w-[200px]">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <ProductIcon className="h-4 w-4 text-blue-600" />
+                      <h3 className="font-semibold text-lg">{policy.policyNumber}</h3>
+                      <Badge className={status.color}>{status.label}</Badge>
+                      <Badge variant="outline" className="text-xs">{policy.type}</Badge>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                      <div><p className="text-gray-500">Customer</p><p className="font-medium">{policy.customerName}</p></div>
+                      <div><p className="text-gray-500">Coverage</p><p className="font-medium text-blue-600">{formatCurrency(policy.coverageAmount)}</p></div>
+                      <div><p className="text-gray-500">Submitted</p><p className="font-medium">{formatDate(policy.submittedDate)}</p></div>
+                    </div>
+                    {policy.premium && (
+                      <p className="text-xs text-gray-500">Premium: ETB {policy.premium?.toLocaleString()}</p>
+                    )}
+                    {policy.paymentReference && (
+                      <p className="text-xs text-orange-600">Payment Ref: {policy.paymentReference}</p>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 flex-wrap">
+                    <Button variant="outline" size="sm" onClick={() => handleViewPolicy(policy)}>
+                      <Eye className="h-4 w-4 mr-1" /> View
+                    </Button>
+
+                    {/* Review button for underwriters */}
+                    {permissions.canReview && ['SUBMITTED', 'UNDER_REVIEW'].includes(policy.status) && (
+                      <Button variant="outline" size="sm" onClick={() => handleReviewPolicy(policy)}>
+                        <ClipboardList className="h-4 w-4 mr-1" /> Review
+                      </Button>
+                    )}
+
+                    {/* Generate Payment Reference for supervisors/managers */}
+                    {permissions.canGeneratePayment && policy.status === 'REVIEWED' && (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700"
+                        onClick={() => {
+                          setSelectedPolicy(policy);
+                          setIsPaymentDialogOpen(true);
+                        }}
+                      >
+                        <DollarSign className="h-4 w-4 mr-1" />
+                        Generate Payment Ref
+                      </Button>
+                    )}
+
+                    {/* Final Approve for PAYMENT_RECEIVED policies */}
+                    {permissions.canFinalApprove && policy.status === 'PAYMENT_RECEIVED' && (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="bg-blue-600 hover:bg-blue-700"
+                        onClick={() => {
+                          setSelectedPolicy(policy);
+                          setReviewData({ decision: 'FINAL_APPROVE', adjustedPremium: '', notes: '' });
+                          setIsReviewModalOpen(true);
+                        }}
+                      >
+                        <CheckCircle className="h-4 w-4 mr-1" />
+                        Final Approve
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+    );
   };
 
-  const handleRejectEndorsement = async (id: string) => {
-    const reason = prompt('Please provide a reason for rejection:');
-    if (reason) {
-      try {
-        await axiosInstance.post(`/underwriting/endorsements/${id}/reject`, { reason });
-        toast.success('Endorsement rejected');
-        fetchDashboardData();
-      } catch (error) {
-        console.error('Failed to reject endorsement:', error);
-        toast.error('Failed to reject endorsement');
-      }
-    }
-  };
-
-  const toggleSection = (section: keyof typeof expandedSections) => {
-    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
-  };
-
-  // ===== Loading State =====
+  // --------------------------------------------------------------------------
+  // Loading / Error
+  // --------------------------------------------------------------------------
   if (loading) {
     return (
       <div className="flex justify-center items-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-500">Loading underwriting dashboard...</p>
+        </div>
       </div>
     );
   }
 
-  // ============================================
-  // RENDER
-  // ============================================
+  if (error) {
+    return (
+      <div className="flex justify-center items-center h-96">
+        <div className="text-center max-w-md">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Something went wrong</h3>
+          <p className="text-gray-500 mb-4">{error}</p>
+          <Button onClick={handleRefresh} className="bg-blue-600 hover:bg-blue-700">
+            <RefreshCw className="h-4 w-4 mr-2" /> Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // ==========================================================================
+  // MAIN RENDER
+  // ==========================================================================
   return (
     <div className="space-y-6">
-      {/* ===== HEADER ===== */}
+      {/* Header */}
       <div className="flex justify-between items-start flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-bold text-[#1A3E6F]">Underwriting Dashboard</h1>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
-            <p className="text-gray-500">Manage policy reviews, risk assessments, and endorsements</p>
-            <Badge className="bg-blue-100 text-blue-800">
-              {permissions.roleDisplayName}
-            </Badge>
-            {permissions.isViewOnly && (
-              <Badge className="bg-yellow-100 text-yellow-800 flex items-center gap-1">
-                <Lock className="h-3 w-3" />
-                View Only
+            <p className="text-gray-500">Review and process policy applications</p>
+            <Badge className="bg-blue-100 text-blue-800">{permissions.roleDisplayName}</Badge>
+            {permissions.canGeneratePayment && (
+              <Badge className="bg-green-100 text-green-800 flex items-center gap-1">
+                <DollarSign className="h-3 w-3" /> Can Generate Payment
               </Badge>
             )}
           </div>
         </div>
-        <Button onClick={handleRefresh} disabled={refreshing} variant="outline" className="flex items-center gap-2">
-          <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-          {refreshing ? 'Refreshing...' : 'Refresh'}
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={handleRefresh} disabled={refreshing} variant="outline">
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Refreshing...' : 'Refresh'}
+          </Button>
+        </div>
       </div>
 
-      {/* ===== STATS CARDS ===== */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5 xl:grid-cols-7">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-500">Pending Review</p>
-                <p className="text-2xl font-bold text-yellow-600">{stats.pendingReviews}</p>
-              </div>
-              <Clock className="h-6 w-6 text-yellow-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-500">Final Approval</p>
-                <p className="text-2xl font-bold text-purple-600">{stats.pendingFinalApprovals}</p>
-              </div>
-              <CheckCircle className="h-6 w-6 text-purple-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-500">Endorsements</p>
-                <p className="text-2xl font-bold text-orange-600">{stats.pendingEndorsements}</p>
-              </div>
-              <FileText className="h-6 w-6 text-orange-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-500">This Month</p>
-                <p className="text-2xl font-bold text-blue-600">{stats.policiesThisMonth}</p>
-              </div>
-              <Activity className="h-6 w-6 text-blue-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-500">Active Policies</p>
-                <p className="text-2xl font-bold text-green-600">{stats.totalActivePolicies}</p>
-              </div>
-              <Shield className="h-6 w-6 text-green-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-500">Rejected</p>
-                <p className="text-2xl font-bold text-red-600">{stats.rejectedPolicies || 0}</p>
-              </div>
-              <XCircle className="h-6 w-6 text-red-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-500">Approval Rate</p>
-                <p className="text-2xl font-bold text-emerald-600">{stats.approvalRate || 0}%</p>
-              </div>
-              <Award className="h-6 w-6 text-emerald-500" />
-            </div>
-          </CardContent>
-        </Card>
+      {/* Stats */}
+      {renderStatsCards()}
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-4">
+        <div className="flex-1 min-w-[200px]">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search policies..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Filter by status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="SUBMITTED">Submitted</SelectItem>
+            <SelectItem value="UNDER_REVIEW">Under Review</SelectItem>
+            <SelectItem value="REVIEWED">Reviewed</SelectItem>
+            <SelectItem value="PENDING_PAYMENT">Pending Payment</SelectItem>
+            <SelectItem value="PAYMENT_RECEIVED">Payment Received</SelectItem>
+            <SelectItem value="ACTIVE">Active</SelectItem>
+            <SelectItem value="REJECTED">Rejected</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
-      {/* ===== TABS ===== */}
+      {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-flex">
           <TabsTrigger value="queue" className="flex items-center gap-2">
-            <FileCheck className="h-4 w-4" />
-            Policy Queue ({stats.pendingReviews})
+            <Clock className="h-4 w-4" />
+            Queue ({policies.filter(p => ['SUBMITTED', 'UNDER_REVIEW'].includes(p.status)).length})
           </TabsTrigger>
-          <TabsTrigger value="risk" className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4" />
-            Risk Assessment ({riskAssessments.length})
-          </TabsTrigger>
-          <TabsTrigger value="endorsements" className="flex items-center gap-2">
+          <TabsTrigger value="reviewed" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
-            Endorsements ({stats.pendingEndorsements})
+            Reviewed ({policies.filter(p => p.status === 'REVIEWED').length})
+          </TabsTrigger>
+          <TabsTrigger value="all" className="flex items-center gap-2">
+            <ClipboardList className="h-4 w-4" />
+            All ({filteredPolicies.length})
           </TabsTrigger>
         </TabsList>
 
-        {/* ===== TAB 1: POLICY QUEUE ===== */}
         <TabsContent value="queue" className="space-y-4">
-          {policies.length === 0 ? (
-            <Card>
-              <CardContent className="text-center py-12">
-                <FileCheck className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">No policies pending review</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4">
-              {policies.map((policy) => {
-                const statusBadge = getStatusBadge(policy.status);
-                const PolicyIcon = getPolicyTypeIcon(policy.type);
-                return (
-                  <Card key={policy.id} className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-6">
-                      <div className="flex justify-between items-start flex-wrap gap-4">
-                        <div className="space-y-2 flex-1">
-                          <div className="flex items-center gap-3 flex-wrap">
-                            <PolicyIcon className="h-5 w-5 text-[#1A3E6F]" />
-                            <h3 className="font-semibold text-lg">{policy.policyNumber}</h3>
-                            <Badge className={statusBadge.color}>{statusBadge.label}</Badge>
-                            {policy.riskScore && policy.riskScore > 60 && (
-                              <Badge className="bg-red-100 text-red-800">High Risk</Badge>
-                            )}
-                          </div>
-                          
-                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                            <div>
-                              <p className="text-gray-500">Type</p>
-                              <p className="font-medium">{policy.type}</p>
-                            </div>
-                            <div>
-                              <p className="text-gray-500">Coverage Amount</p>
-                              <p className="font-medium">ETB {policy.coverageAmount?.toLocaleString()}</p>
-                            </div>
-                            <div>
-                              <p className="text-gray-500">Requested Premium</p>
-                              <p className="font-medium">ETB {policy.premium?.toLocaleString()}</p>
-                            </div>
-                          </div>
-                          
-                          <div className="text-sm">
-                            <p className="text-gray-500">Customer</p>
-                            <p className="font-medium">{policy.customerName}</p>
-                            <p className="text-gray-500 text-xs">{policy.customerEmail}</p>
-                          </div>
-                          
-                          <div className="text-xs text-gray-400">
-                            Submitted: {new Date(policy.createdAt).toLocaleString()}
-                          </div>
-                        </div>
-                        
-                        <div className="flex gap-2 flex-wrap">
-                          {permissions.canDirectApprove && (
-                            <Button 
-                              onClick={() => openActionModal(policy, 'direct_approve')} 
-                              className="bg-green-600 hover:bg-green-700"
-                              size="sm"
-                            >
-                              <Zap className="h-4 w-4 mr-1" /> Direct Approve
-                            </Button>
-                          )}
-                          {permissions.canReject && (
-                            <Button 
-                              onClick={() => openActionModal(policy, 'reject')} 
-                              variant="destructive" 
-                              className="bg-red-600 hover:bg-red-700"
-                              size="sm"
-                            >
-                              <Ban className="h-4 w-4 mr-1" /> Reject
-                            </Button>
-                          )}
-                          <Button 
-                            onClick={() => openActionModal(policy, 'adjust')} 
-                            variant="outline"
-                            size="sm"
-                          >
-                            <Eye className="h-4 w-4 mr-1" /> Review & Adjust
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
+          {renderPolicyList(filteredPolicies.filter(p => ['SUBMITTED', 'UNDER_REVIEW'].includes(p.status)))}
         </TabsContent>
 
-        {/* ===== TAB 2: RISK ASSESSMENT ===== */}
-        <TabsContent value="risk" className="space-y-4">
-          {riskAssessments.length === 0 ? (
-            <Card>
-              <CardContent className="text-center py-12">
-                <AlertTriangle className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">No pending risk assessments</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4">
-              {riskAssessments.map((assessment) => {
-                const riskInfo = getRiskBadge(assessment.riskScore, assessment.riskLevel);
-                const RiskIcon = riskInfo.icon;
-                
-                return (
-                  <Card key={assessment.id} className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-6">
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-3 flex-wrap">
-                          <h3 className="font-semibold text-lg">{assessment.policyNumber}</h3>
-                          <Badge className={riskInfo.color}>
-                            <RiskIcon className="h-3 w-3 mr-1 inline" />
-                            {riskInfo.label}
-                          </Badge>
-                          <Badge className="bg-gray-100 text-gray-800">
-                            Score: {assessment.riskScore}
-                          </Badge>
-                        </div>
-                        
-                        <div>
-                          <p className="text-sm text-gray-500">Customer</p>
-                          <p className="font-medium">{assessment.customerName}</p>
-                        </div>
-                        
-                        <div>
-                          <p className="text-sm text-gray-500">Coverage Amount</p>
-                          <p className="font-medium">ETB {assessment.coverageAmount?.toLocaleString()}</p>
-                        </div>
-                        
-                        {assessment.riskFactors && assessment.riskFactors.length > 0 && (
-                          <div>
-                            <p className="text-sm text-gray-500 mb-1">Risk Factors</p>
-                            <div className="flex flex-wrap gap-2">
-                              {assessment.riskFactors.map((factor, idx) => (
-                                <span key={idx} className="text-xs bg-gray-100 px-2 py-1 rounded">
-                                  {factor}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        
-                        {assessment.recommendation && (
-                          <div className="bg-blue-50 p-3 rounded-lg">
-                            <p className="text-sm font-medium text-blue-800">Recommendation</p>
-                            <p className="text-sm text-blue-700">{assessment.recommendation}</p>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
+        <TabsContent value="reviewed" className="space-y-4">
+          {renderPolicyList(filteredPolicies.filter(p => p.status === 'REVIEWED'))}
         </TabsContent>
 
-        {/* ===== TAB 3: ENDORSEMENTS ===== */}
-        <TabsContent value="endorsements" className="space-y-4">
-          {endorsements.length === 0 ? (
-            <Card>
-              <CardContent className="text-center py-12">
-                <FileText className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">No pending endorsements</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4">
-              {endorsements.map((endorsement) => (
-                <Card key={endorsement.id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex justify-between items-start flex-wrap gap-4">
-                      <div className="space-y-2 flex-1">
-                        <div className="flex items-center gap-3 flex-wrap">
-                          <h3 className="font-semibold">{endorsement.policyNumber}</h3>
-                          <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>
-                          {!permissions.canApproveEndorsements && (
-                            <Badge className="bg-gray-100 text-gray-500 flex items-center gap-1">
-                              <Lock className="h-3 w-3" />
-                              View Only
-                            </Badge>
-                          )}
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-500">Customer</p>
-                          <p className="font-medium">{endorsement.customerName}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-500">Endorsement Type</p>
-                          <p className="font-medium">{endorsement.type}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-500">Changes Requested</p>
-                          <p className="text-sm">
-                            {typeof endorsement.changes === 'string' 
-                              ? endorsement.changes 
-                              : JSON.stringify(endorsement.changes || {})}
-                          </p>
-                        </div>
-                        {endorsement.reason && (
-                          <div>
-                            <p className="text-sm text-gray-500">Reason</p>
-                            <p className="text-sm text-gray-600">{endorsement.reason}</p>
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div className="flex gap-2 flex-wrap">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setSelectedEndorsement(endorsement)}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          View Details
-                        </Button>
-                        {permissions.canApproveEndorsements ? (
-                          <>
-                            <Button
-                              size="sm"
-                              className="bg-green-600 hover:bg-green-700"
-                              onClick={() => handleApproveEndorsement(endorsement.id)}
-                            >
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              Approve
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600 hover:text-red-700"
-                              onClick={() => handleRejectEndorsement(endorsement.id)}
-                            >
-                              <XCircle className="h-4 w-4 mr-1" />
-                              Reject
-                            </Button>
-                          </>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled
-                            className="text-gray-400"
-                          >
-                            <Lock className="h-4 w-4 mr-1" />
-                            No Approval Rights
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
+        <TabsContent value="all" className="space-y-4">
+          {renderPolicyList(filteredPolicies)}
         </TabsContent>
       </Tabs>
 
-      {/* ============================================ */}
-      {/* ACTION MODAL - Full Policy Details */}
-      {/* ============================================ */}
-      {selectedPolicy && policyDetails && (
-        <div 
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 overflow-y-auto" 
-          onClick={() => setSelectedPolicy(null)}
-        >
-          <div 
-            className="bg-white rounded-lg max-w-4xl w-full mx-4 my-8 max-h-[90vh] overflow-y-auto" 
-            onClick={e => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center z-10">
-              <div className="flex items-center gap-3">
-                {(() => {
-                  const Icon = getPolicyTypeIcon(policyDetails.type);
-                  return <Icon className="h-5 w-5 text-[#1A3E6F]" />;
-                })()}
-                <h3 className="text-lg font-semibold">
-                  {actionType === 'direct_approve' && 'Direct Approve Policy'}
-                  {actionType === 'reject' && 'Reject Policy'}
-                  {actionType === 'final_approve' && 'Final Approve Policy'}
-                  {actionType === 'adjust' && `Review Policy: ${policyDetails.policyNumber}`}
-                </h3>
-                {(() => {
-                  const status = getStatusBadge(policyDetails.status);
-                  return <Badge className={status.color}>{status.label}</Badge>;
-                })()}
-              </div>
-              <button onClick={() => setSelectedPolicy(null)} className="text-gray-500 hover:text-gray-700 text-xl">
-                ✕
-              </button>
-            </div>
-            
-            <div className="p-6 space-y-6">
-              {/* ===== RISK ASSESSMENT SUMMARY ===== */}
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
-                  <div>
-                    <p className="font-medium text-amber-800">Risk Assessment Summary</p>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2 text-sm">
-                      <div>
-                        <p className="text-amber-700">Coverage Amount</p>
-                        <p className="font-bold">ETB {policyDetails.coverageAmount?.toLocaleString()}</p>
-                      </div>
-                      <div>
-                        <p className="text-amber-700">Premium</p>
-                        <p className="font-bold">ETB {policyDetails.premium?.toLocaleString()}</p>
-                      </div>
-                      <div>
-                        <p className="text-amber-700">Premium Ratio</p>
-                        <p className="font-bold">
-                          {policyDetails.coverageAmount > 0 
-                            ? ((policyDetails.premium / policyDetails.coverageAmount) * 100).toFixed(2) 
-                            : 0}%
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-amber-700">Risk Level</p>
-                        <Badge className={policyDetails.coverageAmount > 1000000 ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}>
-                          {policyDetails.coverageAmount > 1000000 ? 'High' : 'Medium'}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+      {/* ================================================================ */}
+      {/* REVIEW MODAL */}
+      {/* ================================================================ */}
+      <Dialog open={isReviewModalOpen} onOpenChange={setIsReviewModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {reviewData.decision === 'FINAL_APPROVE'
+                ? 'Final Approval'
+                : `Review Policy: ${selectedPolicy?.policyNumber}`}
+            </DialogTitle>
+            <DialogDescription>
+              {reviewData.decision === 'FINAL_APPROVE'
+                ? 'Confirm payment has been received and activate this policy'
+                : 'Review the policy application and adjust premium if needed'}
+            </DialogDescription>
+          </DialogHeader>
 
-              {/* ===== CUSTOMER INFORMATION ===== */}
-              <SectionHeader 
-                title="Customer Information" 
-                icon={User} 
-                section="customerInfo"
-                expanded={expandedSections.customerInfo}
-                onToggle={toggleSection}
-              />
-              {expandedSections.customerInfo && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 p-4 bg-gray-50 rounded-lg">
-                  <InfoRow label="Full Name" value={`${policyDetails.customer?.firstName} ${policyDetails.customer?.lastName}`} icon={User} />
-                  <InfoRow label="Email" value={policyDetails.customer?.email} icon={Mail} />
-                  <InfoRow label="Phone" value={policyDetails.customer?.phone} icon={Phone} />
-                  <InfoRow label="Address" value={policyDetails.customer?.address} icon={Home} />
-                  <InfoRow label="Date of Birth" value={policyDetails.customer?.dateOfBirth ? formatDate(policyDetails.customer.dateOfBirth) : 'N/A'} icon={CalendarIcon} />
-                  <InfoRow label="Occupation" value={policyDetails.customer?.occupation} icon={Briefcase} />
-                  <InfoRow label="Nationality" value={policyDetails.customer?.nationality} icon={Flag} />
-                  <InfoRow label="ID Number" value={policyDetails.customer?.idNumber} icon={CreditCard} />
-                </div>
-              )}
-
-              {/* ===== VEHICLE DETAILS ===== */}
-              {policyDetails.productDetails?.vehicles && policyDetails.productDetails.vehicles.length > 0 && (
-                <>
-                  <SectionHeader 
-                    title="Motor Vehicle Details" 
-                    icon={Car} 
-                    section="vehicles" 
-                    count={policyDetails.productDetails.vehicles.length}
-                    bgColor="bg-blue-50"
-                    expanded={expandedSections.vehicles}
-                    onToggle={toggleSection}
-                  />
-                  {expandedSections.vehicles && (
-                    <div className="space-y-4 p-4 bg-blue-50 rounded-lg">
-                      {policyDetails.productDetails.vehicles.map((vehicle, idx) => (
-                        <div key={idx} className="border border-blue-200 rounded-lg p-4 bg-white">
-                          <h4 className="font-semibold text-blue-800 mb-3">Vehicle {idx + 1}</h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <InfoRow label="Make" value={vehicle.make} icon={Car} />
-                            <InfoRow label="Model" value={vehicle.model} icon={Car} />
-                            <InfoRow label="Year" value={vehicle.year} icon={CalendarIcon} />
-                            <InfoRow label="Registration Number" value={vehicle.registrationNumber || vehicle.plateNumber} icon={Key} />
-                            <InfoRow label="Plate Number" value={vehicle.plateNumber || vehicle.registrationNumber} icon={Hash} />
-                            <InfoRow label="Engine Number" value={vehicle.engineNumber} icon={Wrench} />
-                            <InfoRow label="Chassis Number" value={vehicle.chassisNumber} icon={Truck} />
-                            <InfoRow label="Vehicle Value" value={`ETB ${vehicle.vehicleValue?.toLocaleString()}`} icon={DollarSign} />
-                            <InfoRow label="Vehicle Type" value={vehicle.vehicleType || 'N/A'} />
-                            <InfoRow label="Fuel Type" value={vehicle.fuelType || 'N/A'} icon={Flag} />
-                            <InfoRow label="Seating Capacity" value={vehicle.seatingCapacity || 'N/A'} icon={Users} />
-                            <InfoRow label="Color" value={vehicle.color || 'N/A'} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* ===== PROPERTY DETAILS ===== */}
-              {policyDetails.productDetails?.propertyAddress && (
-                <>
-                  <SectionHeader 
-                    title="Property Details" 
-                    icon={Building} 
-                    section="propertyDetails"
-                    expanded={expandedSections.propertyDetails}
-                    onToggle={toggleSection}
-                  />
-                  {expandedSections.propertyDetails && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 p-4 bg-gray-50 rounded-lg">
-                      <InfoRow label="Property Type" value={policyDetails.productDetails.propertyType} icon={Building} />
-                      <InfoRow label="Property Address" value={policyDetails.productDetails.propertyAddress} icon={MapPin} />
-                      <InfoRow label="Property Value" value={`ETB ${policyDetails.productDetails.propertyValue?.toLocaleString()}`} icon={DollarSign} />
-                      <InfoRow label="Construction Type" value={policyDetails.productDetails.constructionType} />
-                      <InfoRow label="Year Built" value={policyDetails.productDetails.yearBuilt} icon={CalendarIcon} />
-                      <InfoRow label="Floor Area" value={policyDetails.productDetails.floorArea ? `${policyDetails.productDetails.floorArea} sqm` : 'N/A'} />
-                      <InfoRow label="Number of Rooms" value={policyDetails.productDetails.numberOfRooms} />
-                      <InfoRow label="Security Features" value={policyDetails.productDetails.securityFeatures?.join(', ') || 'None'} icon={Shield} />
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* ===== COVERAGE DETAILS ===== */}
-              <SectionHeader 
-                title="Coverage Details" 
-                icon={ShieldCheck} 
-                section="coverageDetails"
-                expanded={expandedSections.coverageDetails}
-                onToggle={toggleSection}
-              />
-              {expandedSections.coverageDetails && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 p-4 bg-gray-50 rounded-lg">
-                  <InfoRow label="Policy Type" value={policyDetails.type} icon={FileText} />
-                  <InfoRow label="Coverage Amount" value={`ETB ${policyDetails.coverageAmount?.toLocaleString()}`} icon={DollarSign} />
-                  <InfoRow label="Requested Premium" value={`ETB ${policyDetails.premium?.toLocaleString()}`} icon={DollarSign} />
-                  <InfoRow label="Premium Frequency" value={policyDetails.premiumFrequency} icon={CalendarIcon} />
-                  <InfoRow label="Effective Date" value={policyDetails.effectiveDate ? formatDate(policyDetails.effectiveDate) : 'N/A'} icon={CalendarIcon} />
-                  <InfoRow label="Expiration Date" value={policyDetails.expirationDate ? formatDate(policyDetails.expirationDate) : 'N/A'} icon={CalendarIcon} />
-                </div>
-              )}
-
-              {/* ===== SELECTED PERILS ===== */}
-              {policyDetails.selectedPerils && policyDetails.selectedPerils.length > 0 && (
-                <>
-                  <SectionHeader 
-                    title="Selected Perils / Risks" 
-                    icon={AlertCircle} 
-                    section="perils" 
-                    count={policyDetails.selectedPerils.length}
-                    expanded={expandedSections.perils}
-                    onToggle={toggleSection}
-                  />
-                  {expandedSections.perils && (
-                    <div className="space-y-2 p-4 bg-gray-50 rounded-lg">
-                      {policyDetails.selectedPerils.map((peril) => (
-                        <div key={peril.id} className="flex justify-between items-start border-b last:border-0 pb-2">
-                          <div>
-                            <p className="font-medium">{peril.perilName}</p>
-                            <p className="text-xs text-gray-500">{peril.description}</p>
-                          </div>
-                          <p className="font-medium text-amber-600">ETB {peril.premium?.toLocaleString()}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* ===== SELECTED RIDERS ===== */}
-              {policyDetails.selectedRiders && policyDetails.selectedRiders.length > 0 && (
-                <>
-                  <SectionHeader 
-                    title="Selected Riders / Add-ons" 
-                    icon={Package} 
-                    section="riders" 
-                    count={policyDetails.selectedRiders.length}
-                    expanded={expandedSections.riders}
-                    onToggle={toggleSection}
-                  />
-                  {expandedSections.riders && (
-                    <div className="space-y-2 p-4 bg-gray-50 rounded-lg">
-                      {policyDetails.selectedRiders.map((rider) => (
-                        <div key={rider.id} className="flex justify-between items-start border-b last:border-0 pb-2">
-                          <div>
-                            <p className="font-medium">{rider.riderName}</p>
-                            <p className="text-xs text-gray-500">{rider.description}</p>
-                            {rider.maxLimit && <p className="text-xs text-gray-500">Max Limit: ETB {rider.maxLimit.toLocaleString()}</p>}
-                          </div>
-                          <p className="font-medium text-amber-600">ETB {rider.premium?.toLocaleString()}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* ===== PREVIOUS CLAIMS ===== */}
-              {policyDetails.productDetails?.previousClaims && policyDetails.productDetails.previousClaims.length > 0 && (
-                <>
-                  <SectionHeader 
-                    title="Previous Claims History" 
-                    icon={FileCheck} 
-                    section="previousClaims" 
-                    count={policyDetails.productDetails.previousClaims.length}
-                    expanded={expandedSections.previousClaims}
-                    onToggle={toggleSection}
-                  />
-                  {expandedSections.previousClaims && (
-                    <div className="space-y-2 p-4 bg-gray-50 rounded-lg">
-                      {policyDetails.productDetails.previousClaims.map((claim, idx) => (
-                        <div key={idx} className="flex justify-between items-start border-b last:border-0 pb-2">
-                          <div>
-                            <p className="font-medium">{claim.year}</p>
-                            <p className="text-xs text-gray-500">{claim.description}</p>
-                          </div>
-                          <p className="font-medium text-red-600">ETB {claim.amount?.toLocaleString()}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* ===== REVIEW HISTORY ===== */}
-              {policyDetails.negotiationHistory && policyDetails.negotiationHistory.length > 0 && (
-                <>
-                  <SectionHeader 
-                    title="Review History" 
-                    icon={Clock} 
-                    section="reviewHistory"
-                    expanded={expandedSections.reviewHistory}
-                    onToggle={toggleSection}
-                  />
-                  {expandedSections.reviewHistory && (
-                    <div className="space-y-2 max-h-40 overflow-y-auto p-2 bg-gray-50 rounded-lg">
-                      {policyDetails.negotiationHistory.map((item, idx) => (
-                        <div key={idx} className="text-sm p-2 bg-white rounded border">
-                          <div className="flex justify-between">
-                            <span className="font-medium">{item.action}</span>
-                            <span className="text-xs text-gray-500">{new Date(item.timestamp).toLocaleString()}</span>
-                          </div>
-                          {item.notes && <p className="text-xs text-gray-600 mt-1">{item.notes}</p>}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* ============================================ */}
-              {/* ACTION FORMS */}
-              {/* ============================================ */}
-
-              {/* DIRECT APPROVE FORM */}
-              {actionType === 'direct_approve' && (
-                <>
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <p className="font-medium text-green-800">Direct Approval</p>
-                    <p className="text-sm text-green-700">This will approve the policy immediately. The policy will become ACTIVE.</p>
-                  </div>
-                  <div>
-                    <Label>Approval Notes <span className="text-red-500">*</span></Label>
-                    <Textarea 
-                      value={underwriterNotes} 
-                      onChange={(e) => setUnderwriterNotes(e.target.value)} 
-                      placeholder="Add approval notes..." 
-                      rows={3} 
-                      className="mt-1" 
-                    />
-                  </div>
-                  <div className="flex gap-3 pt-4">
-                    <Button 
-                      onClick={handleDirectApprove} 
-                      disabled={submitting} 
-                      className="flex-1 bg-green-600 hover:bg-green-700"
-                    >
-                      {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ThumbsUp className="h-4 w-4 mr-2" />}
-                      Confirm Direct Approval
-                    </Button>
-                    <Button variant="outline" onClick={() => setSelectedPolicy(null)} className="flex-1">
-                      Cancel
-                    </Button>
-                  </div>
-                </>
-              )}
-
-              {/* REJECT FORM */}
-              {actionType === 'reject' && (
-                <>
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                    <p className="font-medium text-red-800">Reject Policy</p>
-                    <p className="text-sm text-red-700">This will reject the policy application. The customer will be notified.</p>
-                  </div>
-                  <div>
-                    <Label>Rejection Reason <span className="text-red-500">*</span></Label>
-                    <Textarea 
-                      value={rejectReason} 
-                      onChange={(e) => setRejectReason(e.target.value)} 
-                      placeholder="Provide clear reason for rejection..." 
-                      rows={3} 
-                      className="mt-1" 
-                    />
-                  </div>
-                  <div className="flex gap-3 pt-4">
-                    <Button 
-                      onClick={handleRejectPolicy} 
-                      disabled={submitting} 
-                      className="flex-1 bg-red-600 hover:bg-red-700"
-                    >
-                      {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Ban className="h-4 w-4 mr-2" />}
-                      Confirm Rejection
-                    </Button>
-                    <Button variant="outline" onClick={() => setSelectedPolicy(null)} className="flex-1">
-                      Cancel
-                    </Button>
-                  </div>
-                </>
-              )}
-
-              {/* FINAL APPROVE FORM */}
-              {actionType === 'final_approve' && (
-                <>
-                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                    <p className="font-medium text-purple-800">Final Approval</p>
-                    <p className="text-sm text-purple-700">This will final approve the policy. The policy will become ACTIVE and the customer will be notified.</p>
-                  </div>
-                  <div>
-                    <Label>Approval Notes <span className="text-red-500">*</span></Label>
-                    <Textarea 
-                      value={underwriterNotes} 
-                      onChange={(e) => setUnderwriterNotes(e.target.value)} 
-                      placeholder="Add final approval notes..." 
-                      rows={3} 
-                      className="mt-1" 
-                    />
-                  </div>
-                  <div className="flex gap-3 pt-4">
-                    <Button 
-                      onClick={handleFinalApprove} 
-                      disabled={submitting} 
-                      className="flex-1 bg-purple-600 hover:bg-purple-700"
-                    >
-                      {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
-                      Confirm Final Approval
-                    </Button>
-                    <Button variant="outline" onClick={() => setSelectedPolicy(null)} className="flex-1">
-                      Cancel
-                    </Button>
-                  </div>
-                </>
-              )}
-
-              {/* ADJUST FORM */}
-              {actionType === 'adjust' && (
-                <>
-                  <div>
-                    <Label>Adjusted Premium (ETB) <span className="text-red-500">*</span></Label>
-                    <Input 
-                      type="number" 
-                      value={adjustedPremium} 
-                      onChange={(e) => setAdjustedPremium(e.target.value)} 
-                      className="mt-1" 
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Original: ETB {policyDetails.premium?.toLocaleString()}</p>
-                  </div>
-                  <div>
-                    <Label>Message to Customer <span className="text-red-500">*</span></Label>
-                    <Textarea 
-                      value={underwriterNotes} 
-                      onChange={(e) => setUnderwriterNotes(e.target.value)} 
-                      placeholder="Explain the premium adjustment..." 
-                      rows={3} 
-                      className="mt-1" 
-                    />
-                  </div>
-                  <div className="flex gap-3 pt-4">
-                    <Button 
-                      onClick={handleAdjustPremium} 
-                      disabled={submitting} 
-                      className="flex-1 bg-blue-600 hover:bg-blue-700"
-                    >
-                      {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
-                      Submit Adjustment
-                    </Button>
-                    <Button variant="outline" onClick={() => setSelectedPolicy(null)} className="flex-1">
-                      Cancel
-                    </Button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ============================================ */}
-      {/* ENDORSEMENT DETAIL MODAL */}
-      {/* ============================================ */}
-      {selectedEndorsement && (
-        <Dialog open={!!selectedEndorsement} onOpenChange={() => setSelectedEndorsement(null)}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Endorsement Details</DialogTitle>
-            </DialogHeader>
-            
+          {selectedPolicy && reviewData.decision !== 'FINAL_APPROVE' && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Policy Number</label>
-                  <p className="mt-1">{selectedEndorsement.policyNumber}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Customer</label>
-                  <p className="mt-1">{selectedEndorsement.customerName}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Type</label>
-                  <p className="mt-1">{selectedEndorsement.type}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Submitted</label>
-                  <p className="mt-1">{new Date(selectedEndorsement.submittedDate).toLocaleDateString()}</p>
+              {/* Policy Summary */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h4 className="font-medium mb-2">Policy Summary</h4>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div><p className="text-gray-500">Customer</p><p className="font-medium">{selectedPolicy.customerName}</p></div>
+                  <div><p className="text-gray-500">Product</p><p className="font-medium">{selectedPolicy.productName || selectedPolicy.type}</p></div>
+                  <div><p className="text-gray-500">Coverage</p><p className="font-medium">{formatCurrency(selectedPolicy.coverageAmount)}</p></div>
+                  <div><p className="text-gray-500">Term</p><p className="font-medium">{selectedPolicy.termMonths} months</p></div>
                 </div>
               </div>
-              
+
+              {/* Decision */}
               <div>
-                <label className="text-sm font-medium text-gray-500">Changes Requested</label>
-                <div className="mt-1 p-3 bg-gray-50 rounded-lg">
-                  <pre className="text-sm whitespace-pre-wrap">
-                    {typeof selectedEndorsement.changes === 'string' 
-                      ? selectedEndorsement.changes 
-                      : JSON.stringify(selectedEndorsement.changes, null, 2)}
-                  </pre>
-                </div>
+                <Label>Decision</Label>
+                <Select value={reviewData.decision} onValueChange={(val) => setReviewData({ ...reviewData, decision: val })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="APPROVE_FOR_PAYMENT">Approve for Payment</SelectItem>
+                    <SelectItem value="REQUIRES_MODIFICATION">Request Modification</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              
-              {selectedEndorsement.reason && (
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Reason</label>
-                  <p className="mt-1 text-gray-700">{selectedEndorsement.reason}</p>
-                </div>
-              )}
-              
-              {!permissions.canApproveEndorsements && (
-                <div className="bg-gray-50 p-3 rounded-lg text-center">
-                  <Lock className="h-5 w-5 text-gray-400 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">You have view-only access for endorsements</p>
-                  <p className="text-xs text-gray-400">Approval requires Senior Officer or higher role</p>
-                </div>
-              )}
-              
-              {permissions.canApproveEndorsements && (
-                <div className="flex gap-3 pt-4">
-                  <Button 
-                    className="flex-1 bg-green-600 hover:bg-green-700" 
-                    onClick={() => {
-                      handleApproveEndorsement(selectedEndorsement.id);
-                      setSelectedEndorsement(null);
-                    }}
-                  >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Approve
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    className="flex-1 text-red-600 hover:text-red-700" 
-                    onClick={() => {
-                      handleRejectEndorsement(selectedEndorsement.id);
-                      setSelectedEndorsement(null);
-                    }}
-                  >
-                    <XCircle className="h-4 w-4 mr-2" />
-                    Reject
-                  </Button>
-                </div>
-              )}
+
+              {/* Adjusted Premium */}
+              <div>
+                <Label>Adjusted Premium (ETB)</Label>
+                <Input
+                  type="number"
+                  value={reviewData.adjustedPremium}
+                  onChange={(e) => setReviewData({ ...reviewData, adjustedPremium: e.target.value })}
+                  placeholder="Leave empty to use original premium"
+                />
+              </div>
+
+              {/* Notes */}
+              <div>
+                <Label>Notes</Label>
+                <Textarea
+                  value={reviewData.notes}
+                  onChange={(e) => setReviewData({ ...reviewData, notes: e.target.value })}
+                  placeholder="Add review notes..."
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <Button onClick={handleSubmitReview} disabled={submitting} className="flex-1 bg-blue-600 hover:bg-blue-700">
+                  {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
+                  Submit Review
+                </Button>
+                <Button variant="outline" className="flex-1 text-red-600" onClick={handleRejectPolicy} disabled={submitting}>
+                  <Ban className="h-4 w-4 mr-2" /> Reject
+                </Button>
+                <Button variant="outline" className="flex-1" onClick={() => setIsReviewModalOpen(false)}>Cancel</Button>
+              </div>
             </div>
-          </DialogContent>
-        </Dialog>
+          )}
+
+          {selectedPolicy && reviewData.decision === 'FINAL_APPROVE' && (
+            <div className="space-y-4">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                <p className="font-medium text-emerald-800">Confirm Final Approval</p>
+                <p className="text-sm text-emerald-700 mt-1">
+                  Payment has been received for this policy. Activating will make it ACTIVE.
+                </p>
+              </div>
+              <div>
+                <Label>Approval Notes</Label>
+                <Textarea
+                  value={reviewData.notes}
+                  onChange={(e) => setReviewData({ ...reviewData, notes: e.target.value })}
+                  placeholder="Add final approval notes..."
+                  rows={3}
+                />
+              </div>
+              <div className="flex gap-3">
+                <Button onClick={handleFinalApprove} disabled={submitting} className="flex-1 bg-emerald-600 hover:bg-emerald-700">
+                  {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+                  Confirm & Activate
+                </Button>
+                <Button variant="outline" onClick={() => setIsReviewModalOpen(false)}>Cancel</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ================================================================ */}
+      {/* DETAILS MODAL */}
+      {/* ================================================================ */}
+      <Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Policy Details: {selectedPolicy?.policyNumber}</DialogTitle>
+          </DialogHeader>
+          {loadingDetails ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+            </div>
+          ) : policyDetails ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                {(() => { const s = getStatusBadge(policyDetails.status); return <Badge className={s.color}>{s.label}</Badge>; })()}
+                <span className="text-sm text-gray-500">Submitted: {formatDate(policyDetails.submittedDate)}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+                <div><p className="text-xs text-gray-500">Policy Number</p><p className="font-medium">{policyDetails.policyNumber}</p></div>
+                <div><p className="text-xs text-gray-500">Product</p><p className="font-medium">{policyDetails.productName || policyDetails.type}</p></div>
+                <div><p className="text-xs text-gray-500">Customer</p><p className="font-medium">{policyDetails.customerName}</p></div>
+                <div><p className="text-xs text-gray-500">Coverage</p><p className="font-medium">{formatCurrency(policyDetails.coverageAmount)}</p></div>
+                <div><p className="text-xs text-gray-500">Premium</p><p className="font-medium">{formatCurrency(policyDetails.premium || 0)}</p></div>
+                <div><p className="text-xs text-gray-500">Term</p><p className="font-medium">{policyDetails.termMonths} months</p></div>
+                {policyDetails.paymentReference && (
+                  <div className="col-span-2">
+                    <p className="text-xs text-gray-500">Payment Reference</p>
+                    <p className="font-medium text-orange-600">{policyDetails.paymentReference}</p>
+                  </div>
+                )}
+              </div>
+              <div className="flex justify-end pt-4 border-t">
+                <Button variant="outline" onClick={() => setIsDetailsModalOpen(false)}>Close</Button>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <AlertCircle className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500">No policy details found</p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ================================================================ */}
+      {/* PAYMENT REFERENCE GENERATOR DIALOG */}
+      {/* ================================================================ */}
+      {selectedPolicy && (
+        <PaymentReferenceGenerator
+          policyId={selectedPolicy.id}
+          policyNumber={selectedPolicy.policyNumber}
+          coverageAmount={selectedPolicy.coverageAmount || 0}
+          customerName={selectedPolicy.customerName}
+          customerPhone={selectedPolicy.customerPhone}
+          customerEmail={selectedPolicy.customerEmail}
+          open={isPaymentDialogOpen}
+          onClose={() => {
+            setIsPaymentDialogOpen(false);
+            setSelectedPolicy(null);
+            fetchDashboardData();
+          }}
+        />
       )}
     </div>
   );

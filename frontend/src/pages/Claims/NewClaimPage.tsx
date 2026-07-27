@@ -72,6 +72,22 @@ const DEFAULT_FIELDS_BY_TYPE: Record<string, CustomField[]> = {
     { name: 'witness_name', label: 'Witness Name', type: 'text', required: false, section: 'Witness' },
     { name: 'witness_phone', label: 'Witness Phone', type: 'text', required: false, section: 'Witness' },
   ],
+  AUTO: [
+    { name: 'vehicle_make', label: 'Vehicle Make', type: 'text', required: true, section: 'Vehicle' },
+    { name: 'vehicle_model', label: 'Vehicle Model', type: 'text', required: true, section: 'Vehicle' },
+    { name: 'vehicle_year', label: 'Vehicle Year', type: 'number', required: true, section: 'Vehicle' },
+    { name: 'plate_number', label: 'Plate Number', type: 'text', required: true, section: 'Vehicle' },
+    { name: 'engine_number', label: 'Engine Number', type: 'text', required: false, section: 'Vehicle' },
+    { name: 'chassis_number', label: 'Chassis Number', type: 'text', required: false, section: 'Vehicle' },
+    { name: 'driver_name', label: 'Driver Full Name', type: 'text', required: true, section: 'Driver' },
+    { name: 'driver_license', label: 'Driver License Number', type: 'text', required: true, section: 'Driver' },
+    { name: 'accident_location', label: 'Accident Location', type: 'text', required: true, section: 'Incident' },
+    { name: 'road_conditions', label: 'Road Conditions', type: 'select', required: false, options: ['Dry', 'Wet', 'Icy', 'Gravel', 'Other'], section: 'Incident' },
+    { name: 'weather_conditions', label: 'Weather Conditions', type: 'select', required: false, options: ['Clear', 'Rain', 'Snow', 'Fog', 'Other'], section: 'Incident' },
+    { name: 'damage_description', label: 'Damage Description', type: 'textarea', required: true, section: 'Incident' },
+    { name: 'witness_name', label: 'Witness Name', type: 'text', required: false, section: 'Witness' },
+    { name: 'witness_phone', label: 'Witness Phone', type: 'text', required: false, section: 'Witness' },
+  ],
   HEALTH: [
     { name: 'patient_name', label: 'Patient Full Name', type: 'text', required: true, section: 'Patient' },
     { name: 'patient_age', label: 'Patient Age', type: 'number', required: true, section: 'Patient' },
@@ -184,34 +200,54 @@ export default function NewClaimPage() {
   // ----------------------------------------------------------------------------
   // Fetch custom fields for the selected policy's product
   // ----------------------------------------------------------------------------
-  const fetchFieldsForPolicy = async (policy: Policy) => {
-    setLoading(true);
-    try {
-      const res = await axiosInstance.get(`/products/${policy.productId || policy.productCode}`);
-      const product = res.data;
-      
-      if (product.customFields && product.customFields.length > 0) {
-        setCustomFields(product.customFields);
-        setLoading(false);
-        return;
+const fetchFieldsForPolicy = async (policy: Policy) => {
+  setLoading(true);
+  try {
+    // Try multiple identifiers in order
+    const identifiers = [
+      policy.productId,
+      policy.productCode,
+      policy.type,
+    ].filter(id => id && id !== 'undefined' && id !== 'null');
+
+    let fields: CustomField[] = [];
+
+    // Try each identifier until we get a successful response
+    for (const identifier of identifiers) {
+      try {
+        const res = await axiosInstance.get(`/products/${identifier}`);
+        const product = res.data;
+        
+        if (Array.isArray(product.customFields) && product.customFields.length > 0) {
+          fields = product.customFields;
+          break;
+        }
+        if (Array.isArray(product.fields) && product.fields.length > 0) {
+          fields = product.fields;
+          break;
+        }
+      } catch {
+        // Continue to next identifier
+        continue;
       }
-      if (product.fields && product.fields.length > 0) {
-        setCustomFields(product.fields);
-        setLoading(false);
-        return;
-      }
-    } catch {
-      console.warn('Could not fetch fields from backend, using defaults');
     }
 
-    const defaults = DEFAULT_FIELDS_BY_TYPE[policy.type] || [];
-    setCustomFields(defaults);
-    
-    if (defaults.length === 0) {
-      toast.info('No specific fields required for this product type');
+    // If no fields found from backend, use defaults
+    if (fields.length === 0) {
+      fields = DEFAULT_FIELDS_BY_TYPE[policy.type] || [];
+      if (fields.length === 0) {
+        console.warn(`No default fields defined for product type: ${policy.type}`);
+      }
     }
+
+    setCustomFields(fields);
+  } catch (error) {
+    console.error('Failed to fetch product fields:', error);
+    setCustomFields(DEFAULT_FIELDS_BY_TYPE[policy.type] || []);
+  } finally {
     setLoading(false);
-  };
+  }
+};
 
   // ----------------------------------------------------------------------------
   // Fetch hospitals (for Health insurance)
@@ -688,8 +724,8 @@ export default function NewClaimPage() {
   if (submissionComplete) {
     return (
       <div className="space-y-6">
-        <Button variant="ghost" onClick={() => navigate('/customer/policies')} className="p-0">
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Policies
+        <Button variant="ghost" onClick={() => navigate('/customer/claims')} className="p-0">
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back to claims
         </Button>
         <Card className="border-green-200 bg-green-50">
           <CardContent className="p-8 text-center">
@@ -717,8 +753,8 @@ export default function NewClaimPage() {
   // ============================================================================
   return (
     <div className="space-y-6">
-      <Button variant="ghost" onClick={() => navigate('/customer/policies')} className="p-0">
-        <ArrowLeft className="mr-2 h-4 w-4" /> Back to Policies
+      <Button variant="ghost" onClick={() => navigate('/customer/claims')} className="p-0">
+        <ArrowLeft className="mr-2 h-4 w-4" /> Back to Claims
       </Button>
 
       <div>

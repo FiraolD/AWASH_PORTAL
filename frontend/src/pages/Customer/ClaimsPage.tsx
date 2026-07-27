@@ -2,20 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus, FileText, AlertCircle, Loader2, Eye, Clock, CheckCircle,
-  XCircle, DollarSign, Activity, Search, Filter, ChevronDown,
-  Shield, Car, Heart, Flame, Plane, User
+  XCircle, DollarSign, Activity, Search, Shield, Car, Heart, Flame,
+  Plane, User, RefreshCw
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
-import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
-import { Badge } from '../../components/ui/Badge';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { Button } from '../../components/ui/button';
+import { Input } from '../../components/ui/input';
+import { Badge } from '../../components/ui/badge';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../../components/ui/Select';
+} from '../../components/ui/select';
 import axiosInstance from '../../lib/axios';
 import { useAuthStore } from '../../stores/authStore';
 import { toast } from 'sonner';
@@ -35,10 +35,10 @@ interface Claim {
   natureOfLoss: string;
   submittedDate: string;
   policyNumber?: string;
-  customerName?: string;
   incidentDescription?: string;
   location?: string;
   productType?: string;
+  customerName?: string;
 }
 
 // ----------------------------------------------------------------------------
@@ -85,6 +85,7 @@ export default function ClaimsPage() {
   const [claims, setClaims] = useState<Claim[]>([]);
   const [filteredClaims, setFilteredClaims] = useState<Claim[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -101,16 +102,31 @@ export default function ClaimsPage() {
     setError(null);
     try {
       const res = await axiosInstance.get('/claims/my-claims');
-      const claimsData = res.data || [];
+      const claimsData = Array.isArray(res.data) ? res.data : (res.data?.claims || res.data?.data || []);
       setClaims(claimsData);
       setFilteredClaims(claimsData);
     } catch (err: any) {
       console.error('Failed to fetch claims:', err);
-      setError(err.response?.data?.error || 'Failed to load claims');
-      toast.error('Failed to load claims');
+      // If /my-claims fails, try the generic /claims endpoint
+      try {
+        const fallbackRes = await axiosInstance.get('/claims');
+        const claimsData = Array.isArray(fallbackRes.data) ? fallbackRes.data : (fallbackRes.data?.claims || fallbackRes.data?.data || []);
+        setClaims(claimsData);
+        setFilteredClaims(claimsData);
+      } catch (fallbackErr: any) {
+        setError(err.response?.data?.error || 'Failed to load claims');
+        toast.error('Failed to load claims');
+      }
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchClaims();
+    setRefreshing(false);
+    toast.success('Claims refreshed');
   };
 
   // --------------------------------------------------------------------------
@@ -119,7 +135,6 @@ export default function ClaimsPage() {
   useEffect(() => {
     let filtered = [...claims];
 
-    // Search filter
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(
@@ -131,12 +146,10 @@ export default function ClaimsPage() {
       );
     }
 
-    // Status filter
     if (statusFilter !== 'all') {
       filtered = filtered.filter(c => c.status === statusFilter);
     }
 
-    // Sort by submitted date (newest first)
     filtered.sort(
       (a, b) =>
         new Date(b.submittedDate || b.incidentDate).getTime() -
@@ -184,6 +197,7 @@ export default function ClaimsPage() {
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Something went wrong</h3>
           <p className="text-gray-500 mb-4">{error}</p>
           <Button onClick={fetchClaims} className="bg-blue-600 hover:bg-blue-700">
+            <RefreshCw className="h-4 w-4 mr-2" />
             Try Again
           </Button>
         </div>
@@ -196,49 +210,35 @@ export default function ClaimsPage() {
   // ==========================================================================
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header – matches Policies page style */}
       <div className="flex justify-between items-start flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-bold text-[#1A3E6F]">My Claims</h1>
           <p className="text-gray-500 mt-1">Track and manage your insurance claims</p>
         </div>
-        <Button
-          onClick={() => navigate('/claims/new-claim')}
-          className="bg-blue-600 hover:bg-blue-700"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Register New Claim
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            variant="outline"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Refreshing...' : 'Refresh'}
+          </Button>
+          {/* ✅ FIXED: Register New Claim button */}
+          <Button
+            onClick={() => navigate('/customer/claims/new')}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Register New Claim
+          </Button>
+        </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 grid-cols-2 md:grid-cols-4 lg:grid-cols-7">
-        {[
-          { label: 'Total', value: stats.total, icon: FileText, color: 'text-gray-600', bg: 'bg-gray-100' },
-          { label: 'Submitted', value: stats.submitted, icon: Clock, color: 'text-yellow-600', bg: 'bg-yellow-100' },
-          { label: 'Under Review', value: stats.underReview, icon: Activity, color: 'text-blue-600', bg: 'bg-blue-100' },
-          { label: 'Reviewed', value: stats.reviewed, icon: FileText, color: 'text-cyan-600', bg: 'bg-cyan-100' },
-          { label: 'Approved', value: stats.approved, icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-100' },
-          { label: 'Rejected', value: stats.rejected, icon: XCircle, color: 'text-red-600', bg: 'bg-red-100' },
-          { label: 'Paid', value: stats.paid, icon: DollarSign, color: 'text-purple-600', bg: 'bg-purple-100' },
-        ].map((card, idx) => (
-          <Card key={idx} className="hover:shadow-md transition-shadow">
-            <CardContent className="p-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-gray-500">{card.label}</p>
-                  <p className="text-xl font-bold">{card.value}</p>
-                </div>
-                <div className={`h-8 w-8 rounded-lg ${card.bg} flex items-center justify-center`}>
-                  <card.icon className={`h-4 w-4 ${card.color}`} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      
 
-      {/* Filters */}
+      {/* Filters – matches Policies page style */}
       <div className="flex flex-wrap gap-4">
         <div className="flex-1 min-w-[200px]">
           <div className="relative">
@@ -265,7 +265,7 @@ export default function ClaimsPage() {
         </Select>
       </div>
 
-      {/* Claims List */}
+      {/* Claims List – matches Policies page card style */}
       {filteredClaims.length === 0 ? (
         <Card>
           <CardContent className="text-center py-16">
@@ -277,7 +277,10 @@ export default function ClaimsPage() {
                 : 'No claims match your current filters.'}
             </p>
             {claims.length === 0 && (
-              <Button onClick={() => navigate('/claims/new-claim')} className="bg-blue-600 hover:bg-blue-700">
+              <Button 
+                onClick={() => navigate('/customer/claims/new')} 
+                className="bg-blue-600 hover:bg-blue-700"
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 Register New Claim
               </Button>

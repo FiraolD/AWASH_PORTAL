@@ -1,6 +1,6 @@
 // src/middleware/auth.middleware.ts
 import jwt from 'jsonwebtoken';
-import pool from '../../lib/db.js'; // ✅ Added .js extension
+import pool from '../../lib/db'; // ✅ Added .js extension
 // ---------------------------------------------------------------------------
 // Role definitions (centralized)
 // ---------------------------------------------------------------------------
@@ -111,14 +111,14 @@ export const authenticate = async (req, res, next) => {
         }
         const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
         const decoded = jwt.verify(token, JWT_SECRET);
-        const userResult = await pool.query(`SELECT id, email, role, "firstName", "lastName", "isActive" 
+        const userResult = await pool.query(`SELECT id, email, role, "firstName", "lastName", "status" 
        FROM users WHERE id = $1`, [decoded.id]);
         if (userResult.rows.length === 0) {
             res.status(401).json({ error: 'User not found.' });
             return;
         }
         const user = userResult.rows[0];
-        if (!user.isActive) {
+        if (!user.status) {
             res.status(403).json({ error: 'Account is deactivated. Contact admin.' });
             return;
         }

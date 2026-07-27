@@ -222,7 +222,7 @@ router.post('/maintenance/run', authenticate, authorize(...SETTINGS_ROLES), asyn
   }
 });
 // GET list of hospitals (public endpoint - no auth required for claim form)
-router.get('/hospitals', async (req: Request, res: Response) => {
+router.get('/hospitals', async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT hospital_name 

@@ -2,7 +2,8 @@
 
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import pool from '../../lib/db.js';  // ✅ Added .js extension
+import pool from '../../lib/db';  // ✅ Added .js extension
+//import pool from '../config/database'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -149,7 +150,7 @@ export const authenticate = async (
     const decoded = jwt.verify(token, JWT_SECRET) as { id: string; email: string; role: string };
 
     const userResult = await pool.query(
-      `SELECT id, email, role, "firstName", "lastName", "isActive" 
+      `SELECT id, email, role, "firstName", "lastName", "status" 
        FROM users WHERE id = $1`,
       [decoded.id]
     );
@@ -161,7 +162,7 @@ export const authenticate = async (
 
     const user = userResult.rows[0];
 
-    if (!user.isActive) {
+    if (!user.status) {
       res.status(403).json({ error: 'Account is deactivated. Contact admin.' });
       return;
     }

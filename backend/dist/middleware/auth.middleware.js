@@ -1,6 +1,6 @@
 // src/middleware/auth.middleware.ts
 import jwt from 'jsonwebtoken';
-import pool from '../config/database';
+import pool from '../lib/db.js';
 // ---------------------------------------------------------------------------
 // Role definitions (centralized)
 // ---------------------------------------------------------------------------
