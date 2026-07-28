@@ -6,11 +6,11 @@ import dotenv from 'dotenv';
 
 // Import routes
 import authRoutes from './api/v1/auth.routes.js';
-import usersRoutes from './api/v1/users.routes.js';
+import usersRoutes from './api/v1/user.routes.js';
 import productsRoutes from './api/v1/products.routes.js';
-import policiesRoutes from './api/v1/policies.routes.js';
-import claimsRoutes from './api/v1/claims.routes.js';
-import paymentsRoutes from './api/v1/payments.routes.js';  // ✅ Add this
+import policiesRoutes from './api/v1/policy.routes.js';
+import claimsRoutes from './api/v1/claim.routes.js';
+import paymentsRoutes from './api/v1/payment.routes.js';  // ✅ Add this
 import settingsRoutes from './api/v1/settings.routes.js';
 // ... other imports
 
