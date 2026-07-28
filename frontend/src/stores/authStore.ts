@@ -1,4 +1,5 @@
 ﻿import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import axiosInstance from '../lib/axios';
 
 interface User {
@@ -33,7 +34,9 @@ interface RegisterData {
   phone?: string;
 }
 
-export const useAuthStore = create<AuthState>((set, get) => ({
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set, get) => ({
   user: null,
   token: null,
   isAuthenticated: false,
@@ -100,6 +103,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       get().logout();
     }
   },
-}));
+    }),
+    {
+      name: 'awash-auth-storage',
+    }
+  )
+);
 
 
