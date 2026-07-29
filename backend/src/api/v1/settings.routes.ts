@@ -43,7 +43,7 @@ router.get('/public', async (req, res: Response) => {
 // Upsert
 router.put('/:key', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
-    const { key } = req.params;
+    const key = String(req.params.key);
     const { value, type, description, isPublic } = req.body;
     if (!value && value !== '' && value !== false) return res.status(400).json({ error: 'Value required' });
 
@@ -66,7 +66,7 @@ router.put('/:key', authenticate, authorizeExecutives, async (req: AuthRequest, 
 // Delete
 router.delete('/:key', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
-    const { key } = req.params;
+    const key = String(req.params.key);
     const oldResult = await pool.query('SELECT * FROM system_settings WHERE "settingKey"=$1', [key]);
     if (oldResult.rows.length === 0) return res.status(404).json({ error: 'Not found' });
 

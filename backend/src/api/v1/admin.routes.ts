@@ -108,7 +108,7 @@ router.get('/', authenticate, authorizeExecutives, async (req: AuthRequest, res:
 // ---------------------------------------------------------------------------
 router.put('/:key', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
-    const { key } = req.params;
+    const key = String(req.params.key);
     const { value } = req.body;
     const userId = req.user!.id;
 
