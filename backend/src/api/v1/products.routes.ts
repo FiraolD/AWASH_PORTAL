@@ -333,7 +333,7 @@ router.post('/:productId/fields', authenticate, authorize('MASTER_ADMIN'), async
         id, "productId", "fieldName", "fieldLabel", "fieldType", 
         "isRequired", options, "displayOrder", "createdAt", "updatedAt"
       ) VALUES (
-        gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, NOW(), NOW()
+        gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, NOW(), NOW()
       ) RETURNING *
     `, [
       productId,
@@ -432,7 +432,7 @@ router.post('/seed', authenticate, authorize('MASTER_ADMIN'), async (req: any, r
       if (existing.rows.length === 0) {
         await pool.query(`
           INSERT INTO products (id, name, code, description, category, "isActive", "createdAt", "updatedAt")
-          VALUES (gen_random_uuid()::text, $1, $2, $3, $4, true, NOW(), NOW())
+          VALUES (gen_random_uuid(), $1, $2, $3, $4, true, NOW(), NOW())
         `, [product.name, product.code, product.description, product.category]);
         inserted++;
       }
