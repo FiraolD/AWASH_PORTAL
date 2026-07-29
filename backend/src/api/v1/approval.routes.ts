@@ -1,6 +1,5 @@
 ﻿import { Router, Response } from 'express';
-import { authenticate, authorizeExecutives } from '../../middleware/auth.middleware';
-import { AuthRequest } from '../../middleware/auth.middleware.ts;
+mport { AuthRequest, authenticate, authorizeExecutives } from '../../middleware/auth.middleware';
 import pool from '../../lib/db';
 
 const router = Router();
