@@ -199,7 +199,7 @@ router.post('/', authenticate, authorize('MASTER_ADMIN'), async (req: any, res: 
         id, name, code, description, category, 
         "isActive", "requiresApproval", "approvalFlow", "createdAt", "updatedAt"
       ) VALUES (
-        gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, NOW(), NOW()
+        gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, NOW(), NOW()
       ) RETURNING *
     `, [
       name,
