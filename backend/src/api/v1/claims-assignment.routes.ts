@@ -5,7 +5,6 @@ import { createAuditLog, getClientIp, getHeaderString } from './audit.routes';
 
 const router = Router();
 
-// Get all
 router.get('/', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
     const result = await pool.query(
@@ -20,7 +19,6 @@ router.get('/', authenticate, authorizeExecutives, async (req: AuthRequest, res:
   }
 });
 
-// Create
 router.post('/', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
     const { ruleName, productType, claimType, minAmount, maxAmount, assignedRole, priorityLevel } = req.body;
@@ -36,7 +34,15 @@ router.post('/', authenticate, authorizeExecutives, async (req: AuthRequest, res
       [ruleName, productType, claimType || null, minAmount || null, maxAmount || null, assignedRole, priorityLevel || 0, req.user!.id]
     );
 
-    await createAuditLog(req.user!.id, req.user!.email, req.user!.role, 'CREATE', 'CLAIMS_ASSIGNMENT_RULE', result.rows[0].id, null, result.rows[0], getClientIp(req), getHeaderString(req, 'user-agent'));
+    // ✅ FIXED: Using helpers for type safety
+    await createAuditLog(
+      req.user!.id, req.user!.email, req.user!.role,
+      'CREATE', 'CLAIMS_ASSIGNMENT_RULE', result.rows[0].id,
+      null, result.rows[0],
+      getClientIp(req),
+      getHeaderString(req, 'user-agent')
+    );
+
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('[AssignmentRules] Create error:', error);
@@ -44,7 +50,6 @@ router.post('/', authenticate, authorizeExecutives, async (req: AuthRequest, res
   }
 });
 
-// Update
 router.put('/:id', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
@@ -57,11 +62,25 @@ router.put('/:id', authenticate, authorizeExecutives, async (req: AuthRequest, r
     await pool.query(
       `UPDATE claims_assignment_rules SET "ruleName"=$1, "productType"=$2, "claimType"=$3, "minAmount"=$4,
        "maxAmount"=$5, "assignedRole"=$6, "priorityLevel"=$7, "isActive"=$8, "updatedAt"=NOW() WHERE id=$9`,
-      [ruleName || oldData.ruleName, productType || oldData.productType, claimType !== undefined ? claimType : oldData.claimType, minAmount !== undefined ? minAmount : oldData.minAmount, maxAmount !== undefined ? maxAmount : oldData.maxAmount, assignedRole || oldData.assignedRole, priorityLevel !== undefined ? priorityLevel : oldData.priorityLevel, isActive !== undefined ? isActive : oldData.isActive, id]
+      [ruleName || oldData.ruleName, productType || oldData.productType,
+       claimType !== undefined ? claimType : oldData.claimType,
+       minAmount !== undefined ? minAmount : oldData.minAmount,
+       maxAmount !== undefined ? maxAmount : oldData.maxAmount,
+       assignedRole || oldData.assignedRole,
+       priorityLevel !== undefined ? priorityLevel : oldData.priorityLevel,
+       isActive !== undefined ? isActive : oldData.isActive, id]
     );
 
     const updated = await pool.query('SELECT * FROM claims_assignment_rules WHERE id = $1', [id]);
-    await createAuditLog(req.user!.id, req.user!.email, req.user!.role, 'UPDATE', 'CLAIMS_ASSIGNMENT_RULE', id, oldData, updated.rows[0], getClientIp(req), getHeaderString(req, 'user-agent'));
+
+    await createAuditLog(
+      req.user!.id, req.user!.email, req.user!.role,
+      'UPDATE', 'CLAIMS_ASSIGNMENT_RULE', id,
+      oldData, updated.rows[0],
+      getClientIp(req),
+      getHeaderString(req, 'user-agent')
+    );
+
     res.json(updated.rows[0]);
   } catch (error) {
     console.error('[AssignmentRules] Update error:', error);
@@ -69,7 +88,6 @@ router.put('/:id', authenticate, authorizeExecutives, async (req: AuthRequest, r
   }
 });
 
-// Delete
 router.delete('/:id', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
@@ -77,7 +95,15 @@ router.delete('/:id', authenticate, authorizeExecutives, async (req: AuthRequest
     if (oldResult.rows.length === 0) return res.status(404).json({ error: 'Assignment rule not found' });
 
     await pool.query('DELETE FROM claims_assignment_rules WHERE id = $1', [id]);
-    await createAuditLog(req.user!.id, req.user!.email, req.user!.role, 'DELETE', 'CLAIMS_ASSIGNMENT_RULE', id, oldResult.rows[0], null, getClientIp(req), getHeaderString(req, 'user-agent'));
+
+    await createAuditLog(
+      req.user!.id, req.user!.email, req.user!.role,
+      'DELETE', 'CLAIMS_ASSIGNMENT_RULE', id,
+      oldResult.rows[0], null,
+      getClientIp(req),
+      getHeaderString(req, 'user-agent')
+    );
+
     res.json({ message: 'Assignment rule deleted' });
   } catch (error) {
     console.error('[AssignmentRules] Delete error:', error);
@@ -85,7 +111,6 @@ router.delete('/:id', authenticate, authorizeExecutives, async (req: AuthRequest
   }
 });
 
-// Toggle
 router.patch('/:id/toggle', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
@@ -95,7 +120,15 @@ router.patch('/:id/toggle', authenticate, authorizeExecutives, async (req: AuthR
     const newStatus = !checkResult.rows[0].isActive;
     await pool.query(`UPDATE claims_assignment_rules SET "isActive"=$1, "updatedAt"=NOW() WHERE id=$2`, [newStatus, id]);
 
-    await createAuditLog(req.user!.id, req.user!.email, req.user!.role, newStatus ? 'ACTIVATE' : 'DEACTIVATE', 'CLAIMS_ASSIGNMENT_RULE', id, { isActive: !newStatus, ruleName: checkResult.rows[0].ruleName }, { isActive: newStatus, ruleName: checkResult.rows[0].ruleName }, getClientIp(req), getHeaderString(req, 'user-agent'));
+    await createAuditLog(
+      req.user!.id, req.user!.email, req.user!.role,
+      newStatus ? 'ACTIVATE' : 'DEACTIVATE', 'CLAIMS_ASSIGNMENT_RULE', id,
+      { isActive: !newStatus, ruleName: checkResult.rows[0].ruleName },
+      { isActive: newStatus, ruleName: checkResult.rows[0].ruleName },
+      getClientIp(req),
+      getHeaderString(req, 'user-agent')
+    );
+
     res.json({ message: `Assignment rule ${newStatus ? 'activated' : 'deactivated'}`, isActive: newStatus });
   } catch (error) {
     console.error('[AssignmentRules] Toggle error:', error);
