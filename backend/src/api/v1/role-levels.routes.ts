@@ -1,31 +1,16 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate, authorizeExecutives } from '../../middleware/auth.middleware';
-import { createAuditLog } from './audit.routes';
 import pool from '../../lib/db';
+import { createAuditLog, getClientIp, getHeaderString } from './audit.routes';
 
 const router = Router();
 
-// ---------------------------------------------------------------------------
-// Get all role levels
-// ---------------------------------------------------------------------------
-router.get('/', authenticate, authorizeExecutives, async (req, res) => {
+// Get all
+router.get('/', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
     const result = await pool.query(
-      `SELECT 
-          id,
-          "roleName",
-          "displayName",
-          "hierarchyLevel",
-          department,
-          "canApprove",
-          "canReject",
-          "canReview",
-          "maxApprovalAmount",
-          "isActive",
-          "createdAt",
-          "updatedAt"
-       FROM role_levels
-       ORDER BY "hierarchyLevel" ASC`
+      `SELECT id, "roleName", "displayName", "hierarchyLevel", department, "canApprove", "canReject", "canReview", "maxApprovalAmount", "isActive", "createdAt", "updatedAt"
+       FROM role_levels ORDER BY "hierarchyLevel"`
     );
     res.json(result.rows);
   } catch (error) {
@@ -34,111 +19,37 @@ router.get('/', authenticate, authorizeExecutives, async (req, res) => {
   }
 });
 
-// ---------------------------------------------------------------------------
-// Get active role levels by department
-// ---------------------------------------------------------------------------
-router.get('/active/:department', authenticate, async (req, res) => {
+// Get active by department
+router.get('/active/:department', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const { department } = req.params;
-
     const result = await pool.query(
-      `SELECT 
-          id,
-          "roleName",
-          "displayName",
-          "hierarchyLevel",
-          "canApprove",
-          "canReject",
-          "canReview",
-          "maxApprovalAmount"
-       FROM role_levels
-       WHERE department = $1 AND "isActive" = true
-       ORDER BY "hierarchyLevel" ASC`,
-      [department]
+      `SELECT id, "roleName", "displayName", "hierarchyLevel", "canApprove", "canReject", "canReview", "maxApprovalAmount"
+       FROM role_levels WHERE department=$1 AND "isActive"=true ORDER BY "hierarchyLevel"`,
+      [req.params.department]
     );
-
     res.json(result.rows);
   } catch (error) {
-    console.error('[RoleLevels] Fetch active error:', error);
+    console.error('[RoleLevels] Active error:', error);
     res.status(500).json({ error: 'Failed to fetch active role levels' });
   }
 });
 
-// ---------------------------------------------------------------------------
-// Get single role level
-// ---------------------------------------------------------------------------
-router.get('/:id', authenticate, authorizeExecutives, async (req, res) => {
+// Update
+router.put('/:id', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const result = await pool.query('SELECT * FROM role_levels WHERE id = $1', [id]);
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Role level not found' });
-    }
-
-    res.json(result.rows[0]);
-  } catch (error) {
-    console.error('[RoleLevels] Fetch single error:', error);
-    res.status(500).json({ error: 'Failed to fetch role level' });
-  }
-});
-
-// ---------------------------------------------------------------------------
-// Update role level
-// ---------------------------------------------------------------------------
-router.put('/:id', authenticate, authorizeExecutives, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const {
-      displayName,
-      hierarchyLevel,
-      department,
-      canApprove,
-      canReject,
-      canReview,
-      maxApprovalAmount,
-      isActive,
-    } = req.body;
-
-    // Check exists
-    const oldResult = await pool.query('SELECT * FROM role_levels WHERE id = $1', [id]);
-    if (oldResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Role level not found' });
-    }
-
+    const oldResult = await pool.query('SELECT * FROM role_levels WHERE id=$1', [id]);
+    if (oldResult.rows.length === 0) return res.status(404).json({ error: 'Not found' });
     const oldData = oldResult.rows[0];
+    const d = req.body;
 
     await pool.query(
-      `UPDATE role_levels 
-       SET "displayName" = $1,
-           "hierarchyLevel" = $2,
-           department = $3,
-           "canApprove" = $4,
-           "canReject" = $5,
-           "canReview" = $6,
-           "maxApprovalAmount" = $7,
-           "isActive" = $8,
-           "updatedAt" = NOW()
-       WHERE id = $9`,
-      [
-        displayName !== undefined ? displayName : oldData.displayName,
-        hierarchyLevel !== undefined ? hierarchyLevel : oldData.hierarchyLevel,
-        department !== undefined ? department : oldData.department,
-        canApprove !== undefined ? canApprove : oldData.canApprove,
-        canReject !== undefined ? canReject : oldData.canReject,
-        canReview !== undefined ? canReview : oldData.canReview,
-        maxApprovalAmount !== undefined ? maxApprovalAmount : oldData.maxApprovalAmount,
-        isActive !== undefined ? isActive : oldData.isActive,
-        id,
-      ]
+      `UPDATE role_levels SET "displayName"=$1,"hierarchyLevel"=$2,department=$3,"canApprove"=$4,"canReject"=$5,"canReview"=$6,"maxApprovalAmount"=$7,"isActive"=$8,"updatedAt"=NOW() WHERE id=$9`,
+      [d.displayName !== undefined ? d.displayName : oldData.displayName, d.hierarchyLevel !== undefined ? d.hierarchyLevel : oldData.hierarchyLevel, d.department !== undefined ? d.department : oldData.department, d.canApprove !== undefined ? d.canApprove : oldData.canApprove, d.canReject !== undefined ? d.canReject : oldData.canReject, d.canReview !== undefined ? d.canReview : oldData.canReview, d.maxApprovalAmount !== undefined ? d.maxApprovalAmount : oldData.maxApprovalAmount, d.isActive !== undefined ? d.isActive : oldData.isActive, id]
     );
 
-    // Fetch updated
-    const updated = await pool.query('SELECT * FROM role_levels WHERE id = $1', [id]);
-
-   await createAuditLog(req.user!.id, req.user!.email, req.user!.role, 'UPDATE', 'ROLE_LEVEL', 
-    id, oldData, updated.rows[0], req.ip || '0.0.0.0', req.headers?.['user-agent'] || 'system');
-
+    const updated = await pool.query('SELECT * FROM role_levels WHERE id=$1', [id]);
+    await createAuditLog(req.user!.id, req.user!.email, req.user!.role, 'UPDATE', 'ROLE_LEVEL', id, oldData, updated.rows[0], getClientIp(req), getHeaderString(req, 'user-agent'));
     res.json(updated.rows[0]);
   } catch (error) {
     console.error('[RoleLevels] Update error:', error);
@@ -146,32 +57,16 @@ router.put('/:id', authenticate, authorizeExecutives, async (req, res) => {
   }
 });
 
-// ---------------------------------------------------------------------------
-// Toggle active status
-// ---------------------------------------------------------------------------
-router.patch('/:id/toggle', authenticate, authorizeExecutives, async (req, res) => {
+// Toggle
+router.patch('/:id/toggle', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-
-    const checkResult = await pool.query(
-      'SELECT id, "isActive", "roleName" FROM role_levels WHERE id = $1',
-      [id]
-    );
-    if (checkResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Role level not found' });
-    }
+    const checkResult = await pool.query('SELECT id, "isActive", "roleName" FROM role_levels WHERE id=$1', [id]);
+    if (checkResult.rows.length === 0) return res.status(404).json({ error: 'Not found' });
 
     const newStatus = !checkResult.rows[0].isActive;
-
-    await pool.query(
-      `UPDATE role_levels SET "isActive" = $1, "updatedAt" = NOW() WHERE id = $2`,
-      [newStatus, id]
-    );
-
-    res.json({
-      message: `Role level ${newStatus ? 'activated' : 'deactivated'}`,
-      isActive: newStatus,
-    });
+    await pool.query(`UPDATE role_levels SET "isActive"=$1, "updatedAt"=NOW() WHERE id=$2`, [newStatus, id]);
+    res.json({ message: `Role level ${newStatus ? 'activated' : 'deactivated'}`, isActive: newStatus });
   } catch (error) {
     console.error('[RoleLevels] Toggle error:', error);
     res.status(500).json({ error: 'Failed to toggle role level' });
