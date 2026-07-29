@@ -4,6 +4,13 @@ import pool from '../../lib/db';
 
 const router = Router();
 
+function getHeaderString(req: any, headerName: string, defaultValue: string = 'system'): string {
+  const value = req.headers?.[headerName];
+  if (Array.isArray(value)) return value[0] || defaultValue;
+  return value || defaultValue;
+}
+
+
 // ---------------------------------------------------------------------------
 // Get audit logs (paginated, filterable)
 // ---------------------------------------------------------------------------
