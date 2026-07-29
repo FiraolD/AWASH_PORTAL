@@ -71,7 +71,7 @@ export const PolicyController = {
             const result = await pool.query(`
         INSERT INTO policies (id, "policyNumber", "userId", type, status, "coverageAmount", premium,
           "premiumFrequency", "effectiveDate", "expirationDate", "insuredItems", "riskScore", "createdAt", "updatedAt")
-        VALUES (gen_random_uuid()::text, $1, $2, $3, 'PENDING', $4, $5, $6, $7::date, $8::date, $9::jsonb, $10, NOW(), NOW())
+        VALUES (gen_random_uuid(), $1, $2, $3, 'PENDING', $4, $5, $6, $7::date, $8::date, $9::jsonb, $10, NOW(), NOW())
         RETURNING id, "policyNumber"
       `, [policyNumber, userId, type, coverageAmount, premium, premiumFrequency, effectiveDate, expirationDate, JSON.stringify(productDetails || {}), riskScore]);
             const userResult = await pool.query('SELECT "firstName", "lastName", email FROM users WHERE id = $1', [userId]);

@@ -17,7 +17,7 @@ export const AuthController = {
             const hashedPassword = await bcrypt.hash(password, 10);
             const result = await pool.query(`
         INSERT INTO users (id, email, "passwordHash", "firstName", "lastName", phone, role, status, "createdAt", "updatedAt")
-        VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, 'CUSTOMER', 'ACTIVE', NOW(), NOW())
+        VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, 'CUSTOMER', 'ACTIVE', NOW(), NOW())
         RETURNING id, email, "firstName", "lastName", role
       `, [email.toLowerCase(), hashedPassword, firstName, lastName, phone || null]);
             const user = result.rows[0];

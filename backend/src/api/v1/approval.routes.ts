@@ -134,7 +134,7 @@ router.post('/rules', authenticate, authorize('MASTER_ADMIN'), validateBody(appr
     const result = await pool.query(
       `INSERT INTO approval_rules 
        (id, rule_name, product_type, min_sum_insured, max_sum_insured, min_risk_score, max_risk_score, approval_levels, is_active, created_by, created_at, updated_at)
-       VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, NOW(), NOW())
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, NOW(), NOW())
        RETURNING id,
                  rule_name AS "ruleName",
                  product_type AS "productType",

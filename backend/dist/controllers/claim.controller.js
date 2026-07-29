@@ -208,7 +208,7 @@ export const ClaimController = {
             // Add timeline entry
             if (notes) {
                 await pool.query(`INSERT INTO claim_timeline (id, "claimId", date, status, note, "createdAt")
-           VALUES (gen_random_uuid()::text, $1, NOW(), $2, $3, NOW())`, [id, status, notes]);
+           VALUES (gen_random_uuid(), $1, NOW(), $2, $3, NOW())`, [id, status, notes]);
             }
             // Notify customer
             const userResult = await pool.query(`SELECT "firstName", "lastName", email FROM users WHERE id = $1`, [claimResult.rows[0].userId]);

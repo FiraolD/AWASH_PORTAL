@@ -24,7 +24,7 @@ router.post('/assignment-rules', authenticate, authorize('MASTER_ADMIN', 'CLAIMS
     
     const result = await pool.query(
       `INSERT INTO claims_assignment_rules (id, rule_name, product_type, min_amount, max_amount, assigned_role, priority, is_active, created_at, updated_at)
-       VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, true, NOW(), NOW())
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, true, NOW(), NOW())
        RETURNING *`,
       [rule_name, product_type, min_amount, max_amount || null, assigned_role, priority]
     );

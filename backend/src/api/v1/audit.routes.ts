@@ -64,7 +64,7 @@ router.post('/', async (req, res) => {
     
     const result = await pool.query(
       `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, old_values, new_values, ip_address, user_agent, created_at)
-       VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, NOW())
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, NOW())
        RETURNING *`,
       [user_id, action, entity_type, entity_id, old_values, new_values, ip_address, user_agent]
     );

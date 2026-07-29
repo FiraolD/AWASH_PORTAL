@@ -42,7 +42,7 @@ export const SupportController = {
             const userResult = await pool.query('SELECT "firstName", "lastName", email FROM users WHERE id = $1', [userId]);
             const result = await pool.query(`
         INSERT INTO support_tickets (id, "ticketNumber", "userId", subject, description, priority, status, "createdAt", "updatedAt")
-        VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, 'open', NOW(), NOW())
+        VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, 'open', NOW(), NOW())
         RETURNING id, "ticketNumber"
       `, [ticketNumber, userId, subject, description, priority]);
             res.status(201).json({ success: true, message: 'Support ticket created', ticketNumber, ticketId: result.rows[0].id });
@@ -89,7 +89,7 @@ export const SupportController = {
                 return res.status(404).json({ error: 'Ticket not found' });
             await pool.query(`
         INSERT INTO support_responses (id, "ticketId", "userId", message, "isFromAdmin", "createdAt")
-        VALUES (gen_random_uuid()::text, $1, $2, $3, $4, NOW())
+        VALUES (gen_random_uuid(), $1, $2, $3, $4, NOW())
       `, [ticketId, userId, message, isAdmin]);
             res.json({ success: true, message: 'Response added' });
         }

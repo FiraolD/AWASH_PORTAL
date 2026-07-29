@@ -75,7 +75,7 @@ router.post('/generate-reference', authenticate, authorize('SUPERVISOR_UNDERWRIT
          WHERE id = $2`, [reference, policyId]);
             // Add timeline
             await client.query(`INSERT INTO policy_timeline (id, "policyId", status, note, "changedBy", "createdAt")
-         VALUES (gen_random_uuid()::text, $1, 'PENDING_PAYMENT', $2, $3, NOW())`, [policyId, `Payment reference generated: ${reference} for ETB ${amount}`, userId]);
+         VALUES (gen_random_uuid(), $1, 'PENDING_PAYMENT', $2, $3, NOW())`, [policyId, `Payment reference generated: ${reference} for ETB ${amount}`, userId]);
         }
         await client.query('COMMIT');
         res.status(201).json({

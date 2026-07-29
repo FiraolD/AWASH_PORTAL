@@ -42,7 +42,7 @@ export const PaymentController = {
             }
             const result = await pool.query(`
         INSERT INTO payment_methods (id, "userId", type, last4, brand, expiry, "isDefault", "createdAt")
-        VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, NOW())
+        VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, NOW())
         RETURNING *
       `, [userId, type, last4, brand, expiry, isDefault || false]);
             res.status(201).json(result.rows[0]);

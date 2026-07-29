@@ -366,7 +366,7 @@ router.post('/seed', authenticate, authorize('MASTER_ADMIN'), async (req, res) =
             if (existing.rows.length === 0) {
                 await pool.query(`
           INSERT INTO products (id, name, code, description, category, "isActive", "createdAt", "updatedAt")
-          VALUES (gen_random_uuid()::text, $1, $2, $3, $4, true, NOW(), NOW())
+          VALUES (gen_random_uuid(), $1, $2, $3, $4, true, NOW(), NOW())
         `, [product.name, product.code, product.description, product.category]);
                 inserted++;
             }

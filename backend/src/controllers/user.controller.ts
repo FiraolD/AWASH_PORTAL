@@ -63,7 +63,7 @@ export const UserController = {
 
       const result = await pool.query(`
         INSERT INTO users (id, email, "passwordHash", "firstName", "lastName", role, phone, status, "createdAt", "updatedAt")
-        VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, 'ACTIVE', NOW(), NOW())
+        VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, 'ACTIVE', NOW(), NOW())
         RETURNING id, email, "firstName", "lastName", role, phone
       `, [email, hashedPassword, firstName, lastName, role, phone]);
 

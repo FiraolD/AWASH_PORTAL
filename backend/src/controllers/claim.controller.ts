@@ -276,7 +276,7 @@ export const ClaimController = {
       if (notes) {
         await pool.query(
           `INSERT INTO claim_timeline (id, "claimId", date, status, note, "createdAt")
-           VALUES (gen_random_uuid()::text, $1, NOW(), $2, $3, NOW())`,
+           VALUES (gen_random_uuid(), $1, NOW(), $2, $3, NOW())`,
           [id, status, notes]
         );
       }
