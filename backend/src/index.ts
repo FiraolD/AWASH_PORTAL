@@ -12,7 +12,14 @@ import policiesRoutes from './api/v1/policy.routes.js';
 import claimsRoutes from './api/v1/claim.routes.js';
 import paymentsRoutes from './api/v1/payment.routes.js';  // ✅ Add this
 import settingsRoutes from './api/v1/settings.routes.js';
-// ... other imports
+import approvalsRouter from './api/v1/approval.routes';
+import auditRouter from './api/v1/audit.routes';
+import premiumRatesRouter from './api/v1/premium-rates.routes';
+//import roleLevelsRouter from './api/v1/roleLevels.routes';
+import hospitalListRouter from './api/v1/hospital-list.routes';
+import migrationsRouter from './api/v1/migrations.routes';
+
+
 
 dotenv.config();
 
@@ -32,6 +39,14 @@ app.use('/api/policies', policiesRoutes);
 app.use('/api/claims', claimsRoutes);
 app.use('/api/payments', paymentsRoutes);    // ✅ Add this
 app.use('/api/settings', settingsRoutes);
+// Admin routes
+app.use('/api/approval-rules', approvalsRouter);
+app.use('/api/audit-logs', auditRouter);
+app.use('/api/premium-rates', premiumRatesRouter);
+//app.use('/api/role-levels', roleLevelsRouter);
+app.use('/api/hospitals', hospitalListRouter);
+app.use('/api/migrations', migrationsRouter);
+// ... other imports
 // ... other routes
 
 // Health check

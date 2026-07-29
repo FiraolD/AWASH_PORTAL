@@ -13,7 +13,7 @@ router.get('/', async (req, res) => {
         pr.product_id,
         pr.product_type,
         pr.coverage_tier,
-        pr.base_rate,
+        pr.baseRate,
         pr.min_coverage,
         pr.max_coverage,
         pr.risk_factor,
@@ -58,7 +58,7 @@ router.get('/product/:productId', async (req, res) => {
 router.post('/', authenticate, authorize('MASTER_ADMIN'), async (req, res) => {
     try {
         const { product_id, // Required – UUID of the product
-        coverage_tier, base_rate, min_coverage, max_coverage, risk_factor } = req.body;
+        coverage_tier, baseRate, min_coverage, max_coverage, risk_factor } = req.body;
         // Validate required fields
         if (!product_id) {
             return res.status(400).json({ error: 'Product ID is required' });
@@ -66,7 +66,7 @@ router.post('/', authenticate, authorize('MASTER_ADMIN'), async (req, res) => {
         if (!coverage_tier) {
             return res.status(400).json({ error: 'Coverage tier is required' });
         }
-        if (!base_rate || base_rate <= 0) {
+        if (!baseRate || baseRate <= 0) {
             return res.status(400).json({ error: 'Valid base rate is required' });
         }
         if (!min_coverage || min_coverage <= 0) {
@@ -85,7 +85,7 @@ router.post('/', authenticate, authorize('MASTER_ADMIN'), async (req, res) => {
         product_id, 
         product_type, 
         coverage_tier, 
-        base_rate, 
+        baseRate, 
         min_coverage, 
         max_coverage, 
         risk_factor, 
@@ -100,7 +100,7 @@ router.post('/', authenticate, authorize('MASTER_ADMIN'), async (req, res) => {
             product_id,
             productCode,
             coverage_tier,
-            base_rate,
+            baseRate,
             min_coverage,
             max_coverage || null,
             risk_factor || 1.0
@@ -122,10 +122,10 @@ router.post('/', authenticate, authorize('MASTER_ADMIN'), async (req, res) => {
 router.put('/:id', authenticate, authorize('MASTER_ADMIN'), async (req, res) => {
     try {
         const { id } = req.params;
-        const { base_rate, min_coverage, max_coverage, risk_factor, is_active } = req.body;
+        const { baseRate, min_coverage, max_coverage, risk_factor, is_active } = req.body;
         const result = await pool.query(`
       UPDATE premium_rates 
-      SET base_rate = COALESCE($1, base_rate),
+      SET baseRate = COALESCE($1, baseRate),
           min_coverage = COALESCE($2, min_coverage),
           max_coverage = COALESCE($3, max_coverage),
           risk_factor = COALESCE($4, risk_factor),
@@ -133,7 +133,7 @@ router.put('/:id', authenticate, authorize('MASTER_ADMIN'), async (req, res) => 
           updated_at = NOW()
       WHERE id = $6
       RETURNING *
-    `, [base_rate, min_coverage, max_coverage, risk_factor, is_active, id]);
+    `, [baseRate, min_coverage, max_coverage, risk_factor, is_active, id]);
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Premium rate not found' });
         }

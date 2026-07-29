@@ -81,7 +81,7 @@ export default function PremiumRateConfigPage() {
   const [editingRate, setEditingRate] = React.useState<PremiumRate | null>(null);
   const [rateForm, setRateForm] = React.useState({
     coverage_tier: '',
-    base_rate: 0,
+    baseRate: 0,
     min_coverage: 0,
     max_coverage: '',
     risk_factor: 1.0,
@@ -169,7 +169,7 @@ export default function PremiumRateConfigPage() {
 
   // Rate CRUD
   const handleRateSubmit = async () => {
-    if (!rateForm.coverage_tier || rateForm.base_rate <= 0 || rateForm.min_coverage <= 0) {
+    if (!rateForm.coverage_tier || rateForm.baseRate <= 0 || rateForm.min_coverage <= 0) {
       toast.error('Please fill all required fields');
       return;
     }
@@ -178,7 +178,7 @@ export default function PremiumRateConfigPage() {
       const payload = {
         product_id: selectedProductId,
         coverage_tier: rateForm.coverage_tier,
-        base_rate: rateForm.base_rate,
+        baseRate: rateForm.baseRate,
         min_coverage: rateForm.min_coverage,
         max_coverage: rateForm.max_coverage ? parseFloat(rateForm.max_coverage) : null,
         risk_factor: rateForm.risk_factor,
@@ -278,7 +278,7 @@ export default function PremiumRateConfigPage() {
     setEditingRate(null);
     setRateForm({
       coverage_tier: '',
-      base_rate: 0,
+      baseRate: 0,
       min_coverage: 0,
       max_coverage: '',
       risk_factor: 1.0,
@@ -411,8 +411,8 @@ export default function PremiumRateConfigPage() {
                       <Input 
                         type="number"
                         step="0.001"
-                        value={rateForm.base_rate}
-                        onChange={(e) => setRateForm({...rateForm, base_rate: parseFloat(e.target.value)})}
+                        value={rateForm.baseRate}
+                        onChange={(e) => setRateForm({...rateForm, baseRate: parseFloat(e.target.value)})}
                         placeholder="e.g., 0.035 = 3.5%"
                       />
                     </div>
@@ -480,7 +480,7 @@ export default function PremiumRateConfigPage() {
                           </p>
                           <div className="flex gap-4 mt-2">
                             <Badge className="bg-blue-100 text-blue-800">
-                              Rate: {(rate.base_rate * 100).toFixed(2)}%
+                              Rate: {(rate.baseRate * 100).toFixed(2)}%
                             </Badge>
                             <Badge className="bg-purple-100 text-purple-800">
                               Risk: {rate.risk_factor}x
@@ -492,7 +492,7 @@ export default function PremiumRateConfigPage() {
                             setEditingRate(rate);
                             setRateForm({
                               coverage_tier: rate.coverage_tier,
-                              base_rate: rate.base_rate,
+                              baseRate: rate.baseRate,
                               min_coverage: rate.min_coverage,
                               max_coverage: rate.max_coverage?.toString() || '',
                               risk_factor: rate.risk_factor,

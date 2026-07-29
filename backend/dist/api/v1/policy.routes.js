@@ -11,7 +11,7 @@ router.use(authenticate);
 // Get base rate from database
 async function getBaseRate(productType, coverageAmount) {
     const result = await pool.query(`
-    SELECT base_rate 
+    SELECT baseRate 
     FROM premium_rates 
     WHERE product_type = $1 
       AND $2 >= min_coverage 
@@ -21,7 +21,7 @@ async function getBaseRate(productType, coverageAmount) {
     LIMIT 1
   `, [productType.toUpperCase(), coverageAmount]);
     if (result.rows.length > 0) {
-        return parseFloat(result.rows[0].base_rate);
+        return parseFloat(result.rows[0].baseRate);
     }
     console.warn(`No rate found for ${productType} with coverage ${coverageAmount}, using default`);
     return 0.03;
@@ -674,13 +674,13 @@ router.post('/calculate-premium', async (req, res) => {
         let baseRate = 0.03;
         try {
             const rateResult = await pool.query(`
-        SELECT base_rate FROM premium_rates 
+        SELECT baseRate FROM premium_rates 
         WHERE product_type = $1 AND $2 >= min_coverage 
           AND (max_coverage IS NULL OR $2 <= max_coverage) AND is_active = true
         ORDER BY min_coverage ASC LIMIT 1
       `, [productType.toUpperCase(), coverageAmount]);
             if (rateResult.rows.length > 0) {
-                baseRate = parseFloat(rateResult.rows[0].base_rate);
+                baseRate = parseFloat(rateResult.rows[0].baseRate);
             }
         }
         catch (err) {

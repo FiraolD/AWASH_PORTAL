@@ -9,7 +9,7 @@ export interface PremiumRate {
   product_type: string;
   product_name?: string;
   coverage_tier: string;
-  base_rate: number;
+  baseRate: number;
   min_coverage: number;
   max_coverage: number | null;
   risk_factor: number;

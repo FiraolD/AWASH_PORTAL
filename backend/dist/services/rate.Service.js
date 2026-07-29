@@ -7,7 +7,7 @@ async function loadRatesFromDB() {
     const result = await pool.query(`
     SELECT 
       product_type as "productType",
-      base_rate as "baseRate",
+      baseRate as "baseRate",
       min_coverage as "minCoverage",
       max_coverage as "maxCoverage",
       risk_factor as "riskFactor"

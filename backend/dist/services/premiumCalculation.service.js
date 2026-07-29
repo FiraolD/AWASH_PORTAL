@@ -3,7 +3,7 @@ class PremiumCalculationService {
     // Get base rate from your existing premium_rates table
     async getBaseRate(productCode, coverageAmount) {
         const result = await pool.query(`
-      SELECT base_rate, coverage_tier
+      SELECT baseRate, coverage_tier
       FROM premium_rates
       WHERE product_type = $1
         AND min_coverage <= $2
@@ -16,7 +16,7 @@ class PremiumCalculationService {
             return { rate: 0.03, tier: 'Standard' };
         }
         return {
-            rate: parseFloat(result.rows[0].base_rate),
+            rate: parseFloat(result.rows[0].baseRate),
             tier: result.rows[0].coverage_tier
         };
     }

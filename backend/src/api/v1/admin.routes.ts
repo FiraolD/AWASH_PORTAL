@@ -1,107 +1,130 @@
-import { Router } from 'express';
-import pool from '../../lib/db.js';
-import { authenticate, authorize } from '../middleware/auth.middleware.js';
+import { Router, Response } from 'express';
+import { authenticate, authorizeExecutives } from '../../middleware/auth.middleware';
+import { AuthRequest } from '../../middleware/auth.middleware.ts;
+import pool from '../../lib/db';
 
 const router = Router();
 
-router.use(authenticate);
-router.use(authorize('MASTER_ADMIN'));
-
-// Get system overview
-router.get('/overview', async (req, res) => {
+// ---------------------------------------------------------------------------
+// Get all hospitals
+// ---------------------------------------------------------------------------
+router.get('/hospitals', async (req: AuthRequest, res: Response) => {
   try {
-    const totalUsers = await pool.query("SELECT COUNT(*) FROM users");
-    const totalproducts = await pool.query("SELECT COUNT(*) FROM products");
-    const totalPolicies = await pool.query("SELECT COUNT(*) FROM policies");
-    const totalClaims = await pool.query("SELECT COUNT(*) FROM claims");
-    const totalPayments = await pool.query("SELECT COUNT(*) FROM payments");
-    const activeUsers = await pool.query("SELECT COUNT(*) FROM users WHERE status = 'ACTIVE'");
-    const pendingPolicies = await pool.query(
-      "SELECT COUNT(*) FROM policies WHERE status IN ('PENDING_UNDERWRITING', 'SUBMITTED')"
+    const result = await pool.query(
+      `SELECT "hospitalName" 
+       FROM hospital_list 
+       WHERE "isActive" = true 
+       ORDER BY "hospitalName" ASC`
     );
-    const pendingClaims = await pool.query("SELECT COUNT(*) FROM claims WHERE status = 'SUBMITTED'");
-    
-    res.json({
-      totalUsers: parseInt(totalUsers.rows[0].count),
-      totalPolicies: parseInt(totalPolicies.rows[0].count),
-      totalClaims: parseInt(totalClaims.rows[0].count),
-      totalPayments: parseInt(totalPayments.rows[0].count),
-      totalProducts: parseInt(totalproducts.rows[0].count), // Assuming total products is equivalent to total policies
-      activeUsers: parseInt(activeUsers.rows[0].count),
-      pendingPolicies: parseInt(pendingPolicies.rows[0].count),
-      pendingClaims: parseInt(pendingClaims.rows[0].count),
-      systemHealth: 'OK'
-    });
+    res.json(result.rows.map((row: any) => row.hospitalName));
   } catch (error) {
-    console.error('Failed to fetch admin overview:', error);
-    res.status(500).json({ error: 'Failed to fetch overview' });
+    console.error('[Settings] Fetch hospitals error:', error);
+    // Fallback list
+    res.json([
+      'Tikur Anbessa Specialized Hospital',
+      "St. Paul's Hospital Millennium Medical College",
+      'Yekatit 12 Hospital Medical College',
+      'Zewditu Memorial Hospital',
+      'Alert Hospital',
+      'Menelik II Referral Hospital',
+      'Gandhi Memorial Hospital',
+    ]);
   }
 });
 
-// Get system metrics
-router.get('/metrics', async (req, res) => {
+// ---------------------------------------------------------------------------
+// Add hospital (admin only)
+// ---------------------------------------------------------------------------
+router.post('/hospitals', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
-    const usersResult = await pool.query(`
-      SELECT COUNT(*) FILTER (WHERE "createdAt" > NOW() - INTERVAL '30 days') as new_users
-      FROM users
-    `);
-    
-    const policiesResult = await pool.query(`
-      SELECT COUNT(*) FILTER (WHERE "createdAt" > NOW() - INTERVAL '30 days') as new_policies
-      FROM policies
-    `);
-
-    const claimsResult = await pool.query(`
-      SELECT COUNT(*) FILTER (WHERE "createdAt" > NOW() - INTERVAL '30 days') as new_claims
-      FROM claims
-    `);
-
-    const revenueResult = await pool.query(`
-      SELECT SUM("amount") as total_revenue
-      FROM payments
-      WHERE "createdAt" > NOW() - INTERVAL '30 days'
-    `);
-
-    const productResult = await pool.query(`
-      SELECT COUNT(*) as total_products
-      FROM products
-    `);
-
-    res.json({
-      period: 'Last 30 days',
-      newUsers: parseInt(usersResult.rows[0].new_users || 0),
-      newPolicies: parseInt(policiesResult.rows[0].new_policies || 0),
-      newClaims: parseInt(claimsResult.rows[0].new_claims || 0),
-      newProducts: parseInt(productResult.rows[0].total_products || 0),
-      revenue: parseFloat(revenueResult.rows[0].total_revenue || 0)
-    });
+    const { name } = req.body;
+    if (!name || name.trim().length === 0) {
+      return res.status(400).json({ error: 'Hospital name is required' });
+    }
+    await pool.query(
+      `INSERT INTO hospital_list ("hospitalName") VALUES ($1) ON CONFLICT ("hospitalName") DO NOTHING`,
+      [name.trim()]
+    );
+    res.status(201).json({ message: 'Hospital added' });
   } catch (error) {
-    console.error('Failed to fetch system metrics:', error);
-    res.status(500).json({ error: 'Failed to fetch metrics' });
+    console.error('[Settings] Add hospital error:', error);
+    res.status(500).json({ error: 'Failed to add hospital' });
   }
 });
 
-// Get database status
-router.get('/database/status', async (req, res) => {
+// ---------------------------------------------------------------------------
+// Update hospital (admin only)
+// ---------------------------------------------------------------------------
+router.put('/hospitals/:name', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
-    await pool.query('SELECT 1 as connected');
-    res.json({
-      status: 'connected',
-      timestamp: new Date().toISOString()
-    });
+    const { name: oldName } = req.params;
+    const { name: newName } = req.body;
+    if (!newName || newName.trim().length === 0) {
+      return res.status(400).json({ error: 'New hospital name is required' });
+    }
+    await pool.query(
+      `UPDATE hospital_list SET "hospitalName" = $1 WHERE "hospitalName" = $2`,
+      [newName.trim(), oldName]
+    );
+    res.json({ message: 'Hospital updated' });
   } catch (error) {
-    console.error('Database connection failed:', error);
-    res.status(500).json({
-      status: 'disconnected',
-      error: 'Database connection failed',
-      timestamp: new Date().toISOString()
-    });
+    console.error('[Settings] Update hospital error:', error);
+    res.status(500).json({ error: 'Failed to update hospital' });
   }
 });
 
-// Clear cache (placeholder)
-router.post('/cache/clear', async (req, res) => {
-  res.json({ message: 'Cache cleared successfully' });
+// ---------------------------------------------------------------------------
+// Delete hospital (admin only)
+// ---------------------------------------------------------------------------
+router.delete('/hospitals/:name', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
+  try {
+    const { name } = req.params;
+    await pool.query(`DELETE FROM hospital_list WHERE "hospitalName" = $1`, [name]);
+    res.json({ message: 'Hospital deleted' });
+  } catch (error) {
+    console.error('[Settings] Delete hospital error:', error);
+    res.status(500).json({ error: 'Failed to delete hospital' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Get all system settings
+// ---------------------------------------------------------------------------
+router.get('/', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, "settingKey", "settingValue", "settingType", description, "isPublic", "createdAt", "updatedAt", "updatedBy"
+       FROM system_settings
+       ORDER BY "settingKey" ASC`
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('[Settings] Fetch settings error:', error);
+    res.status(500).json({ error: 'Failed to fetch settings' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Update a setting (admin only)
+// ---------------------------------------------------------------------------
+router.put('/:key', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
+  try {
+    const { key } = req.params;
+    const { value } = req.body;
+    const userId = req.user!.id;
+
+    await pool.query(
+      `UPDATE system_settings 
+       SET "settingValue" = $1, "updatedAt" = NOW(), "updatedBy" = $2
+       WHERE "settingKey" = $3`,
+      [value, userId, key]
+    );
+
+    res.json({ message: 'Setting updated' });
+  } catch (error) {
+    console.error('[Settings] Update setting error:', error);
+    res.status(500).json({ error: 'Failed to update setting' });
+  }
 });
 
 export default router;
