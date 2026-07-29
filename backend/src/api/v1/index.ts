@@ -19,6 +19,9 @@ import claimsAssignmentRoutes from './claims-assignment.routes.js';
 import coverageTiersRoutes from './coverageTiers.routes.js';
 import perilsRoutes from './perils.routes.js';
 import ridersRoutes from './riders.routes.js';
+import roleLevelsRouter from './role-levels.routes';
+import hospitalListRouter from './hospital-list.routes';
+import migrationsRouter from './migrations.routes';
 
 
 
