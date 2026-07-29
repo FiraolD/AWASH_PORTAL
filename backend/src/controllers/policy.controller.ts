@@ -43,7 +43,7 @@ export const PolicyController = {
   // Get policy by ID for review
   getPolicyForReview: async (req: AuthRequest, res: Response) => {
     try {
-      const { id } = req.params;
+      const id = String(req.params.id);
       const result = await pool.query(`
         SELECT p.*, u.id as "userId", u."firstName" as customerFirstName, u."lastName" as customerLastName,
                u.email as customerEmail, u.phone as customerPhone,
@@ -95,7 +95,7 @@ export const PolicyController = {
   // Approve policy
   approvePolicy: async (req: AuthRequest, res: Response) => {
     try {
-      const { id } = req.params;
+      const id = String(req.params.id);
       const { notes } = req.body;
 
       const policyResult = await pool.query('SELECT "userId", "policyNumber" FROM policies WHERE id = $1', [id]);
@@ -116,7 +116,7 @@ export const PolicyController = {
   // Reject policy
   rejectPolicy: async (req: AuthRequest, res: Response) => {
     try {
-      const { id } = req.params;
+      const id = String(req.params.id);
       const { reason } = req.body;
 
       const policyResult = await pool.query('SELECT "userId", "policyNumber" FROM policies WHERE id = $1', [id]);

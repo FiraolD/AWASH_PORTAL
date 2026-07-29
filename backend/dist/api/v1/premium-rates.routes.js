@@ -121,7 +121,7 @@ router.post('/', authenticate, authorize('MASTER_ADMIN'), async (req, res) => {
 // =============================================
 router.put('/:id', authenticate, authorize('MASTER_ADMIN'), async (req, res) => {
     try {
-        const { id } = req.params;
+        const id = String(req.params.id);
         const { baseRate, min_coverage, max_coverage, risk_factor, is_active } = req.body;
         const result = await pool.query(`
       UPDATE premium_rates 
@@ -149,7 +149,7 @@ router.put('/:id', authenticate, authorize('MASTER_ADMIN'), async (req, res) => 
 // =============================================
 router.delete('/:id', authenticate, authorize('MASTER_ADMIN'), async (req, res) => {
     try {
-        const { id } = req.params;
+        const id = String(req.params.id);
         const result = await pool.query('DELETE FROM premium_rates WHERE id = $1 RETURNING id', [id]);
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Premium rate not found' });
@@ -166,7 +166,7 @@ router.delete('/:id', authenticate, authorize('MASTER_ADMIN'), async (req, res) 
 // =============================================
 router.patch('/:id/toggle', authenticate, authorize('MASTER_ADMIN'), async (req, res) => {
     try {
-        const { id } = req.params;
+        const id = String(req.params.id);
         const { is_active } = req.body;
         const result = await pool.query(`
       UPDATE premium_rates 

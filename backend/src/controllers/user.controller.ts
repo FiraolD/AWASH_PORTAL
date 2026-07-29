@@ -35,7 +35,7 @@ export const UserController = {
   // Get user by ID
   getUserById: async (req: AuthRequest, res: Response) => {
     try {
-      const { id } = req.params;
+      const id = String(req.params.id);
       const result = await pool.query(`
         SELECT id, email, "firstName", "lastName", role, status, phone,
                "addressStreet", "addressCity", "addressState", "addressZip", "addressCountry",
@@ -77,7 +77,7 @@ export const UserController = {
   // Update user
   updateUser: async (req: AuthRequest, res: Response) => {
     try {
-      const { id } = req.params;
+      const id = String(req.params.id);
       const { firstName, lastName, phone, role, addressStreet, addressCity, addressState, addressZip, addressCountry } = req.body;
 
       const result = await pool.query(`
@@ -98,7 +98,7 @@ export const UserController = {
   // Update user status
   updateUserStatus: async (req: AuthRequest, res: Response) => {
     try {
-      const { id } = req.params;
+      const id = String(req.params.id);
       const { status } = req.body;
 
       await pool.query('UPDATE users SET status = $1, "updatedAt" = NOW() WHERE id = $2', [status, id]);
@@ -112,7 +112,7 @@ export const UserController = {
   // Delete user
   deleteUser: async (req: AuthRequest, res: Response) => {
     try {
-      const { id } = req.params;
+      const id = String(req.params.id);
       await pool.query('DELETE FROM users WHERE id = $1', [id]);
       res.json({ message: 'User deleted successfully' });
     } catch (error) {

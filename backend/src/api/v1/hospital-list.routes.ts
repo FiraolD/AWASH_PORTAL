@@ -56,7 +56,7 @@ router.post('/', authenticate, authorizeExecutives, async (req: AuthRequest, res
 // Update
 router.put('/:id', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const { hospitalName } = req.body;
     if (!hospitalName || !hospitalName.trim()) return res.status(400).json({ error: 'Name required' });
 
@@ -77,7 +77,7 @@ router.put('/:id', authenticate, authorizeExecutives, async (req: AuthRequest, r
 // Deactivate
 router.delete('/:id', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const oldResult = await pool.query('SELECT * FROM hospital_list WHERE id=$1', [id]);
     if (oldResult.rows.length === 0) return res.status(404).json({ error: 'Not found' });
 

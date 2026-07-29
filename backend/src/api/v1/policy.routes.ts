@@ -652,7 +652,7 @@ router.get('/pending-underwriting', async (req, res) => {
 // Direct approve policy
 router.post('/:id/direct-approve', async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const approverId = req.user?.id;
     const approverRole = req.user?.role;
     const { comments } = req.body;
@@ -700,7 +700,7 @@ router.post('/:id/direct-approve', async (req, res) => {
 // Review and adjust policy
 router.post('/:id/review-adjust', async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const underwriterId = req.user?.id;
     const underwriterRole = req.user?.role;
     const { adjustedPremium, underwriterNotes, decision, sendToCustomer } = req.body;
@@ -1008,7 +1008,7 @@ router.get('/riders/:productCode', async (req, res) => {
 router.get('/:id/details', async (req, res) => {
   try {
     const userId = req.user?.id;
-    const { id } = req.params;
+    const id = String(req.params.id);
     
     const result = await pool.query(`
       SELECT p.*, u."firstName", u."lastName", u.email, u.phone, pr.name as productName
@@ -1032,7 +1032,7 @@ router.get('/:id/details', async (req, res) => {
 router.get('/:id/document-status', async (req, res) => {
   try {
     const userId = req.user?.id;
-    const { id } = req.params;
+    const id = String(req.params.id);
     
     const result = await pool.query(`
       SELECT "policyDocumentPath", status FROM policies 

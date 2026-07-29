@@ -197,7 +197,7 @@ export const ClaimController = {
     // Update claim status (for officers/admins)
     updateClaimStatus: async (req, res) => {
         try {
-            const { id } = req.params;
+            const id = String(req.params.id);
             const { status, notes } = req.body;
             const userId = req.user.id;
             const claimResult = await pool.query(`SELECT "userId", "claimNumber" FROM claims WHERE id = $1`, [id]);
@@ -226,7 +226,7 @@ export const ClaimController = {
     // Get claim details by ID
     getClaimDetails: async (req, res) => {
         try {
-            const { id } = req.params;
+            const id = String(req.params.id);
             const userId = req.user.id;
             const userRole = req.user.role;
             const claimResult = await pool.query(`SELECT c.*, p."policyNumber", u."firstName", u."lastName", u.email, u.phone

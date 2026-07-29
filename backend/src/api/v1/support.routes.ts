@@ -100,7 +100,7 @@ router.get('/tickets', authenticate, async (req: AuthRequest, res) => {
 // Get single ticket details
 router.get('/tickets/:id', authenticate, async (req: AuthRequest, res) => {
     try {
-        const { id } = req.params;
+        const id = String(req.params.id);
         const userId = req.user!.id;
         const userRole = req.user!.role;
 
@@ -247,7 +247,7 @@ router.post('/tickets', authenticate, async (req: AuthRequest, res) => {
 // Update ticket status (CUSTOMER_ADMIN, MASTER_ADMIN only)
 router.patch('/tickets/:id/status', authenticate, authorize('CUSTOMER_ADMIN', 'MASTER_ADMIN'), async (req: AuthRequest, res) => {
     try {
-        const { id } = req.params;
+        const id = String(req.params.id);
         const { status, priority, assignedTo } = req.body;
         const userId = req.user!.id;
 
@@ -317,7 +317,7 @@ router.patch('/tickets/:id/status', authenticate, authorize('CUSTOMER_ADMIN', 'M
 router.post('/tickets/:id/responses', authenticate, async (req: AuthRequest, res) => {
     try {
         const userId = req.user!.id;
-        const { id } = req.params;
+        const id = String(req.params.id);
         const { message, isInternal = false } = req.body;
         const userRole = req.user!.role;
 
@@ -392,7 +392,7 @@ router.post('/tickets/:id/responses', authenticate, async (req: AuthRequest, res
 // Delete ticket (MASTER_ADMIN only)
 router.delete('/tickets/:id', authenticate, authorize('MASTER_ADMIN'), async (req: AuthRequest, res) => {
     try {
-        const { id } = req.params;
+        const id = String(req.params.id);
 
         // Delete responses first (due to foreign key constraint)
         await pool.query(`DELETE FROM support_responses WHERE "ticketId" = $1`, [id]);

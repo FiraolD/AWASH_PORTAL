@@ -52,7 +52,7 @@ router.post('/', authenticate, authorizeExecutives, async (req: AuthRequest, res
 
 router.put('/:id', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const { ruleName, productType, claimType, minAmount, maxAmount, assignedRole, priorityLevel, isActive } = req.body;
 
     const oldResult = await pool.query('SELECT * FROM claims_assignment_rules WHERE id = $1', [id]);
@@ -90,7 +90,7 @@ router.put('/:id', authenticate, authorizeExecutives, async (req: AuthRequest, r
 
 router.delete('/:id', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const oldResult = await pool.query('SELECT * FROM claims_assignment_rules WHERE id = $1', [id]);
     if (oldResult.rows.length === 0) return res.status(404).json({ error: 'Assignment rule not found' });
 
@@ -113,7 +113,7 @@ router.delete('/:id', authenticate, authorizeExecutives, async (req: AuthRequest
 
 router.patch('/:id/toggle', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const checkResult = await pool.query('SELECT id, "isActive", "ruleName" FROM claims_assignment_rules WHERE id = $1', [id]);
     if (checkResult.rows.length === 0) return res.status(404).json({ error: 'Assignment rule not found' });
 

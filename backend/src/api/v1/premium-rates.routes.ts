@@ -66,7 +66,7 @@ router.post('/', authenticate, authorizeExecutives, async (req: AuthRequest, res
 // Update
 router.put('/:id', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const oldResult = await pool.query('SELECT * FROM premium_rates WHERE id=$1', [id]);
     if (oldResult.rows.length === 0) return res.status(404).json({ error: 'Not found' });
     const oldData = oldResult.rows[0];
@@ -89,7 +89,7 @@ router.put('/:id', authenticate, authorizeExecutives, async (req: AuthRequest, r
 // Delete
 router.delete('/:id', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const oldResult = await pool.query('SELECT * FROM premium_rates WHERE id=$1', [id]);
     if (oldResult.rows.length === 0) return res.status(404).json({ error: 'Not found' });
 
@@ -105,7 +105,7 @@ router.delete('/:id', authenticate, authorizeExecutives, async (req: AuthRequest
 // Toggle
 router.patch('/:id/toggle', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const checkResult = await pool.query('SELECT id, "isActive", "rateName" FROM premium_rates WHERE id=$1', [id]);
     if (checkResult.rows.length === 0) return res.status(404).json({ error: 'Not found' });
 

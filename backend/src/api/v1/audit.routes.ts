@@ -102,7 +102,7 @@ router.get('/', authenticate, authorizeExecutives, async (req: AuthRequest, res:
 // ---------------------------------------------------------------------------
 router.get('/:id', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const result = await pool.query(`SELECT * FROM audit_logs WHERE id = $1`, [id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'Audit log not found' });
     res.json(result.rows[0]);

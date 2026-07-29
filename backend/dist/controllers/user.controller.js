@@ -32,7 +32,7 @@ export const UserController = {
     // Get user by ID
     getUserById: async (req, res) => {
         try {
-            const { id } = req.params;
+            const id = String(req.params.id);
             const result = await pool.query(`
         SELECT id, email, "firstName", "lastName", role, status, phone,
                "addressStreet", "addressCity", "addressState", "addressZip", "addressCountry",
@@ -71,7 +71,7 @@ export const UserController = {
     // Update user
     updateUser: async (req, res) => {
         try {
-            const { id } = req.params;
+            const id = String(req.params.id);
             const { firstName, lastName, phone, role, addressStreet, addressCity, addressState, addressZip, addressCountry } = req.body;
             const result = await pool.query(`
         UPDATE users SET "firstName" = $1, "lastName" = $2, phone = $3, role = $4,
@@ -91,7 +91,7 @@ export const UserController = {
     // Update user status
     updateUserStatus: async (req, res) => {
         try {
-            const { id } = req.params;
+            const id = String(req.params.id);
             const { status } = req.body;
             await pool.query('UPDATE users SET status = $1, "updatedAt" = NOW() WHERE id = $2', [status, id]);
             res.json({ message: `User ${status.toLowerCase()} successfully` });
@@ -104,7 +104,7 @@ export const UserController = {
     // Delete user
     deleteUser: async (req, res) => {
         try {
-            const { id } = req.params;
+            const id = String(req.params.id);
             await pool.query('DELETE FROM users WHERE id = $1', [id]);
             res.json({ message: 'User deleted successfully' });
         }

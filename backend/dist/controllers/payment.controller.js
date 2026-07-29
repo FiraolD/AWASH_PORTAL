@@ -55,7 +55,7 @@ export const PaymentController = {
     // Delete payment method
     deletePaymentMethod: async (req, res) => {
         try {
-            const { id } = req.params;
+            const id = String(req.params.id);
             await pool.query('DELETE FROM payment_methods WHERE id = $1 AND "userId" = $2', [id, req.user.id]);
             res.json({ message: 'Payment method deleted successfully' });
         }

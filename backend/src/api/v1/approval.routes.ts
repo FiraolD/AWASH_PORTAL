@@ -35,7 +35,7 @@ router.get('/', authenticate, authorizeExecutives, async (req: AuthRequest, res:
 // ---------------------------------------------------------------------------
 router.get('/:id', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const result = await pool.query(
       `SELECT 
           id,
@@ -103,7 +103,7 @@ router.post('/', authenticate, authorizeExecutives, async (req: AuthRequest, res
 // ---------------------------------------------------------------------------
 router.put('/:id', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const { ruleName, requiredRoles, minAmount, maxAmount, isActive } = req.body;
 
     // Check exists
@@ -139,7 +139,7 @@ router.put('/:id', authenticate, authorizeExecutives, async (req: AuthRequest, r
 // ---------------------------------------------------------------------------
 router.delete('/:id', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
 
     const checkResult = await pool.query('SELECT id FROM approval_rules WHERE id = $1', [id]);
     if (checkResult.rows.length === 0) {
@@ -159,7 +159,7 @@ router.delete('/:id', authenticate, authorizeExecutives, async (req: AuthRequest
 // ---------------------------------------------------------------------------
 router.patch('/:id/toggle', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
 
     const checkResult = await pool.query('SELECT id, "isActive" FROM approval_rules WHERE id = $1', [id]);
     if (checkResult.rows.length === 0) {

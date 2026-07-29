@@ -23,7 +23,7 @@ const UNDERWRITING_ROLES = [
 // Direct approve policy (without premium adjustment)
 router.post('/policies/:id/direct-approve', authenticate, authorize('SUPERVISOR_UNDERWRITING', 'MANAGER_UNDERWRITING', 'HEAD_UNDERWRITING'),   async (req, res) => {
     try {
-      const { id } = req.params;
+      const id = String(req.params.id);
       const { comments } = req.body;
       const approverId = req.user?.id;
       const approverRole = req.user?.role;
@@ -136,7 +136,7 @@ router.post('/policies/:id/reject',
   ),
   async (req, res) => {
     try {
-      const { id } = req.params;
+      const id = String(req.params.id);
       const { reason, comments } = req.body;
       const rejectorId = req.user?.id;
       const rejectorRole = req.user?.role;
@@ -277,7 +277,7 @@ router.get('/policies/:id',
   authorize(...UNDERWRITING_ROLES),
   async (req, res) => {
     try {
-      const { id } = req.params;
+      const id = String(req.params.id);
       
       console.log('=== FETCHING POLICY DETAILS ===');
       console.log('Policy ID:', id);

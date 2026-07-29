@@ -72,7 +72,7 @@ router.get('/available', async (req: any, res: any) => {
 // Also supports product code lookup as fallback
 router.get('/:id', async (req: any, res: any) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     
     // Check if the parameter looks like a UUID
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);

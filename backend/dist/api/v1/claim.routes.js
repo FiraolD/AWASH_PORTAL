@@ -456,7 +456,7 @@ router.post('/', authenticate, async (req, res) => {
 router.post('/:id/review', authenticate, authorize(...CLAIM_ROLES), validateBody(reviewSchema), async (req, res) => {
     const client = await pool.connect();
     try {
-        const { id } = req.params;
+        const id = String(req.params.id);
         const userId = req.user.id;
         const userRole = req.user.role;
         const { decision, approvedAmount, notes } = req.body;
@@ -524,7 +524,7 @@ router.post('/:id/review', authenticate, authorize(...CLAIM_ROLES), validateBody
 // PATCH /:id/status – Quick status update (approvers only)
 router.patch('/:id/status', authenticate, authorize(...APPROVER_ROLES), async (req, res) => {
     try {
-        const { id } = req.params;
+        const id = String(req.params.id);
         const { status, notes } = req.body;
         const validStatuses = ['UNDER_REVIEW', 'REVIEWED', 'APPROVED', 'REJECTED', 'PAID'];
         if (!validStatuses.includes(status)) {
@@ -548,7 +548,7 @@ router.patch('/:id/status', authenticate, authorize(...APPROVER_ROLES), async (r
 // POST /:id/documents – Upload documents
 router.post('/:id/documents', authenticate, upload.array('documents', 10), async (req, res) => {
     try {
-        const { id } = req.params;
+        const id = String(req.params.id);
         const files = req.files;
         const userId = req.user?.id;
         if (!files || files.length === 0) {
@@ -632,7 +632,7 @@ router.get('/:id/documents/:documentId/download', authenticate, async (req, res)
 // =============================================
 router.get('/:id', authenticate, async (req, res) => {
     try {
-        const { id } = req.params;
+        const id = String(req.params.id);
         const userId = req.user?.id;
         const userRole = req.user?.role;
         const isAdmin = CLAIM_ROLES.includes(userRole) || userRole === 'MASTER_ADMIN';

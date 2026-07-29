@@ -255,7 +255,7 @@ export const ClaimController = {
   // Update claim status (for officers/admins)
   updateClaimStatus: async (req: AuthRequest, res: Response) => {
     try {
-      const { id } = req.params;
+      const id = String(req.params.id);
       const { status, notes } = req.body;
       const userId = req.user!.id;
 
@@ -307,7 +307,7 @@ export const ClaimController = {
   // Get claim details by ID
   getClaimDetails: async (req: AuthRequest, res: Response) => {
     try {
-      const { id } = req.params;
+      const id = String(req.params.id);
       const userId = req.user!.id;
       const userRole = req.user!.role;
 
