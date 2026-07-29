@@ -7,7 +7,7 @@ import { config } from '../config/index.js';
 import { AuthRequest } from '../middleware/auth.middleware.js';
 
 export const AuthController = {
-  register: async (req: Request, res: Response) => {
+  register: async (req, res) => {
     try {
       const { email, password, firstName, lastName, phone } = req.body;
 
@@ -60,7 +60,7 @@ export const AuthController = {
     }
   },
 
-  login: async (req: Request, res: Response) => {
+  login: async (req, res) => {
     try {
       const { email, password } = req.body;
 
@@ -105,7 +105,7 @@ export const AuthController = {
     }
   },
 
-  forgotPassword: async (req: Request, res: Response) => {
+  forgotPassword: async (req, res) => {
     try {
       const { email } = req.body;
 
@@ -136,7 +136,7 @@ export const AuthController = {
     }
   },
 
-  resetPassword: async (req: Request, res: Response) => {
+  resetPassword: async (req, res) => {
     try {
       const { token, newPassword } = req.body;
 

@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate, authorizeExecutives } from '../../middleware/auth.middleware';
 import pool from '../../lib/db';
+import { createAuditLog } from './audit.routes';
 
 const router = Router();
 
@@ -166,20 +167,8 @@ router.post('/', authenticate, authorizeExecutives, async (req: AuthRequest, res
     );
 
     // Log audit
-    const { createAuditLog } = await import('./auditLogs.routes');
-    createAuditLog(
-      userId,
-      req.user!.email,
-      req.user!.role,
-      'CREATE',
-      'PREMIUM_RATE',
-      result.rows[0].id,
-      null,
-      result.rows[0],
-      req.ip || '0.0.0.0',
-      req.headers['user-agent'] || 'system'
-    );
-
+   await createAuditLog(req.user!.id, req.user!.email, req.user!.role, 'CREATE', 'PREMIUM_RATE',
+     result.rows[0].id, null, result.rows[0], req.ip || '0.0.0.0', req.headers?.['user-agent'] || 'system');
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('[PremiumRates] Create error:', error);
@@ -247,19 +236,8 @@ router.put('/:id', authenticate, authorizeExecutives, async (req: AuthRequest, r
     const updated = await pool.query('SELECT * FROM premium_rates WHERE id = $1', [id]);
 
     // Log audit
-    const { createAuditLog } = await import('./auditLogs.routes');
-    createAuditLog(
-      req.user!.id,
-      req.user!.email,
-      req.user!.role,
-      'UPDATE',
-      'PREMIUM_RATE',
-      id,
-      oldData,
-      updated.rows[0],
-      req.ip || '0.0.0.0',
-      req.headers['user-agent'] || 'system'
-    );
+await createAuditLog(req.user!.id, req.user!.email, req.user!.role, 'UPDATE', 'PREMIUM_RATE', id, oldData, updated.rows[0], 
+  req.ip || '0.0.0.0', req.headers?.['user-agent'] || 'system');
 
     res.json(updated.rows[0]);
   } catch (error) {
@@ -283,19 +261,8 @@ router.delete('/:id', authenticate, authorizeExecutives, async (req: AuthRequest
     await pool.query('DELETE FROM premium_rates WHERE id = $1', [id]);
 
     // Log audit
-    const { createAuditLog } = await import('./auditLogs.routes');
-    createAuditLog(
-      req.user!.id,
-      req.user!.email,
-      req.user!.role,
-      'DELETE',
-      'PREMIUM_RATE',
-      id,
-      oldResult.rows[0],
-      null,
-      req.ip || '0.0.0.0',
-      req.headers['user-agent'] || 'system'
-    );
+  await createAuditLog(req.user!.id, req.user!.email, req.user!.role, 'DELETE', 'PREMIUM_RATE', id, oldResult.rows[0],
+     null, req.ip || '0.0.0.0', req.headers?.['user-agent'] || 'system');
 
     res.json({ message: 'Premium rate deleted' });
   } catch (error) {

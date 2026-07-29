@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate, authorizeExecutives } from '../../middleware/auth.middleware';
 import pool from '../../lib/db';
-
+import { createAuditLog } from './audit.routes';
 const router = Router();
 
 // ---------------------------------------------------------------------------
@@ -33,7 +33,7 @@ router.get('/', authenticate, authorizeExecutives, async (req: AuthRequest, res:
 // ---------------------------------------------------------------------------
 // Get public system settings (no auth required)
 // ---------------------------------------------------------------------------
-router.get('/public', async (req: Request, res: Response) => {
+router.get('/public', async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT 
@@ -132,19 +132,8 @@ router.put('/:key', authenticate, authorizeExecutives, async (req: AuthRequest, 
     );
 
     // Log audit
-    const { createAuditLog } = await import('./auditLogs.routes');
-    createAuditLog(
-      userId,
-      req.user!.email,
-      req.user!.role,
-      'UPSERT',
-      'SYSTEM_SETTING',
-      key,
-      null,
-      { value: String(value), type: type || 'string' },
-      req.ip || '0.0.0.0',
-      req.headers['user-agent'] || 'system'
-    );
+await createAuditLog(req.user!.id, req.user!.email, req.user!.role, 'UPSERT', 'SYSTEM_SETTING',
+   key, null, { value: String(value) }, req.ip || '0.0.0.0', req.headers?.['user-agent'] || 'system');
 
     res.json(result.rows[0]);
   } catch (error) {
@@ -170,20 +159,8 @@ router.delete('/:key', authenticate, authorizeExecutives, async (req: AuthReques
 
     await pool.query('DELETE FROM system_settings WHERE "settingKey" = $1', [key]);
 
-    // Log audit
-    const { createAuditLog } = await import('./auditLogs.routes');
-    createAuditLog(
-      req.user!.id,
-      req.user!.email,
-      req.user!.role,
-      'DELETE',
-      'SYSTEM_SETTING',
-      key,
-      oldResult.rows[0],
-      null,
-      req.ip || '0.0.0.0',
-      req.headers['user-agent'] || 'system'
-    );
+ await createAuditLog(req.user!.id, req.user!.email, req.user!.role, 'DELETE', 'SYSTEM_SETTING',
+   key, oldResult.rows[0], null, req.ip || '0.0.0.0', req.headers?.['user-agent'] || 'system');
 
     res.json({ message: 'Setting deleted' });
   } catch (error) {

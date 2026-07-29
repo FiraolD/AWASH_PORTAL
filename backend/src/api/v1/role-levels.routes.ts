@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate, authorizeExecutives } from '../../middleware/auth.middleware';
-
+import { createAuditLog } from './audit.routes';
 import pool from '../../lib/db';
 
 const router = Router();
@@ -136,20 +136,8 @@ router.put('/:id', authenticate, authorizeExecutives, async (req, res) => {
     // Fetch updated
     const updated = await pool.query('SELECT * FROM role_levels WHERE id = $1', [id]);
 
-    // Log audit
-    const { createAuditLog } = await import('./auditLogs.routes');
-    createAuditLog(
-      req.user!.id,
-      req.user!.email,
-      req.user!.role,
-      'UPDATE',
-      'ROLE_LEVEL',
-      id,
-      oldData,
-      updated.rows[0],
-      req.ip || '0.0.0.0',
-      req.headers['user-agent'] || 'system'
-    );
+   await createAuditLog(req.user!.id, req.user!.email, req.user!.role, 'UPDATE', 'ROLE_LEVEL', 
+    id, oldData, updated.rows[0], req.ip || '0.0.0.0', req.headers?.['user-agent'] || 'system');
 
     res.json(updated.rows[0]);
   } catch (error) {

@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate, authorizeExecutives } from '../../middleware/auth.middleware';
 import pool from '../../lib/db';
-
+import { createAuditLog } from './audit.routes';
 const router = Router();
 
 // ---------------------------------------------------------------------------
@@ -117,19 +117,8 @@ router.post('/', authenticate, authorizeExecutives, async (req, res) => {
     );
 
     // Log audit
-    const { createAuditLog } = await import('./auditLogs.routes');
-    createAuditLog(
-      userId,
-      req.user!.email,
-      req.user!.role,
-      'CREATE',
-      'HOSPITAL',
-      result.rows[0].id,
-      null,
-      result.rows[0],
-      req.ip || '0.0.0.0',
-      req.headers['user-agent'] || 'system'
-    );
+  await createAuditLog(req.user!.id, req.user!.email, req.user!.role, 'CREATE', 'HOSPITAL', 
+    result.rows[0].id, null, result.rows[0], req.ip || '0.0.0.0', req.headers?.['user-agent'] || 'system');
 
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -165,20 +154,8 @@ router.put('/:id', authenticate, authorizeExecutives, async (req, res) => {
     // Fetch updated
     const updated = await pool.query('SELECT * FROM hospital_list WHERE id = $1', [id]);
 
-    // Log audit
-    const { createAuditLog } = await import('./auditLogs.routes');
-    createAuditLog(
-      userId,
-      req.user!.email,
-      req.user!.role,
-      'UPDATE',
-      'HOSPITAL',
-      id,
-      oldResult.rows[0],
-      updated.rows[0],
-      req.ip || '0.0.0.0',
-      req.headers['user-agent'] || 'system'
-    );
+await createAuditLog(req.user!.id, req.user!.email, req.user!.role, 'UPDATE', 'HOSPITAL',
+   id, oldResult.rows[0], updated.rows[0], req.ip || '0.0.0.0', req.headers?.['user-agent'] || 'system');
 
     res.json(updated.rows[0]);
   } catch (error) {
@@ -206,20 +183,8 @@ router.delete('/:id', authenticate, authorizeExecutives, async (req, res) => {
       [id]
     );
 
-    // Log audit
-    const { createAuditLog } = await import('./auditLogs.routes');
-    createAuditLog(
-      userId,
-      req.user!.email,
-      req.user!.role,
-      'DEACTIVATE',
-      'HOSPITAL',
-      id,
-      oldResult.rows[0],
-      { isActive: false },
-      req.ip || '0.0.0.0',
-      req.headers['user-agent'] || 'system'
-    );
+ await createAuditLog(req.user!.id, req.user!.email, req.user!.role, 'DEACTIVATE', 'HOSPITAL',
+   id, oldResult.rows[0], { isActive: false }, req.ip || '0.0.0.0', req.headers?.['user-agent'] || 'system');
 
     res.json({ message: 'Hospital deactivated' });
   } catch (error) {
@@ -270,20 +235,8 @@ router.post('/bulk', authenticate, authorizeExecutives, async (req, res) => {
 
     await client.query('COMMIT');
 
-    // Log audit
-    const { createAuditLog } = await import('./auditLogs.routes');
-    createAuditLog(
-      userId,
-      req.user!.email,
-      req.user!.role,
-      'BULK_IMPORT',
-      'HOSPITAL',
-      'bulk',
-      null,
-      { added, skipped, total: hospitals.length },
-      req.ip || '0.0.0.0',
-      req.headers['user-agent'] || 'system'
-    );
+await createAuditLog(req.user!.id, req.user!.email, req.user!.role, 'BULK_IMPORT', 'HOSPITAL', 'bulk', null,
+   { added, skipped, total: hospitals.length }, req.ip || '0.0.0.0', req.headers?.['user-agent'] || 'system');
 
     res.json({ message: `${added} hospitals added, ${skipped} skipped` });
   } catch (error) {

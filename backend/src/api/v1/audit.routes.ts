@@ -156,6 +156,9 @@ router.get('/:id', authenticate, authorizeExecutives, async (req: AuthRequest, r
 // ---------------------------------------------------------------------------
 // Create audit log (internal use)
 // ---------------------------------------------------------------------------
+
+
+
 export async function createAuditLog(
   userId: string,
   userEmail: string,
