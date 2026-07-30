@@ -4,6 +4,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 // Import routes
 import authRoutes from './api/v1/auth.routes.js';
+import approvalRoutes from './api/v1/approval.routes.js';
 import usersRoutes from './api/v1/user.routes.js';
 import productsRoutes from './api/v1/products.routes.js';
 import policiesRoutes from './api/v1/policy.routes.js';
@@ -30,6 +31,7 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/approval', approvalRoutes);
 app.use('/api/products', productsRoutes);
 app.use('/api/policies', policiesRoutes);
 app.use('/api/claims', claimsRoutes);
