@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
-import { AuthRequest, authenticate, authorizeExecutives } from '../../middleware/auth.middleware';
-import pool from '../../lib/db';
+import { AuthRequest, authenticate, authorizeExecutives } from '../../middleware/auth.middleware.js';
+import pool from '../../lib/db.js';
 import { createAuditLog, getClientIp, getHeaderString } from './audit.routes';
 
 const router = Router();
