@@ -21,24 +21,15 @@ app.set('trust proxy', 1);
 // CORS CONFIGURATION
 // ========================
 app.use(cors({
-    origin: (origin, callback) => {
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) {
-            return callback(null, true);
-        }
-        // Check if origin is allowed
-        if (allowedOrigins.includes(origin)) {
-            return callback(null, true);
-        }
-        // Log blocked origins for debugging
-        console.warn(`CORS blocked: ${origin}`);
-        return callback(new Error('CORS policy violation: origin not allowed'));
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Internal-Token'],
-    exposedHeaders: ['RateLimit-Limit', 'RateLimit-Remaining', 'RateLimit-Reset', 'Retry-After'],
-    maxAge: 86400 // 24 hours
+  origin: [
+    'https://awash-portal.vercel.app',
+    'https://awash-portal.onrender.com',
+    'http://localhost:5173',
+    'http://localhost:3011',
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 // ========================
 // MIDDLEWARE
