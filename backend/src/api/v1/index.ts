@@ -1,53 +1,61 @@
 import { Router } from 'express';
 import authRoutes from './auth.routes.js';
-import userRoutes from './user.routes.js';
-import policyRoutes from './policy.routes.js';
-import underwritingRoutes from './underwriting.routes.js';
-import claimRoutes from './claim.routes.js';
-import paymentRoutes from './payment.routes.js';
-import supportRoutes from './support.routes.js';
-import dashboardRoutes from './dashboard.routes.js';
-import adminRoutes from './admin.routes.js';
-import auditRoutes from './audit.routes.js';
-import configRoutes from './config.routes.js';
-import productsRoutes from './products.routes.js';
-import premiumRatesRoutes from './premium-rates.routes.js';
-import profileRoutes from './profile.routes.js';
-import settingsRoutes from './settings.routes.js';
 import approvalRoutes from './approval.routes.js';
+import auditRoutes from './audit.routes.js';
+import claimsRoutes from './claim.routes.js';
 import claimsAssignmentRoutes from './claims-assignment.routes.js';
+import configRoutes from './config.routes.js';
 import coverageTiersRoutes from './coverageTiers.routes.js';
+import dashboardRoutes from './dashboard.routes.js';
+import paymentsRoutes from './payment.routes.js';
 import perilsRoutes from './perils.routes.js';
-import ridersRoutes from './riders.routes.js';
-import roleLevelsRouter from './role-levels.routes';
-import hospitalListRouter from './hospital-list.routes';
-import migrationsRouter from './migrations.routes';
-
-
+import policiesRoutes from './policy.routes.js';
+import premiumRatesRoutes from './premium-rates.routes.js';
+import productsRoutes from './products.routes.js';
+import settingsRoutes from './settings.routes.js';
+import usersRoutes from './user.routes.js';
 
 const router = Router();
 
-// Mount all routes
+// Auth
 router.use('/auth', authRoutes);
-router.use('/users', userRoutes);
-router.use('/policies', policyRoutes);
-router.use('/underwriting', underwritingRoutes);
-router.use('/claims', claimRoutes);
-router.use('/payments', paymentRoutes);
-router.use('/support', supportRoutes);
-router.use('/dashboard', dashboardRoutes);
-router.use('/admin', adminRoutes);
-router.use('/audit', auditRoutes);
-router.use('/config', configRoutes);
+
+// Users
+router.use('/users', usersRoutes);
+
+// Products
 router.use('/products', productsRoutes);
-router.use('/premium-rates', premiumRatesRoutes);
-router.use('/profile', profileRoutes);
-router.use('/settings', settingsRoutes);
-router.use('/approval', approvalRoutes);
+
+// Policies
+router.use('/policies', policiesRoutes);
+
+// Claims
+router.use('/claims', claimsRoutes);
 router.use('/claims-assignment', claimsAssignmentRoutes);
+
+// Payments
+router.use('/payments', paymentsRoutes);
+
+// Approval / Workflow
+router.use('/approval', approvalRoutes);
+
+// Settings & Configuration
+router.use('/settings', settingsRoutes);
+router.use('/config', configRoutes);
+
+// Coverage Tiers
 router.use('/coverage-tiers', coverageTiersRoutes);
+
+// Dashboard
+router.use('/dashboard', dashboardRoutes);
+
+// Perils
 router.use('/perils', perilsRoutes);
-router.use('/riders', ridersRoutes);
-router.get('/approval', approvalRoutes);
+
+// Premium Rates
+router.use('/premium-rates', premiumRatesRoutes);
+
+// Audit Logs
+router.use('/audit', auditRoutes);
 
 export default router;

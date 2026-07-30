@@ -1,4 +1,5 @@
-import express from 'express';
+// src/server.ts
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -17,6 +18,7 @@ dotenv.config();
 getJwtSecret();
 
 const allowedOrigins = getAllowedOrigins();
+
 const app = express();
 const PORT = process.env.PORT || 5001;
 
@@ -26,19 +28,16 @@ app.set('trust proxy', 1);
 // ========================
 // CORS CONFIGURATION
 // ========================
-
 app.use(cors({
-  origin: (origin, callback) => {
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) {
       return callback(null, true);
     }
-
     // Check if origin is allowed
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
-
     // Log blocked origins for debugging
     console.warn(`CORS blocked: ${origin}`);
     return callback(new Error('CORS policy violation: origin not allowed'));
@@ -47,53 +46,51 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Internal-Token'],
   exposedHeaders: ['RateLimit-Limit', 'RateLimit-Remaining', 'RateLimit-Reset', 'Retry-After'],
-  maxAge: 86400 // 24 hours
+  maxAge: 86400, // 24 hours
 }));
 
 // ========================
 // MIDDLEWARE
 // ========================
-
 // Body parsers with size limits
-app.use(express.json({ 
+app.use(express.json({
   limit: '1mb',
-  verify: (req, res, buf) => {
+  verify: (req: any, _res: Response, buf: Buffer) => {
     // Store raw body for signature verification if needed
     (req as any).rawBody = buf;
-  }
+  },
 }));
+
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // Serve static files
 app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
   maxAge: '1y',
   etag: true,
-  lastModified: true
+  lastModified: true,
 }));
 
 // ========================
 // HEALTH CHECK
 // ========================
-
-app.get('/api/health', (req, res) => {
+app.get('/api/health', (_req: Request, res: Response) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     memory: process.memoryUsage(),
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
   });
 });
 
 // Simple ping endpoint for load balancers
-app.get('/ping', (req, res) => {
+app.get('/ping', (_req: Request, res: Response) => {
   res.send('pong');
 });
 
 // ========================
 // ROUTES
 // ========================
-
 // Main API routes
 app.use('/api/v1', apiV1Routes);
 app.use('/api', apiV1Routes); // For backward compatibility
@@ -101,53 +98,49 @@ app.use('/api', apiV1Routes); // For backward compatibility
 // ========================
 // ERROR HANDLING
 // ========================
-
 // 404 handler
-app.use((req, res, next) => {
+app.use((req: Request, res: Response, _next: NextFunction) => {
   res.status(404).json({
     error: 'Not Found',
     message: `Route ${req.method} ${req.path} not found`,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 });
 
 // Global error handler
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
   console.error('Unhandled error:', {
     error: err.message,
     stack: err.stack,
     path: req.path,
     method: req.method,
-    ip: req.ip
+    ip: req.ip,
   });
 
   // Don't leak error details in production
   const isProduction = process.env.NODE_ENV === 'production';
-  
+
   res.status(err.status || 500).json({
     error: isProduction ? 'Internal Server Error' : err.message,
     timestamp: new Date().toISOString(),
-    ...(isProduction ? {} : { stack: err.stack })
+    ...(isProduction ? {} : { stack: err.stack }),
   });
 });
 
 // ========================
 // DATABASE CONNECTION
 // ========================
-
-async function testDatabaseConnection() {
+async function testDatabaseConnection(): Promise<void> {
   try {
     await pool.query('SELECT 1');
     console.log('✅ Database connected successfully via pg pool');
-    
-    // Log database connection details (without exposing credentials)
+
     const client = await pool.connect();
     const result = await client.query('SELECT version()');
     console.log(`✅ PostgreSQL version: ${result.rows[0].version}`);
     client.release();
   } catch (error) {
     console.error('❌ Database connection failed:', error);
-    // Don't exit in production, retry instead
     if (process.env.NODE_ENV !== 'production') {
       process.exit(1);
     } else {
@@ -159,8 +152,7 @@ async function testDatabaseConnection() {
 // ========================
 // SERVER STARTUP
 // ========================
-
-let server: any;
+let server: ReturnType<typeof app.listen>;
 
 async function startServer() {
   // Test database connection
@@ -179,7 +171,7 @@ async function startServer() {
 }
 
 // Start the server
-startServer().catch(error => {
+startServer().catch((error) => {
   console.error('❌ Failed to start server:', error);
   process.exit(1);
 });
@@ -187,10 +179,9 @@ startServer().catch(error => {
 // ========================
 // GRACEFUL SHUTDOWN
 // ========================
-
-async function gracefulShutdown(signal: string) {
+async function gracefulShutdown(signal: string): Promise<void> {
   console.log(`\n⚠️  Received ${signal}, starting graceful shutdown...`);
-  
+
   const shutdownTimeout = setTimeout(() => {
     console.error('❌ Shutdown timeout, forcing exit...');
     process.exit(1);
@@ -205,10 +196,10 @@ async function gracefulShutdown(signal: string) {
     // Close server
     if (server) {
       console.log('🛑 Closing server...');
-      await new Promise((resolve, reject) => {
-        server.close((err: any) => {
+      await new Promise<void>((resolve, reject) => {
+        server.close((err: Error | undefined) => {
           if (err) reject(err);
-          else resolve(null);
+          else resolve();
         });
       });
       console.log('✅ Server closed');
@@ -216,7 +207,6 @@ async function gracefulShutdown(signal: string) {
 
     // Clear timeout
     clearTimeout(shutdownTimeout);
-    
     console.log('👋 Graceful shutdown completed');
     process.exit(0);
   } catch (error) {
@@ -230,13 +220,13 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Handle uncaught exceptions
-process.on('uncaughtException', (error) => {
+process.on('uncaughtException', (error: Error) => {
   console.error('❌ Uncaught Exception:', error);
   gracefulShutdown('uncaughtException');
 });
 
 // Handle unhandled rejections
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
   console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
   gracefulShutdown('unhandledRejection');
 });
@@ -244,6 +234,5 @@ process.on('unhandledRejection', (reason, promise) => {
 // ========================
 // EXPORTS FOR TESTING
 // ========================
-
 export default app;
 export { server };
