@@ -14,7 +14,8 @@ export function getAllowedOrigins() {
     if (!origins) {
         return process.env.NODE_ENV === 'production'
             ? []
-            : ['http://localhost:3011', 'http://localhost:5173', 'https://awash-portal.onrender.com', 'https://awash-portal.onrender.com/', 'https://awash-portal.vercel.app', 'https://awash-portal.vercel.app/' ];
+            : ['http://localhost:3011', 'http://localhost:5173', 'https://awash-portal.onrender.com', 'https://awash-portal.onrender.com/', 
+                'https://awash-portal.vercel.app', 'https://awash-portal.vercel.app/' ];
     }
     return origins
         .split(',')
