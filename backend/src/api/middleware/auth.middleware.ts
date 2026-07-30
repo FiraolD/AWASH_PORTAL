@@ -2,7 +2,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import pool from '../lib/db.js';
+import pool from '../config/database';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -52,6 +52,8 @@ export const ROLES = {
   SYSTEM_ADMIN: 'SYSTEM_ADMIN',
   SUPER_ADMIN: 'SUPER_ADMIN',
   CEO: 'CEO',
+  COO: 'COO',
+  CFO: 'CFO',
   ADMIN: 'ADMIN',
 } as const;
 
@@ -93,6 +95,8 @@ export const ROLE_GROUPS = {
     ROLES.SYSTEM_ADMIN,
     ROLES.SUPER_ADMIN,
     ROLES.CEO,
+    ROLES.COO,
+    ROLES.CFO,
     ROLES.ADMIN,
   ],
   
