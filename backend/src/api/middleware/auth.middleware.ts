@@ -2,8 +2,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import pool from '../../lib/db.js';  // ✅ Added .js extension
-//import pool from '../config/database'
+import pool from '../config/database';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -53,7 +52,7 @@ export const ROLES = {
   SYSTEM_ADMIN: 'SYSTEM_ADMIN',
   SUPER_ADMIN: 'SUPER_ADMIN',
   CEO: 'CEO',
-  COO: 'COO',        // ✅ Fixed
+  COO: 'COO',
   CFO: 'CFO',
   ADMIN: 'ADMIN',
 } as const;
@@ -96,7 +95,7 @@ export const ROLE_GROUPS = {
     ROLES.SYSTEM_ADMIN,
     ROLES.SUPER_ADMIN,
     ROLES.CEO,
-    ROLES.COO,      // ✅ Fixed
+    ROLES.COCO,
     ROLES.CFO,
     ROLES.ADMIN,
   ],
@@ -120,7 +119,9 @@ export const ROLE_GROUPS = {
   ],
   
   // All authenticated users (everyone)
-  ALL_AUTHENTICATED: Object.values(ROLES),
+  ALL_AUTHENTICATED: [
+    ...Object.values(ROLES),
+  ],
 };
 
 // ---------------------------------------------------------------------------
@@ -146,11 +147,13 @@ export const authenticate = async (
       return;
     }
 
+    // Verify JWT
     const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
     const decoded = jwt.verify(token, JWT_SECRET) as { id: string; email: string; role: string };
 
+    // Verify user still exists in database
     const userResult = await pool.query(
-      `SELECT id, email, role, "firstName", "lastName", "status" 
+      `SELECT id, email, role, "firstName", "lastName", "isActive" 
        FROM users WHERE id = $1`,
       [decoded.id]
     );
@@ -162,11 +165,12 @@ export const authenticate = async (
 
     const user = userResult.rows[0];
 
-    if (!user.status) {
+    if (!user.isActive) {
       res.status(403).json({ error: 'Account is deactivated. Contact admin.' });
       return;
     }
 
+    // Attach user to request
     req.user = {
       id: user.id,
       email: user.email,
@@ -225,15 +229,37 @@ export const authorize = (...allowedRoles: string[]) => {
   };
 };
 
-// Convenience middleware
+// ---------------------------------------------------------------------------
+// Convenience middleware using role groups
+// ---------------------------------------------------------------------------
+
+// Allow all claims staff
 export const authorizeClaimsStaff = authorize(...ROLE_GROUPS.CLAIMS_STAFF);
+
+// Allow claims approvers only
 export const authorizeClaimsApprovers = authorize(...ROLE_GROUPS.CLAIMS_APPROVERS, ...ROLE_GROUPS.EXECUTIVES);
+
+// Allow claims reviewers (officers) only
 export const authorizeClaimsReviewers = authorize(...ROLE_GROUPS.CLAIMS_REVIEWERS);
-export const authorizeClaimsAll = authorize(...ROLE_GROUPS.CLAIMS_STAFF, ...ROLE_GROUPS.EXECUTIVES);
+
+// Allow all claims staff + executives
+export const authorizeClaimsAll = authorize(
+  ...ROLE_GROUPS.CLAIMS_STAFF,
+  ...ROLE_GROUPS.EXECUTIVES
+);
+
+// Allow executives only
 export const authorizeExecutives = authorize(...ROLE_GROUPS.EXECUTIVES);
+
+// Allow customers only
 export const authorizeCustomer = authorize(ROLES.CUSTOMER);
+
+// Allow any authenticated user
 export const authorizeAny = authorize(...ROLE_GROUPS.ALL_AUTHENTICATED);
 
+// ---------------------------------------------------------------------------
+// Optional: Soft auth – attaches user if token present, but doesn't block
+// ---------------------------------------------------------------------------
 export const softAuthenticate = async (
   req: AuthRequest,
   res: Response,
@@ -243,6 +269,7 @@ export const softAuthenticate = async (
     const authHeader = req.headers.authorization;
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      // No token – continue without user
       next();
       return;
     }
