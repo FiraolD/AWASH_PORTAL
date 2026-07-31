@@ -70,6 +70,25 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
   lastModified: true,
 }));
 
+
+// ========================
+// ROOT ROUTE
+// ========================
+app.get('/', (_req: Request, res: Response) => {
+  res.json({
+    name: 'Awash Insurance API',
+    version: '1.0.0',
+    status: 'running',
+    environment: process.env.NODE_ENV || 'development',
+    endpoints: {
+      health: '/api/health',
+      ping: '/ping',
+      api: '/api',
+      apiV1: '/api/v1',
+    },
+    docs: 'Contact admin for API documentation',
+  });
+});
 // ========================
 // HEALTH CHECK
 // ========================
