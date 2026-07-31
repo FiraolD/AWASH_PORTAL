@@ -19,6 +19,8 @@ router.get('/', authenticate, authorizeExecutives, async (req: AuthRequest, res:
   }
 });
 
+
+
 router.post('/', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
     const { ruleName, productType, claimType, minAmount, maxAmount, assignedRole, priorityLevel } = req.body;

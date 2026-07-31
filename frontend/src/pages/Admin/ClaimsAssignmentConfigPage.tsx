@@ -81,7 +81,7 @@ export default function ClaimsAssignmentConfigPage() {
   const fetchRules = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_URL}/claims-assignment/assignment-rules`, {
+      const response = await axios.get(`${API_URL}/claims-assignment`, {
         headers: getAuthHeaders()
       });
       setRules(response.data);
@@ -108,12 +108,12 @@ export default function ClaimsAssignmentConfigPage() {
       };
 
       if (editingRule) {
-        await axios.put(`${API_URL}/claims-assignment/assignment-rules/${editingRule.id}`, payload, {
+        await axios.put(`${API_URL}/claims-assignment/${editingRule.id}`, payload, {
           headers: getAuthHeaders()
         });
         toast.success('Assignment rule updated successfully');
       } else {
-        await axios.post(`${API_URL}/claims-assignment/assignment-rules`, payload, {
+        await axios.post(`${API_URL}/claims-assignment/`, payload, {
           headers: getAuthHeaders()
         });
         toast.success('Assignment rule created successfully');
@@ -130,7 +130,7 @@ export default function ClaimsAssignmentConfigPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this rule?')) return;
     try {
-      await axios.delete(`${API_URL}/claims-assignment/assignment-rules/${id}`, {
+      await axios.delete(`${API_URL}/claims-assignment/${id}`, {
         headers: getAuthHeaders()
       });
       toast.success('Assignment rule deleted successfully');
