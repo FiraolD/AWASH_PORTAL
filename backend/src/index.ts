@@ -1,62 +1,114 @@
 ﻿// backend/src/index.ts
-
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// Import routes
-import authRoutes from './api/v1/auth.routes.js';
-import usersRoutes from './api/v1/user.routes.js';
-import productsRoutes from './api/v1/products.routes.js';
-import policiesRoutes from './api/v1/policy.routes.js';
-import claimsRoutes from './api/v1/claim.routes.js';
-import paymentsRoutes from './api/v1/payment.routes.js';  // ✅ Add this
-import settingsRoutes from './api/v1/settings.routes.js';
-import approvalsRouter from './api/v1/approval.routes';
-import auditRouter from './api/v1/audit.routes';
-import premiumRatesRouter from './api/v1/premium-rates.routes';
-//import roleLevelsRouter from './api/v1/roleLevels.routes';
-import hospitalListRouter from './api/v1/hospital-list.routes';
-import migrationsRouter from './api/v1/migrations.routes';
+// Import centralized API routes
+import apiV1Routes from './api/v1/index.js';
 
-
-
+// Load environment variables
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// ========================
+// MIDDLEWARE
+// ========================
+app.use(cors({
+  origin: process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',').map(o => o.trim())
+    : ['http://localhost:5173', 'http://localhost:3011'],
+  credentials: true,
+}));
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/users', usersRoutes);
-app.use('/api/products', productsRoutes);
-app.use('/api/policies', policiesRoutes);
-app.use('/api/claims', claimsRoutes);
-app.use('/api/payments', paymentsRoutes);    // ✅ Add this
-app.use('/api/settings', settingsRoutes);
-// Admin routes
-app.use('/api/approval-rules', approvalsRouter);
-app.use('/api/audit-logs', auditRouter);
-app.use('/api/premium-rates', premiumRatesRouter);
-//app.use('/api/role-levels', roleLevelsRouter);
-app.use('/api/hospitals', hospitalListRouter);
-app.use('/api/migrations', migrationsRouter);
-// ... other imports
-// ... other routes
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Request logging (development only)
+if (process.env.NODE_ENV !== 'production') {
+  app.use((req: Request, _res: Response, next: NextFunction) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+    next();
+  });
+}
+
+// ========================
+// ROUTES
+// ========================
+
+// All API v1 routes
+app.use('/api', apiV1Routes);
+
+// Also mount at /api/v1 for explicit versioning
+app.use('/api/v1', apiV1Routes);
+
+// ========================
+// HEALTH CHECK
+// ========================
+app.get('/api/health', (_req: Request, res: Response) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development',
+  });
 });
 
-// Start server
+app.get('/ping', (_req: Request, res: Response) => {
+  res.send('pong');
+});
+
+// ========================
+// STATIC FILES (production)
+// ========================
+if (process.env.NODE_ENV === 'production') {
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+
+  app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+}
+
+// ========================
+// 404 HANDLER
+// ========================
+app.use((req: Request, res: Response) => {
+  res.status(404).json({
+    error: 'Not Found',
+    message: `Route ${req.method} ${req.path} not found`,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// ========================
+// GLOBAL ERROR HANDLER
+// ========================
+app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
+  console.error('Unhandled error:', {
+    error: err.message,
+    stack: err.stack,
+    path: req.path,
+    method: req.method,
+  });
+
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  res.status(err.status || 500).json({
+    error: isProduction ? 'Internal Server Error' : err.message,
+    timestamp: new Date().toISOString(),
+    ...(isProduction ? {} : { stack: err.stack }),
+  });
+});
+
+// ========================
+// START SERVER
+// ========================
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`\n🚀 Server running on http://localhost:${PORT}`);
+  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔗 Health check: http://localhost:${PORT}/api/health\n`);
 });
 
 export default app;

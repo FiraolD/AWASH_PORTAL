@@ -1,61 +1,141 @@
 import { Router } from 'express';
+
+// Auth
 import authRoutes from './auth.routes.js';
-import approvalRoutes from './approval.routes.js';
-import auditRoutes from './audit.routes.js';
+
+// Users & Profile
+import usersRoutes from './user.routes.js';
+import profileRoutes from './profile.routes.js';
+
+// Admin
+import adminRoutes from './admin.routes.js';
+import migrationsRoutes from './migrations.routes.js';
+import roleLevelsRoutes from './role-levels.routes.js';
+
+// Products & Coverage
+import productsRoutes from './products.routes.js';
+import coverageTiersRoutes from './coverageTiers.routes.js';
+
+// Policies
+import policiesRoutes from './policy.routes.js';
+
+// Claims
 import claimsRoutes from './claim.routes.js';
 import claimsAssignmentRoutes from './claims-assignment.routes.js';
-import configRoutes from './config.routes.js';
-import coverageTiersRoutes from './coverageTiers.routes.js';
-import dashboardRoutes from './dashboard.routes.js';
+
+// Payments
 import paymentsRoutes from './payment.routes.js';
-import perilsRoutes from './perils.routes.js';
-import policiesRoutes from './policy.routes.js';
-import premiumRatesRoutes from './premium-rates.routes.js';
-import productsRoutes from './products.routes.js';
+
+// Approval / Workflow
+import approvalRoutes from './approval.routes.js';
+
+// Underwriting
+import underwritingRoutes from './underwriting.routes.js';
+
+// Settings & Configuration
 import settingsRoutes from './settings.routes.js';
-import usersRoutes from './user.routes.js';
+import configRoutes from './config.routes.js';
+
+// Risk & Pricing
+import perilsRoutes from './perils.routes.js';
+import ridersRoutes from './riders.routes.js';
+import premiumRatesRoutes from './premium-rates.routes.js';
+
+// Support
+import supportRoutes from './support.routes.js';
+
+// Hospitals
+import hospitalListRoutes from './hospital-list.routes.js';
+
+// Dashboard
+import dashboardRoutes from './dashboard.routes.js';
+
+// Audit
+import auditRoutes from './audit.routes.js';
 
 const router = Router();
 
-// Auth
+// ============================================================================
+// AUTH
+// ============================================================================
 router.use('/auth', authRoutes);
 
-// Users
+// ============================================================================
+// USERS & PROFILE
+// ============================================================================
 router.use('/users', usersRoutes);
+router.use('/profile', profileRoutes);
 
-// Products
+// ============================================================================
+// ADMIN
+// ============================================================================
+router.use('/admin', adminRoutes);
+router.use('/migrations', migrationsRoutes);
+router.use('/role-levels', roleLevelsRoutes);
+
+// ============================================================================
+// PRODUCTS & COVERAGE
+// ============================================================================
 router.use('/products', productsRoutes);
+router.use('/coverage-tiers', coverageTiersRoutes);
 
-// Policies
+// ============================================================================
+// POLICIES
+// ============================================================================
 router.use('/policies', policiesRoutes);
 
-// Claims
+// ============================================================================
+// CLAIMS
+// ============================================================================
 router.use('/claims', claimsRoutes);
 router.use('/claims-assignment', claimsAssignmentRoutes);
 
-// Payments
+// ============================================================================
+// PAYMENTS
+// ============================================================================
 router.use('/payments', paymentsRoutes);
 
-// Approval / Workflow
+// ============================================================================
+// APPROVAL / WORKFLOW
+// ============================================================================
 router.use('/approval', approvalRoutes);
 
-// Settings & Configuration
+// ============================================================================
+// UNDERWRITING
+// ============================================================================
+router.use('/underwriting', underwritingRoutes);
+
+// ============================================================================
+// SETTINGS & CONFIGURATION
+// ============================================================================
 router.use('/settings', settingsRoutes);
 router.use('/config', configRoutes);
 
-// Coverage Tiers
-router.use('/coverage-tiers', coverageTiersRoutes);
-
-// Dashboard
-router.use('/dashboard', dashboardRoutes);
-
-// Perils
+// ============================================================================
+// RISK & PRICING
+// ============================================================================
 router.use('/perils', perilsRoutes);
-
-// Premium Rates
+router.use('/riders', ridersRoutes);
 router.use('/premium-rates', premiumRatesRoutes);
 
-// Audit Logs
+// ============================================================================
+// SUPPORT
+// ============================================================================
+router.use('/support', supportRoutes);
+
+// ============================================================================
+// HOSPITALS
+// ============================================================================
+router.use('/hospitals', hospitalListRoutes);
+
+// ============================================================================
+// DASHBOARD
+// ============================================================================
+router.use('/dashboard', dashboardRoutes);
+
+// ============================================================================
+// AUDIT
+// ============================================================================
 router.use('/audit', auditRoutes);
 
 export default router;
