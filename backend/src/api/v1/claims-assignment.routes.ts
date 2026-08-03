@@ -8,7 +8,7 @@ const router = Router();
 router.get('/', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
     const result = await pool.query(
-      `SELECT id, "ruleName", "productType", "claimType", "minAmount", "maxAmount",
+      `SELECT id, "ruleName", "productType", "minAmount", "maxAmount",
               "assignedRole", "priorityLevel", "isActive", "createdAt", "updatedAt", "createdBy"
        FROM claims_assignment_rules ORDER BY "priorityLevel" ASC, "createdAt" DESC`
     );
@@ -23,17 +23,17 @@ router.get('/', authenticate, authorizeExecutives, async (req: AuthRequest, res:
 
 router.post('/', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
-    const { ruleName, productType, claimType, minAmount, maxAmount, assignedRole, priorityLevel } = req.body;
+    const { ruleName, productType, minAmount, maxAmount, assignedRole, priorityLevel } = req.body;
     if (!ruleName || !productType || !assignedRole) {
       return res.status(400).json({ error: 'ruleName, productType, and assignedRole are required' });
     }
 
     const result = await pool.query(
       `INSERT INTO claims_assignment_rules (
-        "ruleName", "productType", "claimType", "minAmount", "maxAmount",
+        "ruleName", "productType", "minAmount", "maxAmount",
         "assignedRole", "priorityLevel", "isActive", "createdBy", "createdAt", "updatedAt"
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, true, $8, NOW(), NOW()) RETURNING *`,
-      [ruleName, productType, claimType || null, minAmount || null, maxAmount || null, assignedRole, priorityLevel || 0, req.user!.id]
+      [ruleName, productType, minAmount || null, maxAmount || null, assignedRole, priorityLevel || 0, req.user!.id]
     );
 
     // ✅ FIXED: Using helpers for type safety
@@ -55,17 +55,16 @@ router.post('/', authenticate, authorizeExecutives, async (req: AuthRequest, res
 router.put('/:id', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
     const id = String(req.params.id);
-    const { ruleName, productType, claimType, minAmount, maxAmount, assignedRole, priorityLevel, isActive } = req.body;
+    const { ruleName, productType, minAmount, maxAmount, assignedRole, priorityLevel, isActive } = req.body;
 
     const oldResult = await pool.query('SELECT * FROM claims_assignment_rules WHERE id = $1', [id]);
     if (oldResult.rows.length === 0) return res.status(404).json({ error: 'Assignment rule not found' });
     const oldData = oldResult.rows[0];
 
     await pool.query(
-      `UPDATE claims_assignment_rules SET "ruleName"=$1, "productType"=$2, "claimType"=$3, "minAmount"=$4,
+      `UPDATE claims_assignment_rules SET "ruleName"=$1, "productType"=$2, "minAmount"=$4,
        "maxAmount"=$5, "assignedRole"=$6, "priorityLevel"=$7, "isActive"=$8, "updatedAt"=NOW() WHERE id=$9`,
       [ruleName || oldData.ruleName, productType || oldData.productType,
-       claimType !== undefined ? claimType : oldData.claimType,
        minAmount !== undefined ? minAmount : oldData.minAmount,
        maxAmount !== undefined ? maxAmount : oldData.maxAmount,
        assignedRole || oldData.assignedRole,
