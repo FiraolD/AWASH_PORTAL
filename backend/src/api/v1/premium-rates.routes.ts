@@ -5,20 +5,31 @@ import { createAuditLog, getClientIp, getHeaderString } from './audit.routes.js'
 
 const router = Router();
 
-// Get all
-router.get('/', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
+router.get('/', authenticate, authorizeExecutives, async (req, res) => {
   try {
-    const { productType, isActive, calculationType } = req.query;
-    let query = `SELECT id, "productType", "rateName", "baseRate", "minRate", "maxRate", "calculationType", "isPercentage", "effectiveFrom", "effectiveTo", "isActive", "createdAt", "updatedAt", "createdBy" FROM premium_rates WHERE 1=1`;
-    const params: any[] = [];
-    let p = 1;
+    const result = await pool.query(`
+      SELECT
+        pr.id,
+        pr."productId",
+        p.name AS "productName",
+        p.code AS "productCode",
+        pr."productType",
+        pr."productType",
+        pr."baseRate",
+        pr."coverageTier",
+        pr."baseRate",
+        pr."minCoverage",
+        pr."maxCoverage",
+        pr."riskFactor",
+        pr."isActive",
+        pr."createdAt",
+        pr."updatedAt"
+      FROM premium_rates pr
+      LEFT JOIN products p
+        ON pr."productId" = p.id
+      ORDER BY p.name, pr."coverageTier"
+    `);
 
-    if (productType) { query += ` AND "productType" = $${p++}`; params.push(productType); }
-    if (isActive !== undefined) { query += ` AND "isActive" = $${p++}`; params.push(isActive === 'true'); }
-    if (calculationType) { query += ` AND "calculationType" = $${p++}`; params.push(calculationType); }
-
-    query += ` ORDER BY "productType", "rateName"`;
-    const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (error) {
     console.error('[PremiumRates] Fetch error:', error);
@@ -26,21 +37,24 @@ router.get('/', authenticate, authorizeExecutives, async (req: AuthRequest, res:
   }
 });
 
-// Get active by product
-router.get('/active/:productType', async (req: AuthRequest, res: Response) => {
+router.get('/product/:productId', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const result = await pool.query(
-      `SELECT id, "productType", "rateName", "baseRate", "minRate", "maxRate", "calculationType", "isPercentage", "effectiveFrom", "effectiveTo"
-       FROM premium_rates WHERE "productType"=$1 AND "isActive"=true AND ("effectiveFrom" IS NULL OR "effectiveFrom"<=NOW()) AND ("effectiveTo" IS NULL OR "effectiveTo">=NOW()) ORDER BY "rateName"`,
-      [req.params.productType]
+      `
+      SELECT *
+      FROM premium_rates
+      WHERE "productId" = $1
+      ORDER BY "coverageTier"
+      `,
+      [req.params.productId]
     );
+
     res.json(result.rows);
   } catch (error) {
-    console.error('[PremiumRates] Active error:', error);
-    res.status(500).json({ error: 'Failed to fetch active premium rates' });
+    console.error('[PremiumRates] Product fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch premium rates' });
   }
 });
-
 // Create
 router.post('/', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
@@ -49,11 +63,45 @@ router.post('/', authenticate, authorizeExecutives, async (req: AuthRequest, res
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const result = await pool.query(
-      `INSERT INTO premium_rates ("productType", "rateName", "baseRate", "minRate", "maxRate", "calculationType", "isPercentage", "effectiveFrom", "effectiveTo", "isActive", "createdBy", "createdAt", "updatedAt")
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,true,$10,NOW(),NOW()) RETURNING *`,
-      [productType, rateName, baseRate, minRate || 0, maxRate || baseRate * 2, calculationType, isPercentage || false, effectiveFrom || null, effectiveTo || null, req.user!.id]
-    );
+const {
+  productId,
+  productType,
+  coverageTier,
+  baseRate,
+  minCoverage,
+  maxCoverage,
+  riskFactor
+} = req.body;
+
+const result = await pool.query(
+`
+INSERT INTO premium_rates (
+    "productId",
+    "productType",
+    "coverageTier",
+    "baseRate",
+    "minCoverage",
+    "maxCoverage",
+    "riskFactor",
+    "isActive",
+    "createdAt",
+    "updatedAt"
+)
+VALUES (
+    $1,$2,$3,$4,$5,$6,$7,true,NOW(),NOW()
+)
+RETURNING *
+`,
+[
+    productId,
+    productType,
+    coverageTier,
+    baseRate,
+    minCoverage,
+    maxCoverage,
+    riskFactor
+]
+);
 
     await createAuditLog(req.user!.id, req.user!.email, req.user!.role, 'CREATE', 'PREMIUM_RATE', result.rows[0].id, null, result.rows[0], getClientIp(req), getHeaderString(req, 'user-agent'));
     res.status(201).json(result.rows[0]);
@@ -73,7 +121,18 @@ router.put('/:id', authenticate, authorizeExecutives, async (req: AuthRequest, r
     const d = req.body;
 
     await pool.query(
-      `UPDATE premium_rates SET "productType"=$1,"rateName"=$2,"baseRate"=$3,"minRate"=$4,"maxRate"=$5,"calculationType"=$6,"isPercentage"=$7,"effectiveFrom"=$8,"effectiveTo"=$9,"isActive"=$10,"updatedAt"=NOW() WHERE id=$11`,
+      `UPDATE premium_rates
+SET
+    "productId"=$1,
+    "productType"=$2,
+    "coverageTier"=$3,
+    "baseRate"=$4,
+    "minCoverage"=$5,
+    "maxCoverage"=$6,
+    "riskFactor"=$7,
+    "isActive"=$8,
+    "updatedAt"=NOW()
+WHERE id=$9`,
       [d.productType || oldData.productType, d.rateName || oldData.rateName, d.baseRate !== undefined ? d.baseRate : oldData.baseRate, d.minRate !== undefined ? d.minRate : oldData.minRate, d.maxRate !== undefined ? d.maxRate : oldData.maxRate, d.calculationType || oldData.calculationType, d.isPercentage !== undefined ? d.isPercentage : oldData.isPercentage, d.effectiveFrom !== undefined ? d.effectiveFrom : oldData.effectiveFrom, d.effectiveTo !== undefined ? d.effectiveTo : oldData.effectiveTo, d.isActive !== undefined ? d.isActive : oldData.isActive, id]
     );
 
@@ -106,7 +165,7 @@ router.delete('/:id', authenticate, authorizeExecutives, async (req: AuthRequest
 router.patch('/:id/toggle', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
     const id = String(req.params.id);
-    const checkResult = await pool.query('SELECT id, "isActive", "rateName" FROM premium_rates WHERE id=$1', [id]);
+    const checkResult = await pool.query('SELECT id, "isActive", "coverageTier" FROM premium_rates WHERE id=$1', [id]);
     if (checkResult.rows.length === 0) return res.status(404).json({ error: 'Not found' });
 
     const newStatus = !checkResult.rows[0].isActive;
