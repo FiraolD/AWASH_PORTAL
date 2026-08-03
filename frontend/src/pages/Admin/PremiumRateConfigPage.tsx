@@ -170,41 +170,41 @@ export default function PremiumRateConfigPage() {
   // ==========================================================================
   // Rate CRUD
   // ==========================================================================
-  const handleRateSubmit = async () => {
-    if (!rateForm.coverageTier || rateForm.baseRate <= 0 || rateForm.minCoverage <= 0) {
-      toast.error('Please fill all required fields');
-      return;
+const handleRateSubmit = async () => {
+  if (!rateForm.coverageTier || rateForm.baseRate <= 0 || rateForm.minCoverage <= 0) {
+    toast.error('Please fill all required fields');
+    return;
+  }
+
+  try {
+    // FIXED: Use camelCase to match backend
+    const payload = {
+      productId: selectedProductId || undefined,
+      productType: selectedProduct?.code || selectedProduct?.category || 'GENERAL',
+      coverageTier: rateForm.coverageTier,
+      baseRate: Number(rateForm.baseRate),
+      minCoverage: Number(rateForm.minCoverage),
+      maxCoverage: rateForm.maxCoverage ? Number(rateForm.maxCoverage) : null,
+      riskFactor: Number(rateForm.riskFactor),
+      isActive: rateForm.isActive,
+    };
+
+    console.log('[PremiumRateConfig] Sending payload:', payload);
+
+    if (editingRate) {
+      await updateRate(editingRate.id, payload);
+      toast.success('Rate updated successfully');
+    } else {
+      await createRate(payload);
+      toast.success('Rate created successfully');
     }
-
-    try {
-      const payload = {
-        productId: selectedProductId || undefined,
-        productType: selectedProduct?.code || selectedProduct?.category || 'GENERAL',
-        coverageTier: rateForm.coverageTier,
-        baseRate: Number(rateForm.baseRate),
-        minCoverage: Number(rateForm.minCoverage),
-        maxCoverage: rateForm.maxCoverage ? Number(rateForm.maxCoverage) : null,
-        riskFactor: Number(rateForm.riskFactor),
-        isActive: rateForm.isActive,
-      };
-
-      console.log('[PremiumRateConfig] Submitting payload:', payload);
-
-      if (editingRate) {
-        await updateRate(editingRate.id, payload);
-        toast.success('Rate updated successfully');
-      } else {
-        await createRate(payload);
-        toast.success('Rate created successfully');
-      }
-      setIsRateDialogOpen(false);
-      resetRateForm();
-      fetchRatesForProduct();
-    } catch (error: any) {
-      console.error('[PremiumRateConfig] Submit error:', error.response?.data || error.message);
-      toast.error(error.response?.data?.error || 'Failed to save rate');
-    }
-  };
+    setIsRateDialogOpen(false);
+    resetRateForm();
+    fetchRatesForProduct();
+  } catch (error: any) {
+    toast.error(error.response?.data?.error || 'Failed to save rate');
+  }
+};
 
   // ==========================================================================
   // Peril CRUD
