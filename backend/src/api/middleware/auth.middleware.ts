@@ -103,7 +103,6 @@ export const ROLE_GROUPS = {
     ROLES.UNDERWRITING_OFFICER_I,
     ROLES.UNDERWRITING_OFFICER_II,
     ROLES.SENIOR_UNDERWRITING_OFFICER,
-    ROLES.SUPERVISOR_UNDERWRITING,
     ROLES.MANAGER_UNDERWRITING,
     ROLES.HEAD_UNDERWRITING,
     ROLES.UNDERWRITING_ADMIN,
@@ -152,7 +151,7 @@ export const authenticate = async (
 
     // Verify user still exists in database
     const userResult = await pool.query(
-      `SELECT id, email, role, "firstName", "lastName", "isActive"
+      `SELECT id, email, role, "firstName", "lastName", "status" 
        FROM users WHERE id = $1`,
       [decoded.id]
     );
@@ -164,7 +163,7 @@ export const authenticate = async (
 
     const user = userResult.rows[0];
 
-    if (!user.isActive) {
+    if (!user.status) {
       res.status(403).json({ error: 'Account is deactivated. Contact admin.' });
       return;
     }
