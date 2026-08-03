@@ -76,7 +76,7 @@ export default function PremiumRateConfigPage() {
   const [riders, setRiders] = React.useState<Rider[]>([]);
   const [activeTab, setActiveTab] = React.useState('rates');
   
-  // Rate form state (fixed: camelCase)
+  // Rate form state
   const [isRateDialogOpen, setIsRateDialogOpen] = React.useState(false);
   const [editingRate, setEditingRate] = React.useState<PremiumRate | null>(null);
   const [rateForm, setRateForm] = React.useState({
@@ -168,7 +168,7 @@ export default function PremiumRateConfigPage() {
   };
 
   // ==========================================================================
-  // Rate CRUD (FIXED)
+  // Rate CRUD
   // ==========================================================================
   const handleRateSubmit = async () => {
     if (!rateForm.coverageTier || rateForm.baseRate <= 0 || rateForm.minCoverage <= 0) {
@@ -284,9 +284,6 @@ export default function PremiumRateConfigPage() {
     }
   };
 
-  // ==========================================================================
-  // Reset functions (FIXED)
-  // ==========================================================================
   const resetRateForm = () => {
     setEditingRate(null);
     setRateForm({
@@ -342,8 +339,8 @@ export default function PremiumRateConfigPage() {
     }
   };
 
-  // Filter rates for selected product
-  const productRates = rates.filter(r => r.productId === selectedProductId || r.product_id === selectedProductId);
+  // Filter rates for selected product (now uses camelCase from store)
+  const productRates = rates.filter(r => r.productId === selectedProductId);
 
   return (
     <div className="space-y-6">
@@ -477,7 +474,6 @@ export default function PremiumRateConfigPage() {
                 <CardContent className="text-center py-8">
                   <DollarSign className="h-12 w-12 text-gray-300 mx-auto mb-3" />
                   <p className="text-gray-500">No rate tiers configured for {selectedProduct.name}</p>
-                  <p className="text-sm text-gray-400 mt-1">Click "Add Rate Tier" to get started</p>
                 </CardContent>
               </Card>
             ) : (
@@ -551,137 +547,53 @@ export default function PremiumRateConfigPage() {
                     </div>
                     <div>
                       <Label>Description</Label>
-                      <Textarea
-                        value={perilForm.description}
-                        onChange={(e) => setPerilForm({...perilForm, description: e.target.value})}
-                        placeholder="Describe what this peril covers"
-                        rows={2}
-                      />
+                      <Textarea value={perilForm.description} onChange={(e) => setPerilForm({...perilForm, description: e.target.value})} rows={2} />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label>Premium Rate *</Label>
-                        <div className="relative">
-                          <Input 
-                            type="number"
-                            step="0.001"
-                            value={perilForm.premiumRate}
-                            onChange={(e) => setPerilForm({...perilForm, premiumRate: parseFloat(e.target.value)})}
-                            className="pl-8"
-                          />
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                            {perilForm.calculationType === 'PERCENTAGE' ? '%' : 'ETB'}
-                          </span>
-                        </div>
+                        <Input type="number" step="0.001" value={perilForm.premiumRate} onChange={(e) => setPerilForm({...perilForm, premiumRate: parseFloat(e.target.value)})} />
                       </div>
                       <div>
                         <Label>Calculation Type</Label>
-                        <Select 
-                          value={perilForm.calculationType}
-                          onValueChange={(val) => setPerilForm({...perilForm, calculationType: val})}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
+                        <Select value={perilForm.calculationType} onValueChange={(val) => setPerilForm({...perilForm, calculationType: val})}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="PERCENTAGE">Percentage of Coverage</SelectItem>
+                            <SelectItem value="PERCENTAGE">Percentage</SelectItem>
                             <SelectItem value="FIXED">Fixed Amount</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label>Min Coverage (ETB)</Label>
-                        <Input 
-                          type="number"
-                          value={perilForm.minCoverage}
-                          onChange={(e) => setPerilForm({...perilForm, minCoverage: e.target.value})}
-                        />
-                      </div>
-                      <div>
-                        <Label>Max Coverage (ETB)</Label>
-                        <Input 
-                          type="number"
-                          value={perilForm.maxCoverage}
-                          onChange={(e) => setPerilForm({...perilForm, maxCoverage: e.target.value})}
-                        />
-                      </div>
-                    </div>
                     <div className="flex items-center justify-between">
-                      <Label>Default Peril (auto-included)</Label>
-                      <Switch 
-                        checked={perilForm.isDefault}
-                        onCheckedChange={(val) => setPerilForm({...perilForm, isDefault: val})}
-                      />
+                      <Label>Default Peril</Label>
+                      <Switch checked={perilForm.isDefault} onCheckedChange={(val) => setPerilForm({...perilForm, isDefault: val})} />
                     </div>
-                    <Button onClick={handlePerilSubmit} className="w-full bg-[#1A3E6F]">
-                      {editingPeril ? 'Update' : 'Create'}
-                    </Button>
+                    <Button onClick={handlePerilSubmit} className="w-full bg-[#1A3E6F]">{editingPeril ? 'Update' : 'Create'}</Button>
                   </div>
                 </DialogContent>
               </Dialog>
             </div>
-
             {perils.length === 0 ? (
-              <Card>
-                <CardContent className="text-center py-8">
-                  <Shield className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500">No perils configured for {selectedProduct.name}</p>
-                  <p className="text-sm text-gray-400 mt-1">Click "Add Peril" to configure covered risks</p>
-                </CardContent>
-              </Card>
+              <Card><CardContent className="text-center py-8"><Shield className="h-12 w-12 text-gray-300 mx-auto mb-3" /><p className="text-gray-500">No perils configured</p></CardContent></Card>
             ) : (
               <div className="grid gap-4">
                 {perils.map((peril) => (
                   <Card key={peril.id} className="hover:shadow-md transition-shadow">
                     <CardContent className="p-4">
                       <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-semibold text-lg">{peril.perilName}</h3>
-                            {peril.isDefault && <Badge className="bg-green-100 text-green-800">Default</Badge>}
-                          </div>
-                          <p className="text-sm text-gray-600 mt-1">{peril.description}</p>
-                          <div className="flex gap-4 mt-2">
-                            <Badge className="bg-blue-100 text-blue-800">
-                              {peril.calculationType === 'PERCENTAGE' 
-                                ? `${(peril.premiumRate * 100).toFixed(2)}% of coverage` 
-                                : `ETB ${peril.premiumRate.toLocaleString()} fixed`}
-                            </Badge>
-                            {peril.minCoverage && (
-                              <Badge variant="outline">Min: ETB {peril.minCoverage.toLocaleString()}</Badge>
-                            )}
-                          </div>
+                        <div>
+                          <h3 className="font-semibold text-lg">{peril.perilName}</h3>
+                          <p className="text-sm text-gray-600">{peril.description}</p>
+                          <Badge className="bg-blue-100 text-blue-800 mt-2">{(peril.premiumRate * 100).toFixed(2)}%</Badge>
                         </div>
                         <div className="flex gap-2">
                           <Button variant="ghost" size="sm" onClick={() => {
                             setEditingPeril(peril);
-                            setPerilForm({
-                              perilName: peril.perilName,
-                              description: peril.description || '',
-                              premiumRate: peril.premiumRate,
-                              calculationType: peril.calculationType,
-                              minCoverage: peril.minCoverage?.toString() || '',
-                              maxCoverage: peril.maxCoverage?.toString() || '',
-                              isDefault: peril.isDefault,
-                              isOptional: peril.isOptional,
-                              displayOrder: peril.displayOrder,
-                              isActive: peril.isActive
-                            });
+                            setPerilForm({...peril, premiumRate: peril.premiumRate, minCoverage: peril.minCoverage?.toString() || '', maxCoverage: peril.maxCoverage?.toString() || ''});
                             setIsPerilDialogOpen(true);
-                          }}>
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={async () => {
-                            if (confirm('Delete this peril?')) {
-                              await axiosInstance.delete(`/perils/${peril.id}`);
-                              fetchPerilsForProduct();
-                              toast.success('Peril deleted');
-                            }
-                          }}>
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
+                          }}><Edit2 className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="sm" onClick={async () => { await axiosInstance.delete(`/perils/${peril.id}`); fetchPerilsForProduct(); toast.success('Peril deleted'); }}><Trash2 className="h-4 w-4 text-red-500" /></Button>
                         </div>
                       </div>
                     </CardContent>
@@ -707,127 +619,45 @@ export default function PremiumRateConfigPage() {
                   <div className="space-y-4">
                     <div>
                       <Label>Rider Name *</Label>
-                      <Input 
-                        value={riderForm.riderName}
-                        onChange={(e) => setRiderForm({...riderForm, riderName: e.target.value})}
-                        placeholder="e.g., Accidental Death Benefit, Dental Coverage"
-                      />
+                      <Input value={riderForm.riderName} onChange={(e) => setRiderForm({...riderForm, riderName: e.target.value})} />
                     </div>
                     <div>
                       <Label>Description</Label>
-                      <Textarea
-                        value={riderForm.description}
-                        onChange={(e) => setRiderForm({...riderForm, description: e.target.value})}
-                        rows={2}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label>Premium Rate *</Label>
-                        <div className="relative">
-                          <Input 
-                            type="number"
-                            step="0.001"
-                            value={riderForm.premiumRate}
-                            onChange={(e) => setRiderForm({...riderForm, premiumRate: parseFloat(e.target.value)})}
-                            className="pl-8"
-                          />
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                            {riderForm.calculationType === 'PERCENTAGE' ? '%' : 'ETB'}
-                          </span>
-                        </div>
-                      </div>
-                      <div>
-                        <Label>Calculation Type</Label>
-                        <Select 
-                          value={riderForm.calculationType}
-                          onValueChange={(val) => setRiderForm({...riderForm, calculationType: val})}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="PERCENTAGE">Percentage of Coverage</SelectItem>
-                            <SelectItem value="FIXED">Fixed Amount</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                      <Textarea value={riderForm.description} onChange={(e) => setRiderForm({...riderForm, description: e.target.value})} rows={2} />
                     </div>
                     <div>
-                      <Label>Maximum Limit (ETB)</Label>
-                      <Input 
-                        type="number"
-                        value={riderForm.maxLimit}
-                        onChange={(e) => setRiderForm({...riderForm, maxLimit: e.target.value})}
-                        placeholder="Maximum payout limit"
-                      />
+                      <Label>Premium Rate *</Label>
+                      <Input type="number" step="0.001" value={riderForm.premiumRate} onChange={(e) => setRiderForm({...riderForm, premiumRate: parseFloat(e.target.value)})} />
                     </div>
-                    <Button onClick={handleRiderSubmit} className="w-full bg-[#1A3E6F]">
-                      {editingRider ? 'Update' : 'Create'}
-                    </Button>
+                    <div>
+                      <Label>Max Limit (ETB)</Label>
+                      <Input type="number" value={riderForm.maxLimit} onChange={(e) => setRiderForm({...riderForm, maxLimit: e.target.value})} />
+                    </div>
+                    <Button onClick={handleRiderSubmit} className="w-full bg-[#1A3E6F]">{editingRider ? 'Update' : 'Create'}</Button>
                   </div>
                 </DialogContent>
               </Dialog>
             </div>
-
             {riders.length === 0 ? (
-              <Card>
-                <CardContent className="text-center py-8">
-                  <FileText className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500">No riders configured for {selectedProduct.name}</p>
-                  <p className="text-sm text-gray-400 mt-1">Click "Add Rider" to configure optional coverages</p>
-                </CardContent>
-              </Card>
+              <Card><CardContent className="text-center py-8"><FileText className="h-12 w-12 text-gray-300 mx-auto mb-3" /><p className="text-gray-500">No riders configured</p></CardContent></Card>
             ) : (
               <div className="grid gap-4">
                 {riders.map((rider) => (
                   <Card key={rider.id} className="hover:shadow-md transition-shadow">
                     <CardContent className="p-4">
                       <div className="flex justify-between items-start">
-                        <div className="flex-1">
+                        <div>
                           <h3 className="font-semibold text-lg">{rider.riderName}</h3>
-                          <p className="text-sm text-gray-600 mt-1">{rider.description}</p>
-                          <div className="flex gap-4 mt-2">
-                            <Badge className="bg-blue-100 text-blue-800">
-                              {rider.calculationType === 'PERCENTAGE' 
-                                ? `${(rider.premiumRate * 100).toFixed(2)}% of coverage` 
-                                : `ETB ${rider.premiumRate.toLocaleString()} fixed`}
-                            </Badge>
-                            {rider.maxLimit && (
-                              <Badge className="bg-purple-100 text-purple-800">
-                                Max: ETB {rider.maxLimit.toLocaleString()}
-                              </Badge>
-                            )}
-                          </div>
+                          <p className="text-sm text-gray-600">{rider.description}</p>
+                          <Badge className="bg-blue-100 text-blue-800 mt-2">{(rider.premiumRate * 100).toFixed(2)}%</Badge>
                         </div>
                         <div className="flex gap-2">
                           <Button variant="ghost" size="sm" onClick={() => {
                             setEditingRider(rider);
-                            setRiderForm({
-                              riderName: rider.riderName,
-                              description: rider.description || '',
-                              premiumRate: rider.premiumRate,
-                              calculationType: rider.calculationType,
-                              minCoverage: rider.minCoverage?.toString() || '',
-                              maxCoverage: rider.maxCoverage?.toString() || '',
-                              maxLimit: rider.maxLimit?.toString() || '',
-                              isOptional: rider.isOptional,
-                              displayOrder: rider.displayOrder,
-                              isActive: rider.isActive
-                            });
+                            setRiderForm({...rider, premiumRate: rider.premiumRate, maxLimit: rider.maxLimit?.toString() || ''});
                             setIsRiderDialogOpen(true);
-                          }}>
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={async () => {
-                            if (confirm('Delete this rider?')) {
-                              await axiosInstance.delete(`/riders/${rider.id}`);
-                              fetchRidersForProduct();
-                              toast.success('Rider deleted');
-                            }
-                          }}>
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
+                          }}><Edit2 className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="sm" onClick={async () => { await axiosInstance.delete(`/riders/${rider.id}`); fetchRidersForProduct(); toast.success('Rider deleted'); }}><Trash2 className="h-4 w-4 text-red-500" /></Button>
                         </div>
                       </div>
                     </CardContent>
