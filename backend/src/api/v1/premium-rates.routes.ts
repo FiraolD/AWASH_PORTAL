@@ -14,8 +14,6 @@ router.get('/', authenticate, authorizeExecutives, async (req, res) => {
         p.name AS "productName",
         p.code AS "productCode",
         pr."productType",
-        pr."productType",
-        pr."baseRate",
         pr."coverageTier",
         pr."baseRate",
         pr."minCoverage",
