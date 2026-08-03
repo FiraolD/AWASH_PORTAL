@@ -56,12 +56,7 @@ router.get('/product/:productId', authenticate, async (req: AuthRequest, res: Re
 // Create
 router.post('/', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
-    const { productType, rateName, baseRate, minRate, maxRate, calculationType, isPercentage, effectiveFrom, effectiveTo } = req.body;
-    if (!productType || !rateName || baseRate === undefined || !calculationType) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
-const {
+    const {
   productId,
   productType,
   coverageTier,
@@ -70,6 +65,10 @@ const {
   maxCoverage,
   riskFactor
 } = req.body;
+
+    if (!productType || !coverageTier || baseRate === undefined || !minCoverage || !maxCoverage || !riskFactor) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
 
 const result = await pool.query(
 `
