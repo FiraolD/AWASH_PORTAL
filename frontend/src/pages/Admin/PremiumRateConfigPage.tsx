@@ -178,7 +178,7 @@ export default function PremiumRateConfigPage() {
 
     try {
       const payload = {
-        productId: selectedProductId || null,
+        productId: selectedProductId || undefined,
         productType: selectedProduct?.code || selectedProduct?.category || 'GENERAL',
         coverageTier: rateForm.coverageTier,
         baseRate: Number(rateForm.baseRate),
@@ -313,20 +313,20 @@ export default function PremiumRateConfigPage() {
   };
 
   const resetRiderForm = () => {
-    setEditingRider(null);
-    setRiderForm({
-      riderName: '',
-      description: '',
-      premiumRate: 0,
-      calculationType: 'PERCENTAGE',
-      minCoverage: '',
-      maxCoverage: '',
-      maxLimit: '',
-      isOptional: true,
-      displayOrder: 0,
-      isActive: true,
-    });
-  };
+  setEditingRider(null);
+  setRiderForm({
+    riderName: '',
+    description: '',
+    premiumRate: 0,
+    calculationType: 'PERCENTAGE',
+    minCoverage: '',
+    maxCoverage: '',
+    maxLimit: '',
+    isOptional: true,
+    displayOrder: 0,
+    isActive: true,
+  });
+};
 
   const getProductIcon = (code: string) => {
     switch (code) {
@@ -653,10 +653,23 @@ export default function PremiumRateConfigPage() {
                         </div>
                         <div className="flex gap-2">
                           <Button variant="ghost" size="sm" onClick={() => {
-                            setEditingRider(rider);
-                            setRiderForm({...rider, premiumRate: rider.premiumRate, maxLimit: rider.maxLimit?.toString() || ''});
-                            setIsRiderDialogOpen(true);
-                          }}><Edit2 className="h-4 w-4" /></Button>
+  setEditingRider(rider);
+setRiderForm({
+  riderName: rider.riderName,
+  description: rider.description || '',
+  premiumRate: rider.premiumRate,
+  calculationType: rider.calculationType,
+  minCoverage: rider.minCoverage?.toString() || '',
+  maxCoverage: rider.maxCoverage?.toString() || '',
+  maxLimit: rider.maxLimit?.toString() || '',
+  isOptional: rider.isOptional,
+  displayOrder: rider.displayOrder,
+  isActive: rider.isActive,
+});
+  setIsRiderDialogOpen(true);
+}}>
+  <Edit2 className="h-4 w-4" />
+</Button>
                           <Button variant="ghost" size="sm" onClick={async () => { await axiosInstance.delete(`/riders/${rider.id}`); fetchRidersForProduct(); toast.success('Rider deleted'); }}><Trash2 className="h-4 w-4 text-red-500" /></Button>
                         </div>
                       </div>
