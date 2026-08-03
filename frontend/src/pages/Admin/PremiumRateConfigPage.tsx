@@ -35,7 +35,7 @@ interface Product {
   name: string;
   code: string;
   category: string;
-  is_active: boolean;
+  isActive: boolean;
 }
 
 interface Peril {
@@ -80,10 +80,10 @@ export default function PremiumRateConfigPage() {
   const [isRateDialogOpen, setIsRateDialogOpen] = React.useState(false);
   const [editingRate, setEditingRate] = React.useState<PremiumRate | null>(null);
   const [rateForm, setRateForm] = React.useState({
-    coverage_tier: '',
+     coverageTier: '',
     baseRate: 0,
-    min_coverage: 0,
-    max_coverage: '',
+    minCoverage: 0,
+    maxCoverage: '',
     risk_factor: 1.0,
     is_active: true
   });
@@ -169,20 +169,20 @@ export default function PremiumRateConfigPage() {
 
   // Rate CRUD
   const handleRateSubmit = async () => {
-    if (!rateForm.coverage_tier || rateForm.baseRate <= 0 || rateForm.min_coverage <= 0) {
+    if (!rateForm. coverageTier || rateForm.baseRate <= 0 || rateForm.minCoverage <= 0) {
       toast.error('Please fill all required fields');
       return;
     }
 
     try {
       const payload = {
-        product_id: selectedProductId,
-        coverage_tier: rateForm.coverage_tier,
+        productId: selectedProductId,
+        coverageTier: rateForm. coverageTier,
         baseRate: rateForm.baseRate,
-        min_coverage: rateForm.min_coverage,
-        max_coverage: rateForm.max_coverage ? parseFloat(rateForm.max_coverage) : null,
-        risk_factor: rateForm.risk_factor,
-        is_active: rateForm.is_active
+        minCoverage: rateForm.minCoverage,
+        maxCoverage: rateForm.maxCoverage ? parseFloat(rateForm.maxCoverage) : null,
+        riskFactor: rateForm.risk_factor,
+        isActive: rateForm.is_active
       };
 
       if (editingRate) {
@@ -277,12 +277,12 @@ export default function PremiumRateConfigPage() {
   const resetRateForm = () => {
     setEditingRate(null);
     setRateForm({
-      coverage_tier: '',
+      coverageTier: '',
       baseRate: 0,
-      min_coverage: 0,
-      max_coverage: '',
-      risk_factor: 1.0,
-      is_active: true
+      minCoverage: 0,
+      maxCoverage: '',
+      riskFactor: 1.0,
+      isActive: true
     });
   };
 
@@ -401,8 +401,8 @@ export default function PremiumRateConfigPage() {
                     <div>
                       <Label>Coverage Tier *</Label>
                       <Input 
-                        value={rateForm.coverage_tier}
-                        onChange={(e) => setRateForm({...rateForm, coverage_tier: e.target.value})}
+                        value={rateForm. coverageTier}
+                        onChange={(e) => setRateForm({...rateForm,  coverageTier: e.target.value})}
                         placeholder="e.g., Basic, Standard, Premium"
                       />
                     </div>
@@ -421,16 +421,16 @@ export default function PremiumRateConfigPage() {
                         <Label>Min Coverage (ETB) *</Label>
                         <Input 
                           type="number"
-                          value={rateForm.min_coverage}
-                          onChange={(e) => setRateForm({...rateForm, min_coverage: parseFloat(e.target.value)})}
+                          value={rateForm.minCoverage}
+                          onChange={(e) => setRateForm({...rateForm, minCoverage: parseFloat(e.target.value)})}
                         />
                       </div>
                       <div>
                         <Label>Max Coverage (ETB)</Label>
                         <Input 
                           type="number"
-                          value={rateForm.max_coverage}
-                          onChange={(e) => setRateForm({...rateForm, max_coverage: e.target.value})}
+                          value={rateForm.maxCoverage}
+                          onChange={(e) => setRateForm({...rateForm, maxCoverage: e.target.value})}
                           placeholder="Leave empty for unlimited"
                         />
                       </div>
@@ -474,9 +474,9 @@ export default function PremiumRateConfigPage() {
                     <CardContent className="p-4">
                       <div className="flex justify-between items-start">
                         <div>
-                          <h3 className="font-semibold text-lg">{rate.coverage_tier}</h3>
+                          <h3 className="font-semibold text-lg">{rate. coverageTier}</h3>
                           <p className="text-sm text-gray-500">
-                            Coverage: ETB {rate.min_coverage.toLocaleString()} - {rate.max_coverage ? rate.max_coverage.toLocaleString() : 'Unlimited'}
+                            Coverage: ETB {rate.minCoverage.toLocaleString()} - {rate.maxCoverage ? rate.maxCoverage.toLocaleString() : 'Unlimited'}
                           </p>
                           <div className="flex gap-4 mt-2">
                             <Badge className="bg-blue-100 text-blue-800">
@@ -491,10 +491,10 @@ export default function PremiumRateConfigPage() {
                           <Button variant="ghost" size="sm" onClick={() => {
                             setEditingRate(rate);
                             setRateForm({
-                              coverage_tier: rate.coverage_tier,
+                               coverageTier: rate. coverageTier,
                               baseRate: rate.baseRate,
-                              min_coverage: rate.min_coverage,
-                              max_coverage: rate.max_coverage?.toString() || '',
+                              minCoverage: rate.minCoverage,
+                              maxCoverage: rate.maxCoverage?.toString() || '',
                               risk_factor: rate.risk_factor,
                               is_active: rate.is_active
                             });
