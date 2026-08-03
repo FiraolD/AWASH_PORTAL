@@ -76,7 +76,7 @@ router.post('/', authenticate, authorize('MASTER_ADMIN'), async (req, res) => {
         id, "productId", "riderName", "description", "premiumRate", 
         "calculationType", "isOptional", "maxLimit", "displayOrder", "isActive", "createdAt", "updatedAt"
       ) VALUES (
-        gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW()
+        gen_random_uuid()::uuid, $1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW()
       ) RETURNING *
     `, [productId, riderName, description, premiumRate, calculationType, isOptional !== false, maxLimit || null, displayOrder || 0, isActive !== false]);
     
