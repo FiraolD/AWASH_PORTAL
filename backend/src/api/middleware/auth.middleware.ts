@@ -152,7 +152,7 @@ export const authenticate = async (
 
     // Verify user still exists in database
     const userResult = await pool.query(
-      `SELECT id, email, role, "firstName", "lastName", "status" 
+      `SELECT id, email, role, "firstName", "lastName", "isActive"
        FROM users WHERE id = $1`,
       [decoded.id]
     );
@@ -164,7 +164,7 @@ export const authenticate = async (
 
     const user = userResult.rows[0];
 
-    if (!user.status) {
+    if (!user.isActive) {
       res.status(403).json({ error: 'Account is deactivated. Contact admin.' });
       return;
     }
