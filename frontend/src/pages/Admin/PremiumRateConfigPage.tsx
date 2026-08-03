@@ -76,16 +76,16 @@ export default function PremiumRateConfigPage() {
   const [riders, setRiders] = React.useState<Rider[]>([]);
   const [activeTab, setActiveTab] = React.useState('rates');
   
-  // Rate form state
+  // Rate form state (fixed: camelCase)
   const [isRateDialogOpen, setIsRateDialogOpen] = React.useState(false);
   const [editingRate, setEditingRate] = React.useState<PremiumRate | null>(null);
   const [rateForm, setRateForm] = React.useState({
-     coverageTier: '',
+    coverageTier: '',
     baseRate: 0,
     minCoverage: 0,
     maxCoverage: '',
-    risk_factor: 1.0,
-    is_active: true
+    riskFactor: 1.0,
+    isActive: true
   });
 
   // Peril form state
@@ -135,7 +135,7 @@ export default function PremiumRateConfigPage() {
   const fetchRatesForProduct = async () => {
     try {
       const response = await axiosInstance.get(`/premium-rates/product/${selectedProductId}`);
-      // Update rates in store or local state
+      // Store handles the data
     } catch (error) {
       console.error('Failed to fetch rates:', error);
     }
@@ -167,23 +167,28 @@ export default function PremiumRateConfigPage() {
     setSelectedProduct(product || null);
   };
 
-  // Rate CRUD
+  // ==========================================================================
+  // Rate CRUD (FIXED)
+  // ==========================================================================
   const handleRateSubmit = async () => {
-    if (!rateForm. coverageTier || rateForm.baseRate <= 0 || rateForm.minCoverage <= 0) {
+    if (!rateForm.coverageTier || rateForm.baseRate <= 0 || rateForm.minCoverage <= 0) {
       toast.error('Please fill all required fields');
       return;
     }
 
     try {
       const payload = {
-        productId: selectedProductId,
-        coverageTier: rateForm. coverageTier,
-        baseRate: rateForm.baseRate,
-        minCoverage: rateForm.minCoverage,
-        maxCoverage: rateForm.maxCoverage ? parseFloat(rateForm.maxCoverage) : null,
-        riskFactor: rateForm.risk_factor,
-        isActive: rateForm.is_active
+        productId: selectedProductId || null,
+        productType: selectedProduct?.code || selectedProduct?.category || 'GENERAL',
+        coverageTier: rateForm.coverageTier,
+        baseRate: Number(rateForm.baseRate),
+        minCoverage: Number(rateForm.minCoverage),
+        maxCoverage: rateForm.maxCoverage ? Number(rateForm.maxCoverage) : null,
+        riskFactor: Number(rateForm.riskFactor),
+        isActive: rateForm.isActive,
       };
+
+      console.log('[PremiumRateConfig] Submitting payload:', payload);
 
       if (editingRate) {
         await updateRate(editingRate.id, payload);
@@ -194,13 +199,16 @@ export default function PremiumRateConfigPage() {
       }
       setIsRateDialogOpen(false);
       resetRateForm();
-      fetchRates();
+      fetchRatesForProduct();
     } catch (error: any) {
+      console.error('[PremiumRateConfig] Submit error:', error.response?.data || error.message);
       toast.error(error.response?.data?.error || 'Failed to save rate');
     }
   };
 
+  // ==========================================================================
   // Peril CRUD
+  // ==========================================================================
   const handlePerilSubmit = async () => {
     if (!perilForm.perilName || perilForm.premiumRate <= 0) {
       toast.error('Please fill all required fields');
@@ -212,14 +220,14 @@ export default function PremiumRateConfigPage() {
         productId: selectedProductId,
         perilName: perilForm.perilName,
         description: perilForm.description,
-        premiumRate: perilForm.premiumRate,
+        premiumRate: Number(perilForm.premiumRate),
         calculationType: perilForm.calculationType,
-        minCoverage: perilForm.minCoverage ? parseFloat(perilForm.minCoverage) : null,
-        maxCoverage: perilForm.maxCoverage ? parseFloat(perilForm.maxCoverage) : null,
+        minCoverage: perilForm.minCoverage ? Number(perilForm.minCoverage) : null,
+        maxCoverage: perilForm.maxCoverage ? Number(perilForm.maxCoverage) : null,
         isDefault: perilForm.isDefault,
         isOptional: perilForm.isOptional,
         displayOrder: perilForm.displayOrder,
-        isActive: perilForm.isActive
+        isActive: perilForm.isActive,
       };
 
       if (editingPeril) {
@@ -237,7 +245,9 @@ export default function PremiumRateConfigPage() {
     }
   };
 
+  // ==========================================================================
   // Rider CRUD
+  // ==========================================================================
   const handleRiderSubmit = async () => {
     if (!riderForm.riderName || riderForm.premiumRate <= 0) {
       toast.error('Please fill all required fields');
@@ -249,14 +259,14 @@ export default function PremiumRateConfigPage() {
         productId: selectedProductId,
         riderName: riderForm.riderName,
         description: riderForm.description,
-        premiumRate: riderForm.premiumRate,
+        premiumRate: Number(riderForm.premiumRate),
         calculationType: riderForm.calculationType,
-        minCoverage: riderForm.minCoverage ? parseFloat(riderForm.minCoverage) : null,
-        maxCoverage: riderForm.maxCoverage ? parseFloat(riderForm.maxCoverage) : null,
-        maxLimit: riderForm.maxLimit ? parseFloat(riderForm.maxLimit) : null,
+        minCoverage: riderForm.minCoverage ? Number(riderForm.minCoverage) : null,
+        maxCoverage: riderForm.maxCoverage ? Number(riderForm.maxCoverage) : null,
+        maxLimit: riderForm.maxLimit ? Number(riderForm.maxLimit) : null,
         isOptional: riderForm.isOptional,
         displayOrder: riderForm.displayOrder,
-        isActive: riderForm.isActive
+        isActive: riderForm.isActive,
       };
 
       if (editingRider) {
@@ -274,6 +284,9 @@ export default function PremiumRateConfigPage() {
     }
   };
 
+  // ==========================================================================
+  // Reset functions (FIXED)
+  // ==========================================================================
   const resetRateForm = () => {
     setEditingRate(null);
     setRateForm({
@@ -282,7 +295,7 @@ export default function PremiumRateConfigPage() {
       minCoverage: 0,
       maxCoverage: '',
       riskFactor: 1.0,
-      isActive: true
+      isActive: true,
     });
   };
 
@@ -298,7 +311,7 @@ export default function PremiumRateConfigPage() {
       isDefault: false,
       isOptional: true,
       displayOrder: 0,
-      isActive: true
+      isActive: true,
     });
   };
 
@@ -314,7 +327,7 @@ export default function PremiumRateConfigPage() {
       maxLimit: '',
       isOptional: true,
       displayOrder: 0,
-      isActive: true
+      isActive: true,
     });
   };
 
@@ -330,7 +343,7 @@ export default function PremiumRateConfigPage() {
   };
 
   // Filter rates for selected product
-  const productRates = rates.filter(r => r.product_id === selectedProductId);
+  const productRates = rates.filter(r => r.productId === selectedProductId || r.product_id === selectedProductId);
 
   return (
     <div className="space-y-6">
@@ -401,8 +414,8 @@ export default function PremiumRateConfigPage() {
                     <div>
                       <Label>Coverage Tier *</Label>
                       <Input 
-                        value={rateForm. coverageTier}
-                        onChange={(e) => setRateForm({...rateForm,  coverageTier: e.target.value})}
+                        value={rateForm.coverageTier}
+                        onChange={(e) => setRateForm({...rateForm, coverageTier: e.target.value})}
                         placeholder="e.g., Basic, Standard, Premium"
                       />
                     </div>
@@ -440,15 +453,15 @@ export default function PremiumRateConfigPage() {
                       <Input 
                         type="number"
                         step="0.1"
-                        value={rateForm.risk_factor}
-                        onChange={(e) => setRateForm({...rateForm, risk_factor: parseFloat(e.target.value)})}
+                        value={rateForm.riskFactor}
+                        onChange={(e) => setRateForm({...rateForm, riskFactor: parseFloat(e.target.value)})}
                       />
                     </div>
                     <div className="flex items-center justify-between">
                       <Label>Active</Label>
                       <Switch 
-                        checked={rateForm.is_active}
-                        onCheckedChange={(val) => setRateForm({...rateForm, is_active: val})}
+                        checked={rateForm.isActive}
+                        onCheckedChange={(val) => setRateForm({...rateForm, isActive: val})}
                       />
                     </div>
                     <Button onClick={handleRateSubmit} className="w-full bg-[#1A3E6F]">
@@ -474,7 +487,7 @@ export default function PremiumRateConfigPage() {
                     <CardContent className="p-4">
                       <div className="flex justify-between items-start">
                         <div>
-                          <h3 className="font-semibold text-lg">{rate. coverageTier}</h3>
+                          <h3 className="font-semibold text-lg">{rate.coverageTier}</h3>
                           <p className="text-sm text-gray-500">
                             Coverage: ETB {rate.minCoverage.toLocaleString()} - {rate.maxCoverage ? rate.maxCoverage.toLocaleString() : 'Unlimited'}
                           </p>
@@ -483,7 +496,7 @@ export default function PremiumRateConfigPage() {
                               Rate: {(rate.baseRate * 100).toFixed(2)}%
                             </Badge>
                             <Badge className="bg-purple-100 text-purple-800">
-                              Risk: {rate.risk_factor}x
+                              Risk: {rate.riskFactor}x
                             </Badge>
                           </div>
                         </div>
@@ -491,12 +504,12 @@ export default function PremiumRateConfigPage() {
                           <Button variant="ghost" size="sm" onClick={() => {
                             setEditingRate(rate);
                             setRateForm({
-                               coverageTier: rate. coverageTier,
+                              coverageTier: rate.coverageTier,
                               baseRate: rate.baseRate,
                               minCoverage: rate.minCoverage,
                               maxCoverage: rate.maxCoverage?.toString() || '',
-                              risk_factor: rate.risk_factor,
-                              is_active: rate.is_active
+                              riskFactor: rate.riskFactor,
+                              isActive: rate.isActive,
                             });
                             setIsRateDialogOpen(true);
                           }}>
