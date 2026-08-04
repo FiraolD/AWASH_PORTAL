@@ -3,7 +3,7 @@
 import { Router, Response } from 'express';
 import { authenticate, authorizeExecutives } from '../../middleware/auth.middleware';
 import { AuthRequest } from '../../middleware/auth.middleware';
-import pool from '../../config/database';
+import pool from '../../lib/db.js';
 
 const router = Router();
 
