@@ -52,14 +52,14 @@ interface Product {
 }
 
 type RulePayload = {
-  ruleName: string;          // Changed from rule_name
-  productType: string;       // Changed from product_type
-  minSumInsured: number | null;   // Changed from min_sum_insured
-  maxSumInsured: number | null;   // Changed from max_sum_insured
-  minRiskScore: number | null;    // Changed from min_risk_score
-  maxRiskScore: number | null;    // Changed from max_risk_score
-  approvalLevels: string[];       // Changed from approval_levels
-  isActive: boolean;              // Changed from is_active
+  ruleName: string;
+  productType: string;
+  minSumInsured: number | null;
+  maxSumInsured: number | null;
+  minRiskScore: number | null;
+  maxRiskScore: number | null;
+  approvalLevels: string[];
+  isActive: boolean;
 };
 
 type RoleLevelPayload = {
@@ -215,7 +215,7 @@ export default function ApprovalRulesConfigPage() {
   // ==========================================================================
   // RULE HANDLERS
   // ==========================================================================
-  function buildPayload(rule: ApprovalRule): RulePayload {
+function buildPayload(rule: ApprovalRule): RulePayload {
   return {
     ruleName: rule.ruleName,
     productType: rule.productType,
@@ -267,15 +267,15 @@ export default function ApprovalRulesConfigPage() {
     return;
   }
   const payload: RulePayload = {
-    ruleName: ruleForm.ruleName.trim(),
-    productType: ruleForm.productType,
-    minSumInsured: toOptionalNumber(ruleForm.minSumInsured),
-    maxSumInsured: toOptionalNumber(ruleForm.maxSumInsured),
-    minRiskScore: toOptionalNumber(ruleForm.minRiskScore),
-    maxRiskScore: toOptionalNumber(ruleForm.maxRiskScore),
-    approvalLevels: ruleForm.approvalLevels,
-    isActive: ruleForm.isActive,
-  };
+  ruleName: ruleForm.ruleName.trim(),
+  productType: ruleForm.productType,
+  minSumInsured: toOptionalNumber(ruleForm.minSumInsured),
+  maxSumInsured: toOptionalNumber(ruleForm.maxSumInsured),
+  minRiskScore: toOptionalNumber(ruleForm.minRiskScore),
+  maxRiskScore: toOptionalNumber(ruleForm.maxRiskScore),
+  approvalLevels: ruleForm.approvalLevels,
+  isActive: ruleForm.isActive,
+};
   saveRuleMutation.mutate({ id: editingRule?.id, payload });
 };
 
