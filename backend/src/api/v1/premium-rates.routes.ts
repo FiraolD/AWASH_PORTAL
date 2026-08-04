@@ -109,38 +109,81 @@ RETURNING *
 });
 
 // Update
-router.put('/:id', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
-  try {
-    const id = String(req.params.id);
-    const oldResult = await pool.query('SELECT * FROM premium_rates WHERE id=$1', [id]);
-    if (oldResult.rows.length === 0) return res.status(404).json({ error: 'Not found' });
-    const oldData = oldResult.rows[0];
-    const d = req.body;
+router.put(
+  '/:id',
+  authenticate,
+  authorizeExecutives,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const id = String(req.params.id);
 
-    await pool.query(
-      `UPDATE premium_rates
-SET
-    "productId"=$1,
-    "productType"=$2,
-    "coverageTier"=$3,
-    "baseRate"=$4,
-    "minCoverage"=$5,
-    "maxCoverage"=$6,
-    "riskFactor"=$7,
-    "isActive"=$8,
-    "updatedAt"=NOW()
-WHERE id=$9`,
-      [d.productType || oldData.productType, d.rateName || oldData.rateName, d.baseRate !== undefined ? d.baseRate : oldData.baseRate, d.minRate !== undefined ? d.minRate : oldData.minRate, d.maxRate !== undefined ? d.maxRate : oldData.maxRate, d.calculationType || oldData.calculationType, d.isPercentage !== undefined ? d.isPercentage : oldData.isPercentage, d.effectiveFrom !== undefined ? d.effectiveFrom : oldData.effectiveFrom, d.effectiveTo !== undefined ? d.effectiveTo : oldData.effectiveTo, d.isActive !== undefined ? d.isActive : oldData.isActive, id]
-    );
+      // Check if record exists
+      const oldResult = await pool.query(
+        'SELECT * FROM premium_rates WHERE id = $1',
+        [id]
+      );
+      
+      if (oldResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Premium rate not found' });
+      }
 
-    const updated = await pool.query('SELECT * FROM premium_rates WHERE id=$1', [id]);
-    await createAuditLog(req.user!.id, req.user!.email, req.user!.role, 'UPDATE', 'PREMIUM_RATE', id, oldData, updated.rows[0], getClientIp(req), getHeaderString(req, 'user-agent'));
-    res.json(updated.rows[0]);
-  } catch (error) {
-    console.error('[PremiumRates] Update error:', error);
-    res.status(500).json({ error: 'Failed to update premium rate' });
+      const oldData = oldResult.rows[0];
+      const d = req.body;
+
+      // Update with matching placeholders and values
+      await pool.query(
+        `UPDATE premium_rates
+         SET
+           "productId"   = $1,
+           "productType" = $2,
+           "rateName"    = $3,
+           "baseRate"    = $4,
+           "minCoverage" = $5,
+           "maxCoverage" = $6,
+           "riskFactor"  = $7,
+           "isActive"    = $8,
+           "updatedAt"   = NOW()
+         WHERE id = $9`,
+        [
+          d.productId   ?? oldData.productId,      // $1
+          d.productType ?? oldData.productType,     // $2
+          d.rateName    ?? oldData.rateName,        // $3
+          d.baseRate    ?? oldData.baseRate,        // $4
+          d.minCoverage ?? oldData.minCoverage,     // $5
+          d.maxCoverage ?? oldData.maxCoverage,     // $6
+          d.riskFactor  ?? oldData.riskFactor,      // $7
+          d.isActive    ?? oldData.isActive,        // $8
+          id,                                       // $9
+        ]
+      );
+
+      // Fetch updated record
+      const updated = await pool.query(
+        'SELECT * FROM premium_rates WHERE id = $1',
+        [id]
+      );
+
+      // Audit log
+      await createAuditLog(
+        req.user!.id,
+        req.user!.email,
+        req.user!.role,
+        'UPDATE',
+        'PREMIUM_RATE',
+        id,
+        oldData,
+        updated.rows[0],
+        getClientIp(req),
+        getHeaderString(req, 'user-agent')
+      );
+
+      res.json(updated.rows[0]);
+    } catch (error) {
+      console.error('[PremiumRates] Update error:', error);
+      res.status(500).json({ error: 'Failed to update premium rate' });
+    }
   }
-});
+);
 
 // Delete
 router.delete('/:id', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
