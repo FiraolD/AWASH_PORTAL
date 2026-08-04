@@ -183,28 +183,6 @@ router.put(
   }
 );
 
-      // Audit log
-      await createAuditLog(
-        req.user!.id,
-        req.user!.email,
-        req.user!.role,
-        'UPDATE',
-        'PREMIUM_RATE',
-        id,
-        oldData,
-        updated.rows[0],
-        getClientIp(req),
-        getHeaderString(req, 'user-agent')
-      );
-
-      res.json(updated.rows[0]);
-    } catch (error) {
-      console.error('[PremiumRates] Update error:', error);
-      res.status(500).json({ error: 'Failed to update premium rate' });
-    }
-  }
-);
-
 // Delete
 router.delete('/:id', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
   try {
