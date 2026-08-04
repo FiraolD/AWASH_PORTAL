@@ -1,8 +1,7 @@
 ﻿// src/api/v1/approval.routes.ts
 
 import { Router, Response } from 'express';
-import { authenticate, authorizeExecutives } from '../../middleware/auth.middleware';
-import { AuthRequest } from '../../middleware/auth.middleware';
+import { AuthRequest, authenticate, authorizeExecutives } from '../../middleware/auth.middleware.js';
 import pool from '../../lib/db.js';
 
 const router = Router();
