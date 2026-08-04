@@ -26,18 +26,22 @@ import {
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
+// ---------------------------------------------------------------------------
+// Types – camelCase to match backend
+// ---------------------------------------------------------------------------
 interface AssignmentRule {
   id: string;
-  rule_name: string;
-  product_type: string;
-  min_amount: number;
-  max_amount: number | null;
-  assigned_role: string;
+  ruleName: string;        // ✅ camelCase
+  productType: string;     // ✅ camelCase
+  minAmount: number;       // ✅ camelCase
+  maxAmount: number | null; // ✅ camelCase
+  assignedRole: string;    // ✅ camelCase
   priority: number;
-  is_active: boolean;
+  isActive: boolean;       // ✅ camelCase
 }
 
 const PRODUCT_TYPES = ['AUTO', 'HOME', 'LIFE', 'HEALTH', 'ALL'];
+
 const CLAIM_ROLES = [
   'CLAIM_OFFICER_I',
   'CLAIM_OFFICER_II',
@@ -45,29 +49,38 @@ const CLAIM_ROLES = [
   'SUPERVISOR_CLAIMS',
   'MANAGER_CLAIMS',
   'HEAD_CLAIMS',
-  'CLAIMS_ADMIN'
+  'CLAIMS_ADMIN',
 ];
 
+// ---------------------------------------------------------------------------
+// Main Component
+// ---------------------------------------------------------------------------
 export default function ClaimsAssignmentConfigPage() {
   const [rules, setRules] = React.useState<AssignmentRule[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [editingRule, setEditingRule] = React.useState<AssignmentRule | null>(null);
+
+  // Form state – camelCase
   const [formData, setFormData] = React.useState({
-    rule_name: '',
-    product_type: 'ALL',
-    min_amount: 0,
-    max_amount: '',
-    assigned_role: 'CLAIM_OFFICER_II',
+    ruleName: '',           // ✅ camelCase
+    productType: 'ALL',     // ✅ camelCase
+    minAmount: 0,           // ✅ camelCase
+    maxAmount: '',          // ✅ camelCase (string for input)
+    assignedRole: 'CLAIM_OFFICER_II', // ✅ camelCase
     priority: 1,
-    is_active: true
+    isActive: true,         // ✅ camelCase
   });
+
   const { token } = useAuthStore();
 
   React.useEffect(() => {
     fetchRules();
   }, []);
 
+  // --------------------------------------------------------------------------
+  // Auth headers
+  // --------------------------------------------------------------------------
   const getAuthHeaders = () => {
     const stored = localStorage.getItem('awash-auth-storage');
     let authToken = token;
@@ -78,11 +91,14 @@ export default function ClaimsAssignmentConfigPage() {
     return { Authorization: `Bearer ${authToken}` };
   };
 
+  // --------------------------------------------------------------------------
+  // Fetch rules
+  // --------------------------------------------------------------------------
   const fetchRules = async () => {
     try {
       setLoading(true);
       const response = await axios.get(`${API_URL}/claims-assignment`, {
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
       });
       setRules(response.data);
     } catch (error) {
@@ -93,28 +109,35 @@ export default function ClaimsAssignmentConfigPage() {
     }
   };
 
+  // --------------------------------------------------------------------------
+  // Save (create/update) rule
+  // --------------------------------------------------------------------------
   const handleSubmit = async () => {
-    if (!formData.rule_name || !formData.assigned_role) {
+    if (!formData.ruleName || !formData.assignedRole) {
       toast.error('Please fill all required fields');
       return;
     }
 
     try {
+      // Build payload with camelCase field names
       const payload = {
-        ...formData,
-        max_amount: formData.max_amount ? parseFloat(formData.max_amount) : null,
-        min_amount: parseFloat(formData.min_amount.toString()),
-        priority: parseInt(formData.priority.toString())
+        ruleName: formData.ruleName,
+        productType: formData.productType,
+        minAmount: parseFloat(formData.minAmount.toString()),
+        maxAmount: formData.maxAmount ? parseFloat(formData.maxAmount) : null,
+        assignedRole: formData.assignedRole,
+        priority: parseInt(formData.priority.toString()),
+        isActive: formData.isActive,
       };
 
       if (editingRule) {
         await axios.put(`${API_URL}/claims-assignment/${editingRule.id}`, payload, {
-          headers: getAuthHeaders()
+          headers: getAuthHeaders(),
         });
         toast.success('Assignment rule updated successfully');
       } else {
         await axios.post(`${API_URL}/claims-assignment/`, payload, {
-          headers: getAuthHeaders()
+          headers: getAuthHeaders(),
         });
         toast.success('Assignment rule created successfully');
       }
@@ -127,11 +150,14 @@ export default function ClaimsAssignmentConfigPage() {
     }
   };
 
+  // --------------------------------------------------------------------------
+  // Delete rule
+  // --------------------------------------------------------------------------
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this rule?')) return;
     try {
       await axios.delete(`${API_URL}/claims-assignment/${id}`, {
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
       });
       toast.success('Assignment rule deleted successfully');
       fetchRules();
@@ -141,33 +167,42 @@ export default function ClaimsAssignmentConfigPage() {
     }
   };
 
+  // --------------------------------------------------------------------------
+  // Edit rule – populate form with camelCase fields
+  // --------------------------------------------------------------------------
   const handleEdit = (rule: AssignmentRule) => {
     setEditingRule(rule);
     setFormData({
-      rule_name: rule.rule_name,
-      product_type: rule.product_type,
-      min_amount: rule.min_amount,
-      max_amount: rule.max_amount?.toString() || '',
-      assigned_role: rule.assigned_role,
+      ruleName: rule.ruleName,
+      productType: rule.productType,
+      minAmount: rule.minAmount,
+      maxAmount: rule.maxAmount?.toString() || '',
+      assignedRole: rule.assignedRole,
       priority: rule.priority,
-      is_active: rule.is_active
+      isActive: rule.isActive,
     });
     setIsDialogOpen(true);
   };
 
+  // --------------------------------------------------------------------------
+  // Reset form
+  // --------------------------------------------------------------------------
   const resetForm = () => {
     setEditingRule(null);
     setFormData({
-      rule_name: '',
-      product_type: 'ALL',
-      min_amount: 0,
-      max_amount: '',
-      assigned_role: 'CLAIM_OFFICER_II',
+      ruleName: '',
+      productType: 'ALL',
+      minAmount: 0,
+      maxAmount: '',
+      assignedRole: 'CLAIM_OFFICER_II',
       priority: 1,
-      is_active: true
+      isActive: true,
     });
   };
 
+  // --------------------------------------------------------------------------
+  // Loading state
+  // --------------------------------------------------------------------------
   if (loading) {
     return (
       <div className="flex justify-center items-center h-96">
@@ -179,12 +214,18 @@ export default function ClaimsAssignmentConfigPage() {
     );
   }
 
+  // ==========================================================================
+  // RENDER
+  // ==========================================================================
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-[#1A3E6F]">Claims Assignment Configuration</h1>
-          <p className="text-gray-500 mt-1">Configure which claim officer handles claims based on sum insured amount</p>
+          <p className="text-gray-500 mt-1">
+            Configure which claim officer handles claims based on sum insured amount
+          </p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
@@ -194,84 +235,107 @@ export default function ClaimsAssignmentConfigPage() {
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>{editingRule ? 'Edit Assignment Rule' : 'Add Assignment Rule'}</DialogTitle>
+              <DialogTitle>
+                {editingRule ? 'Edit Assignment Rule' : 'Add Assignment Rule'}
+              </DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
+              {/* Rule Name */}
               <div className="space-y-2">
                 <Label>Rule Name *</Label>
-                <Input 
-                  value={formData.rule_name}
-                  onChange={(e) => setFormData({...formData, rule_name: e.target.value})}
+                <Input
+                  value={formData.ruleName}
+                  onChange={(e) => setFormData({ ...formData, ruleName: e.target.value })}
                   placeholder="e.g., Low Value Auto Claims"
                 />
               </div>
+
+              {/* Product Type */}
               <div className="space-y-2">
                 <Label>Product Type *</Label>
-                <Select 
-                  value={formData.product_type}
-                  onValueChange={(val) => setFormData({...formData, product_type: val})}
+                <Select
+                  value={formData.productType}
+                  onValueChange={(val) => setFormData({ ...formData, productType: val })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select product type" />
                   </SelectTrigger>
                   <SelectContent>
-                    {PRODUCT_TYPES.map(type => (
+                    {PRODUCT_TYPES.map((type) => (
                       <SelectItem key={type} value={type}>{type}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Amount Range */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Min Amount (ETB)</Label>
-                  <Input 
+                  <Input
                     type="number"
-                    value={formData.min_amount}
-                    onChange={(e) => setFormData({...formData, min_amount: parseFloat(e.target.value)})}
+                    value={formData.minAmount}
+                    onChange={(e) =>
+                      setFormData({ ...formData, minAmount: parseFloat(e.target.value) || 0 })
+                    }
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>Max Amount (ETB)</Label>
-                  <Input 
+                  <Input
                     type="number"
-                    value={formData.max_amount}
-                    onChange={(e) => setFormData({...formData, max_amount: e.target.value})}
+                    value={formData.maxAmount}
+                    onChange={(e) =>
+                      setFormData({ ...formData, maxAmount: e.target.value })
+                    }
                     placeholder="Leave empty for unlimited"
                   />
                 </div>
               </div>
+
+              {/* Assign To Role */}
               <div className="space-y-2">
                 <Label>Assign To Role *</Label>
-                <Select 
-                  value={formData.assigned_role}
-                  onValueChange={(val) => setFormData({...formData, assigned_role: val})}
+                <Select
+                  value={formData.assignedRole}
+                  onValueChange={(val) => setFormData({ ...formData, assignedRole: val })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select role" />
                   </SelectTrigger>
                   <SelectContent>
-                    {CLAIM_ROLES.map(role => (
-                      <SelectItem key={role} value={role}>{role.replace('_', ' ')}</SelectItem>
+                    {CLAIM_ROLES.map((role) => (
+                      <SelectItem key={role} value={role}>
+                        {role.replace(/_/g, ' ')}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Priority */}
               <div className="space-y-2">
                 <Label>Priority</Label>
-                <Input 
+                <Input
                   type="number"
                   value={formData.priority}
-                  onChange={(e) => setFormData({...formData, priority: parseInt(e.target.value)})}
+                  onChange={(e) =>
+                    setFormData({ ...formData, priority: parseInt(e.target.value) || 1 })
+                  }
                   placeholder="Lower number = higher priority"
                 />
               </div>
+
+              {/* Active Toggle */}
               <div className="flex items-center justify-between">
                 <Label>Active</Label>
-                <Switch 
-                  checked={formData.is_active}
-                  onCheckedChange={(val) => setFormData({...formData, is_active: val})}
+                <Switch
+                  checked={formData.isActive}
+                  onCheckedChange={(val) => setFormData({ ...formData, isActive: val })}
                 />
               </div>
+
+              {/* Buttons */}
               <div className="flex gap-3 pt-4">
                 <Button onClick={handleSubmit} className="flex-1 bg-[#1A3E6F]">
                   {editingRule ? 'Update' : 'Create'}
@@ -285,10 +349,13 @@ export default function ClaimsAssignmentConfigPage() {
         </Dialog>
       </div>
 
+      {/* Rules Table */}
       <Card>
         <CardHeader>
           <CardTitle>Assignment Rules</CardTitle>
-          <CardDescription>Claims are automatically assigned to officers based on these rules</CardDescription>
+          <CardDescription>
+            Claims are automatically assigned to officers based on these rules
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {rules.length === 0 ? (
@@ -314,20 +381,27 @@ export default function ClaimsAssignmentConfigPage() {
                 <tbody className="divide-y">
                   {rules.map((rule) => (
                     <tr key={rule.id} className="hover:bg-gray-50">
-                      <td className="py-3 font-medium">{rule.rule_name}</td>
+                      <td className="py-3 font-medium">{rule.ruleName}</td>
                       <td className="py-3">
-                        <Badge variant="outline">{rule.product_type}</Badge>
-                       </td>
+                        <Badge variant="outline">{rule.productType}</Badge>
+                      </td>
                       <td className="py-3">
-                        {rule.min_amount.toLocaleString()} - {rule.max_amount ? rule.max_amount.toLocaleString() : 'Unlimited'}
-                       </td>
-                      <td className="py-3">{rule.assigned_role.replace('_', ' ')}</td>
+                        {rule.minAmount?.toLocaleString() ?? 0} -{' '}
+                        {rule.maxAmount ? rule.maxAmount.toLocaleString() : 'Unlimited'}
+                      </td>
+                      <td className="py-3">{rule.assignedRole?.replace(/_/g, ' ')}</td>
                       <td className="py-3">{rule.priority}</td>
                       <td className="py-3">
-                        <Badge className={rule.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
-                          {rule.is_active ? 'Active' : 'Inactive'}
+                        <Badge
+                          className={
+                            rule.isActive
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-gray-100 text-gray-800'
+                          }
+                        >
+                          {rule.isActive ? 'Active' : 'Inactive'}
                         </Badge>
-                       </td>
+                      </td>
                       <td className="py-3">
                         <div className="flex gap-2">
                           <Button variant="ghost" size="sm" onClick={() => handleEdit(rule)}>
@@ -337,8 +411,8 @@ export default function ClaimsAssignmentConfigPage() {
                             <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
                         </div>
-                       </td>
-                     </tr>
+                      </td>
+                    </tr>
                   ))}
                 </tbody>
               </table>
@@ -347,6 +421,7 @@ export default function ClaimsAssignmentConfigPage() {
         </CardContent>
       </Card>
 
+      {/* Info box */}
       <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
         <div className="flex items-start gap-3">
           <DollarSign className="h-5 w-5 text-blue-600 mt-0.5" />
