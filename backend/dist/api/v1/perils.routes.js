@@ -27,7 +27,7 @@ router.post('/', authenticate, authorize('MASTER_ADMIN'), async (req, res) => {
         "minCoverage", "maxCoverage", "isDefault", "isOptional", "displayOrder", 
         "isActive", "createdAt", "updatedAt"
       ) VALUES (
-        gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW()
+        gen_random_uuid()::uuid, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW()
       ) RETURNING *
     `, [productId, perilName, description, premiumRate, calculationType,
             minCoverage, maxCoverage, isDefault || false, isOptional !== false,

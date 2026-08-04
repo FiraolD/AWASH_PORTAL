@@ -1,3 +1,4 @@
+// src/server.ts
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -21,15 +22,22 @@ app.set('trust proxy', 1);
 // CORS CONFIGURATION
 // ========================
 app.use(cors({
-  origin: [
-    'https://awash-portal.vercel.app',
-    'https://awash-portal.onrender.com',
-    'http://localhost:5173',
-    'http://localhost:3011',
-  ],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+    origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) {
+            return callback(null, true);
+        }
+        // Check if origin is allowed
+        if (allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+        // Log blocked origins
+        console.warn(`CORS blocked: ${origin}`);
+        callback(new Error('CORS policy violation: origin not allowed'));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 // ========================
 // MIDDLEWARE
@@ -37,32 +45,50 @@ app.use(cors({
 // Body parsers with size limits
 app.use(express.json({
     limit: '1mb',
-    verify: (req, res, buf) => {
+    verify: (req, _res, buf) => {
         // Store raw body for signature verification if needed
         req.rawBody = buf;
-    }
+    },
 }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 // Serve static files
 app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
     maxAge: '1y',
     etag: true,
-    lastModified: true
+    lastModified: true,
 }));
+// ========================
+// ROOT ROUTE
+// ========================
+app.get('/', (_req, res) => {
+    res.json({
+        name: 'Awash Insurance API',
+        version: '1.0.0',
+        status: 'running',
+        environment: process.env.NODE_ENV || 'development',
+        endpoints: {
+            health: '/api/health',
+            ping: '/ping',
+            api: '/api',
+            apiV1: '/api/v1',
+        },
+        docs: 'Contact admin for API documentation',
+    });
+});
 // ========================
 // HEALTH CHECK
 // ========================
-app.get('/api/health', (req, res) => {
+app.get('/api/health', (_req, res) => {
     res.json({
         status: 'ok',
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
         memory: process.memoryUsage(),
-        environment: process.env.NODE_ENV || 'development'
+        environment: process.env.NODE_ENV || 'development',
     });
 });
 // Simple ping endpoint for load balancers
-app.get('/ping', (req, res) => {
+app.get('/ping', (_req, res) => {
     res.send('pong');
 });
 // ========================
@@ -75,28 +101,28 @@ app.use('/api', apiV1Routes); // For backward compatibility
 // ERROR HANDLING
 // ========================
 // 404 handler
-app.use((req, res, next) => {
+app.use((req, res, _next) => {
     res.status(404).json({
         error: 'Not Found',
         message: `Route ${req.method} ${req.path} not found`,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
     });
 });
 // Global error handler
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
     console.error('Unhandled error:', {
         error: err.message,
         stack: err.stack,
         path: req.path,
         method: req.method,
-        ip: req.ip
+        ip: req.ip,
     });
     // Don't leak error details in production
     const isProduction = process.env.NODE_ENV === 'production';
     res.status(err.status || 500).json({
         error: isProduction ? 'Internal Server Error' : err.message,
         timestamp: new Date().toISOString(),
-        ...(isProduction ? {} : { stack: err.stack })
+        ...(isProduction ? {} : { stack: err.stack }),
     });
 });
 // ========================
@@ -106,7 +132,6 @@ async function testDatabaseConnection() {
     try {
         await pool.query('SELECT 1');
         console.log('✅ Database connected successfully via pg pool');
-        // Log database connection details (without exposing credentials)
         const client = await pool.connect();
         const result = await client.query('SELECT version()');
         console.log(`✅ PostgreSQL version: ${result.rows[0].version}`);
@@ -114,7 +139,6 @@ async function testDatabaseConnection() {
     }
     catch (error) {
         console.error('❌ Database connection failed:', error);
-        // Don't exit in production, retry instead
         if (process.env.NODE_ENV !== 'production') {
             process.exit(1);
         }
@@ -141,7 +165,7 @@ async function startServer() {
     return server;
 }
 // Start the server
-startServer().catch(error => {
+startServer().catch((error) => {
     console.error('❌ Failed to start server:', error);
     process.exit(1);
 });
@@ -167,7 +191,7 @@ async function gracefulShutdown(signal) {
                     if (err)
                         reject(err);
                     else
-                        resolve(null);
+                        resolve();
                 });
             });
             console.log('✅ Server closed');

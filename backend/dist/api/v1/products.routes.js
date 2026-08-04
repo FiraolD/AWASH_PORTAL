@@ -165,7 +165,7 @@ router.post('/', authenticate, authorize('MASTER_ADMIN'), async (req, res) => {
         id, name, code, description, category, 
         "isActive", "requiresApproval", "approvalFlow", "createdAt", "updatedAt"
       ) VALUES (
-        gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, NOW(), NOW()
+        gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, NOW(), NOW()
       ) RETURNING *
     `, [
             name,
@@ -280,7 +280,7 @@ router.post('/:productId/fields', authenticate, authorize('MASTER_ADMIN'), async
         id, "productId", "fieldName", "fieldLabel", "fieldType", 
         "isRequired", options, "displayOrder", "createdAt", "updatedAt"
       ) VALUES (
-        gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, NOW(), NOW()
+        gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, NOW(), NOW()
       ) RETURNING *
     `, [
             productId,

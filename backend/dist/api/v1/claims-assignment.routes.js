@@ -1,94 +1,92 @@
 import { Router } from 'express';
+import { authenticate, authorizeExecutives } from '../../middleware/auth.middleware.js';
 import pool from '../../lib/db.js';
-import { authenticate, authorize } from '../middleware/auth.middleware.js';
+import { createAuditLog, getClientIp, getHeaderString } from './audit.routes.js';
 const router = Router();
-// Get assignment rules
-router.get('/', authenticate, authorize('MASTER_ADMIN', 'CLAIMS_ADMIN', 'MANAGER_CLAIMS', 'HEAD_CLAIMS'), async (req, res) => {
+router.get('/', authenticate, authorizeExecutives, async (req, res) => {
     try {
-        const result = await pool.query(`SELECT * FROM claims_assignment_rules WHERE is_active = true ORDER BY priority ASC`);
+        const result = await pool.query(`SELECT id, "ruleName", "productType", "minAmount", "maxAmount",
+              "assignedRole", "priorityLevel", "isActive", "createdAt", "updatedAt", "createdBy"
+       FROM claims_assignment_rules ORDER BY "priorityLevel" ASC, "createdAt" DESC`);
         res.json(result.rows);
     }
     catch (error) {
-        console.error('Failed to fetch assignment rules:', error);
-        res.json([]);
+        console.error('[AssignmentRules] Fetch error:', error);
+        res.status(500).json({ error: 'Failed to fetch assignment rules' });
     }
 });
-// Create assignment rule
-router.post('/', authenticate, authorize('MASTER_ADMIN', 'CLAIMS_ADMIN', 'MANAGER_CLAIMS', 'HEAD_CLAIMS'), async (req, res) => {
+router.post('/', authenticate, authorizeExecutives, async (req, res) => {
     try {
-        const { rule_name, product_type, min_amount, max_amount, assigned_role, priority } = req.body;
-        const result = await pool.query(`INSERT INTO claims_assignment_rules (id, rule_name, product_type, min_amount, max_amount, assigned_role, priority, is_active, created_at, updated_at)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, true, NOW(), NOW())
-       RETURNING *`, [rule_name, product_type, min_amount, max_amount || null, assigned_role, priority]);
+        const { ruleName, productType, minAmount, maxAmount, assignedRole, priorityLevel } = req.body;
+        if (!ruleName || !productType || !assignedRole) {
+            return res.status(400).json({ error: 'ruleName, productType, and assignedRole are required' });
+        }
+        const result = await pool.query(`INSERT INTO claims_assignment_rules (
+        "ruleName", "productType", "minAmount", "maxAmount",
+        "assignedRole", "priorityLevel", "isActive", "createdBy", "createdAt", "updatedAt"
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, true, $8, NOW(), NOW()) RETURNING *`, [ruleName, productType, minAmount || null, maxAmount || null, assignedRole, priorityLevel || 0, req.user.id]);
+        // ✅ FIXED: Using helpers for type safety
+        await createAuditLog(req.user.id, req.user.email, req.user.role, 'CREATE', 'CLAIMS_ASSIGNMENT_RULE', result.rows[0].id, null, result.rows[0], getClientIp(req), getHeaderString(req, 'user-agent'));
         res.status(201).json(result.rows[0]);
     }
     catch (error) {
-        console.error('Failed to create assignment rule:', error);
+        console.error('[AssignmentRules] Create error:', error);
         res.status(500).json({ error: 'Failed to create assignment rule' });
     }
 });
-// Update assignment rule
-router.put('/:id', authenticate, authorize('MASTER_ADMIN', 'MANAGER_CLAIMS', 'HEAD_CLAIMS'), async (req, res) => {
+router.put('/:id', authenticate, authorizeExecutives, async (req, res) => {
     try {
-        const { rule_name, product_type, min_amount, max_amount, assigned_role, priority, is_active } = req.body;
-        const result = await pool.query(`UPDATE claims_assignment_rules 
-       SET rule_name = COALESCE($1, rule_name),
-           product_type = COALESCE($2, product_type),
-           min_amount = COALESCE($3, min_amount),
-           max_amount = COALESCE($4, max_amount),
-           assigned_role = COALESCE($5, assigned_role),
-           priority = COALESCE($6, priority),
-           is_active = COALESCE($7, is_active),
-           updated_at = NOW()
-       WHERE id = $8
-       RETURNING *`, [rule_name, product_type, min_amount, max_amount, assigned_role, priority, is_active, req.params.id]);
-        res.json(result.rows[0]);
+        const id = String(req.params.id);
+        const { ruleName, productType, minAmount, maxAmount, assignedRole, priorityLevel, isActive } = req.body;
+        const oldResult = await pool.query('SELECT * FROM claims_assignment_rules WHERE id = $1', [id]);
+        if (oldResult.rows.length === 0)
+            return res.status(404).json({ error: 'Assignment rule not found' });
+        const oldData = oldResult.rows[0];
+        await pool.query(`UPDATE claims_assignment_rules SET "ruleName"=$1, "productType"=$2, "minAmount"=$4,
+       "maxAmount"=$5, "assignedRole"=$6, "priorityLevel"=$7, "isActive"=$8, "updatedAt"=NOW() WHERE id=$9`, [ruleName || oldData.ruleName, productType || oldData.productType,
+            minAmount !== undefined ? minAmount : oldData.minAmount,
+            maxAmount !== undefined ? maxAmount : oldData.maxAmount,
+            assignedRole || oldData.assignedRole,
+            priorityLevel !== undefined ? priorityLevel : oldData.priorityLevel,
+            isActive !== undefined ? isActive : oldData.isActive, id]);
+        const updated = await pool.query('SELECT * FROM claims_assignment_rules WHERE id = $1', [id]);
+        await createAuditLog(req.user.id, req.user.email, req.user.role, 'UPDATE', 'CLAIMS_ASSIGNMENT_RULE', id, oldData, updated.rows[0], getClientIp(req), getHeaderString(req, 'user-agent'));
+        res.json(updated.rows[0]);
     }
     catch (error) {
-        console.error('Failed to update assignment rule:', error);
+        console.error('[AssignmentRules] Update error:', error);
         res.status(500).json({ error: 'Failed to update assignment rule' });
     }
 });
-// Delete assignment rule
-router.delete('/:id', authenticate, authorize('MASTER_ADMIN, MANAGER_CLAIMS, HEAD_CLAIMS'), async (req, res) => {
+router.delete('/:id', authenticate, authorizeExecutives, async (req, res) => {
     try {
-        await pool.query('DELETE FROM claims_assignment_rules WHERE id = $1', [req.params.id]);
-        res.json({ message: 'Assignment rule deleted successfully' });
+        const id = String(req.params.id);
+        const oldResult = await pool.query('SELECT * FROM claims_assignment_rules WHERE id = $1', [id]);
+        if (oldResult.rows.length === 0)
+            return res.status(404).json({ error: 'Assignment rule not found' });
+        await pool.query('DELETE FROM claims_assignment_rules WHERE id = $1', [id]);
+        await createAuditLog(req.user.id, req.user.email, req.user.role, 'DELETE', 'CLAIMS_ASSIGNMENT_RULE', id, oldResult.rows[0], null, getClientIp(req), getHeaderString(req, 'user-agent'));
+        res.json({ message: 'Assignment rule deleted' });
     }
     catch (error) {
-        console.error('Failed to delete assignment rule:', error);
+        console.error('[AssignmentRules] Delete error:', error);
         res.status(500).json({ error: 'Failed to delete assignment rule' });
     }
 });
-// Assign claim to officer
-router.post('/claims/:claimId/assign', authenticate, authorize('CLAIMS_ADMIN', 'MANAGER_CLAIMS', 'HEAD_CLAIMS', 'MASTER_ADMIN'), async (req, res) => {
+router.patch('/:id/toggle', authenticate, authorizeExecutives, async (req, res) => {
     try {
-        const { officerId } = req.body;
-        await pool.query(`UPDATE claims 
-       SET "assignedTo" = $1, status = 'ASSIGNED', "updatedAt" = NOW()
-       WHERE id = $2`, [officerId, req.params.claimId]);
-        res.json({ message: 'Claim assigned successfully' });
+        const id = String(req.params.id);
+        const checkResult = await pool.query('SELECT id, "isActive", "ruleName" FROM claims_assignment_rules WHERE id = $1', [id]);
+        if (checkResult.rows.length === 0)
+            return res.status(404).json({ error: 'Assignment rule not found' });
+        const newStatus = !checkResult.rows[0].isActive;
+        await pool.query(`UPDATE claims_assignment_rules SET "isActive"=$1, "updatedAt"=NOW() WHERE id=$2`, [newStatus, id]);
+        await createAuditLog(req.user.id, req.user.email, req.user.role, newStatus ? 'ACTIVATE' : 'DEACTIVATE', 'CLAIMS_ASSIGNMENT_RULE', id, { isActive: !newStatus, ruleName: checkResult.rows[0].ruleName }, { isActive: newStatus, ruleName: checkResult.rows[0].ruleName }, getClientIp(req), getHeaderString(req, 'user-agent'));
+        res.json({ message: `Assignment rule ${newStatus ? 'activated' : 'deactivated'}`, isActive: newStatus });
     }
     catch (error) {
-        console.error('Failed to assign claim:', error);
-        res.status(500).json({ error: 'Failed to assign claim' });
-    }
-});
-// Get claim officers
-router.get('/officers', authenticate, authorize('MASTER_ADMIN', 'CLAIMS_ADMIN', 'MANAGER_CLAIMS', 'HEAD_CLAIMS'), async (req, res) => {
-    try {
-        const result = await pool.query(`
-      SELECT co.*, u."firstName", u."lastName", u.email
-      FROM claim_officers co
-      JOIN users u ON u.id = co.user_id
-      WHERE co.is_active = true
-      ORDER BY co.role_level ASC
-    `);
-        res.json(result.rows);
-    }
-    catch (error) {
-        console.error('Failed to fetch claim officers:', error);
-        res.json([]);
+        console.error('[AssignmentRules] Toggle error:', error);
+        res.status(500).json({ error: 'Failed to toggle assignment rule' });
     }
 });
 export default router;

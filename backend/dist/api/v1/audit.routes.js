@@ -1,99 +1,119 @@
 import { Router } from 'express';
+import { authenticate, authorizeExecutives } from '../../middleware/auth.middleware.js';
 import pool from '../../lib/db.js';
-import { authenticate, authorize } from '../middleware/auth.middleware.js';
 const router = Router();
-// Get audit logs
-router.get('/', authenticate, authorize('MASTER_ADMIN', 'AUDITOR'), async (req, res) => {
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+export function getHeaderString(req, headerName, defaultValue = 'system') {
+    const value = req.headers?.[headerName];
+    if (Array.isArray(value))
+        return value[0] || defaultValue;
+    return value || defaultValue;
+}
+export function getClientIp(req) {
+    return (req.ip ||
+        req.headers?.['x-forwarded-for']?.split(',')[0]?.trim() ||
+        '0.0.0.0');
+}
+// ---------------------------------------------------------------------------
+// Create audit log (exported for other route files)
+// ---------------------------------------------------------------------------
+export async function createAuditLog(userId, userEmail, userRole, actionType, entityType, entityId, oldValues = null, newValues = null, ipAddress = '0.0.0.0', userAgent = 'system') {
     try {
-        const { page = 1, limit = 50, action, userId, startDate, endDate } = req.query;
+        await pool.query(`INSERT INTO audit_logs (
+        "userId", "userEmail", "userRole", "actionType", "entityType", "entityId",
+        "oldValues", "newValues", "ipAddress", "userAgent", "createdAt"
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`, [
+            userId,
+            userEmail,
+            userRole,
+            actionType,
+            entityType,
+            entityId,
+            oldValues ? JSON.stringify(oldValues) : null,
+            newValues ? JSON.stringify(newValues) : null,
+            ipAddress,
+            userAgent,
+        ]);
+    }
+    catch (error) {
+        console.error('[AuditLogs] Create error:', error);
+    }
+}
+// ---------------------------------------------------------------------------
+// Get audit logs (paginated, filterable)
+// ---------------------------------------------------------------------------
+router.get('/', authenticate, authorizeExecutives, async (req, res) => {
+    try {
+        const { page = 1, limit = 50, actionType, entityType, userId, userRole, startDate, endDate, search } = req.query;
         const offset = (Number(page) - 1) * Number(limit);
-        let query = `
-      SELECT al.*, u.email, u."firstName", u."lastName"
-      FROM audit_logs al
-      LEFT JOIN users u ON u.id = al.user_id
-      WHERE 1=1
-    `;
+        let query = `SELECT id, "userId", "userEmail", "userRole", "actionType", "entityType", "entityId", "oldValues", "newValues", "ipAddress", "userAgent", "createdAt" FROM audit_logs WHERE 1=1`;
+        let countQuery = `SELECT COUNT(*) as total FROM audit_logs WHERE 1=1`;
         const params = [];
-        let paramIndex = 1;
-        if (action) {
-            query += ` AND al.action = $${paramIndex++}`;
-            params.push(action);
+        let paramCount = 1;
+        if (actionType) {
+            query += ` AND "actionType" = $${paramCount++}`;
+            countQuery += ` AND "actionType" = $${paramCount - 1}`;
+            params.push(actionType);
+        }
+        if (entityType) {
+            query += ` AND "entityType" = $${paramCount++}`;
+            countQuery += ` AND "entityType" = $${paramCount - 1}`;
+            params.push(entityType);
         }
         if (userId) {
-            query += ` AND al.user_id = $${paramIndex++}`;
+            query += ` AND "userId" = $${paramCount++}`;
+            countQuery += ` AND "userId" = $${paramCount - 1}`;
             params.push(userId);
         }
+        if (userRole) {
+            query += ` AND "userRole" = $${paramCount++}`;
+            countQuery += ` AND "userRole" = $${paramCount - 1}`;
+            params.push(userRole);
+        }
         if (startDate) {
-            query += ` AND al.created_at >= $${paramIndex++}`;
+            query += ` AND "createdAt" >= $${paramCount++}`;
+            countQuery += ` AND "createdAt" >= $${paramCount - 1}`;
             params.push(startDate);
         }
         if (endDate) {
-            query += ` AND al.created_at <= $${paramIndex++}`;
+            query += ` AND "createdAt" <= $${paramCount++}`;
+            countQuery += ` AND "createdAt" <= $${paramCount - 1}`;
             params.push(endDate);
         }
-        query += ` ORDER BY al.created_at DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
+        if (search) {
+            query += ` AND ("userEmail" ILIKE $${paramCount} OR "actionType" ILIKE $${paramCount} OR "entityType" ILIKE $${paramCount})`;
+            countQuery += ` AND ("userEmail" ILIKE $${paramCount} OR "actionType" ILIKE $${paramCount} OR "entityType" ILIKE $${paramCount})`;
+            params.push(`%${search}%`);
+            paramCount++;
+        }
+        const countResult = await pool.query(countQuery, params);
+        const total = parseInt(countResult.rows[0].total);
+        query += ` ORDER BY "createdAt" DESC LIMIT $${paramCount++} OFFSET $${paramCount}`;
         params.push(Number(limit), offset);
         const result = await pool.query(query, params);
-        const countResult = await pool.query('SELECT COUNT(*) FROM audit_logs');
-        const total = parseInt(countResult.rows[0].count);
-        res.json({
-            logs: result.rows,
-            total,
-            page: Number(page),
-            limit: Number(limit),
-            totalPages: Math.ceil(total / Number(limit))
-        });
+        res.json({ data: result.rows, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) });
     }
     catch (error) {
-        console.error('Failed to fetch audit logs:', error);
+        console.error('[AuditLogs] Fetch error:', error);
         res.status(500).json({ error: 'Failed to fetch audit logs' });
     }
 });
-// Create audit log (internal use)
-router.post('/', async (req, res) => {
+// ---------------------------------------------------------------------------
+// Get single audit log
+// ---------------------------------------------------------------------------
+router.get('/:id', authenticate, authorizeExecutives, async (req, res) => {
     try {
-        const { user_id, action, entity_type, entity_id, old_values, new_values, ip_address, user_agent } = req.body;
-        const result = await pool.query(`INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, old_values, new_values, ip_address, user_agent, created_at)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, NOW())
-       RETURNING *`, [user_id, action, entity_type, entity_id, old_values, new_values, ip_address, user_agent]);
-        res.status(201).json(result.rows[0]);
-    }
-    catch (error) {
-        console.error('Failed to create audit log:', error);
-        res.status(500).json({ error: 'Failed to create audit log' });
-    }
-});
-// Get audit log by ID
-router.get('/:id', authenticate, authorize('MASTER_ADMIN', 'AUDITOR'), async (req, res) => {
-    try {
-        const result = await pool.query(`SELECT al.*, u.email, u."firstName", u."lastName"
-       FROM audit_logs al
-       LEFT JOIN users u ON u.id = al.user_id
-       WHERE al.id = $1`, [req.params.id]);
-        if (result.rows.length === 0) {
+        const id = String(req.params.id);
+        const result = await pool.query(`SELECT * FROM audit_logs WHERE id = $1`, [id]);
+        if (result.rows.length === 0)
             return res.status(404).json({ error: 'Audit log not found' });
-        }
         res.json(result.rows[0]);
     }
     catch (error) {
-        console.error('Failed to fetch audit log:', error);
+        console.error('[AuditLogs] Fetch single error:', error);
         res.status(500).json({ error: 'Failed to fetch audit log' });
-    }
-});
-// Get audit log actions list
-router.get('/actions/list', authenticate, authorize('MASTER_ADMIN', 'AUDITOR'), async (req, res) => {
-    try {
-        const result = await pool.query(`
-      SELECT action, COUNT(*) as count
-      FROM audit_logs
-      GROUP BY action
-      ORDER BY count DESC
-    `);
-        res.json(result.rows);
-    }
-    catch (error) {
-        console.error('Failed to fetch audit actions:', error);
-        res.json([]);
     }
 });
 export default router;
