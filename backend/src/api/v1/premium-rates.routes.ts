@@ -151,6 +151,7 @@ router.put(
           d.maxCoverage ?? oldData.maxCoverage,     // $5
           d.riskFactor  ?? oldData.riskFactor,      // $6
           d.isActive    ?? oldData.isActive,        // $7
+          d.updatedAt   ?? oldData.updatedAt,       // $8
           id,                                       // $9
         ]
       );
