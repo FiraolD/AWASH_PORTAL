@@ -1,10 +1,221 @@
-﻿// src/api/v1/approval.routes.ts
-
-import { Router, Response } from 'express';
-import { AuthRequest, authenticate, authorizeExecutives } from '../../middleware/auth.middleware.js';
+﻿import { Router, Response } from 'express';
+import { authenticate, authorizeExecutives } from '../../middleware/auth.middleware';
+import { AuthRequest } from '../../middleware/auth.middleware.js';
 import pool from '../../lib/db.js';
 
 const router = Router();
+
+// ===========================================================================
+// ROLE LEVELS ROUTES
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// GET all role levels
+// ---------------------------------------------------------------------------
+router.get(
+  '/role-levels',
+  authenticate,
+  authorizeExecutives,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const result = await pool.query(
+        `SELECT 
+            id,
+            "levelCode",
+            "levelName",
+            "department",
+            "levelOrder",
+            "canApprove",
+            "canReject",
+            "maxAmountLimit",
+            "isActive",
+            "createdAt",
+            "updatedAt"
+         FROM role_levels
+         WHERE "isActive" = true
+         ORDER BY "levelOrder" ASC`
+      );
+
+      res.json(result.rows);
+    } catch (error: any) {
+      console.error('[RoleLevels] Fetch error:', error);
+      res.status(500).json({
+        error: 'Failed to fetch role levels',
+        detail: error.message,
+      });
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// CREATE role level
+// ---------------------------------------------------------------------------
+router.post(
+  '/role-levels',
+  authenticate,
+  authorizeExecutives,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const {
+        levelCode,
+        levelName,
+        department,
+        levelOrder,
+        canApprove,
+        canReject,
+        maxAmountLimit,
+        isActive,
+      } = req.body;
+
+      // Validate required fields
+      if (!levelCode || !levelName) {
+        return res.status(400).json({
+          error: 'levelCode and levelName are required',
+        });
+      }
+
+      const result = await pool.query(
+        `INSERT INTO role_levels (
+            "levelCode",
+            "levelName",
+            "department",
+            "levelOrder",
+            "canApprove",
+            "canReject",
+            "maxAmountLimit",
+            "isActive",
+            "createdAt",
+            "updatedAt"
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+         RETURNING *`,
+        [
+          levelCode,
+          levelName,
+          department || 'CLAIMS',
+          levelOrder || 0,
+          canApprove !== undefined ? canApprove : false,
+          canReject !== undefined ? canReject : false,
+          maxAmountLimit || null,
+          isActive !== undefined ? isActive : true,
+        ]
+      );
+
+      res.status(201).json(result.rows[0]);
+    } catch (error: any) {
+      console.error('[RoleLevels] Create error:', error);
+      res.status(500).json({
+        error: 'Failed to create role level',
+        detail: error.message,
+      });
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// UPDATE role level
+// ---------------------------------------------------------------------------
+router.put(
+  '/role-levels/:id',
+  authenticate,
+  authorizeExecutives,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const {
+        levelCode,
+        levelName,
+        department,
+        levelOrder,
+        canApprove,
+        canReject,
+        maxAmountLimit,
+        isActive,
+      } = req.body;
+
+      // Check if exists
+      const oldResult = await pool.query(
+        'SELECT * FROM role_levels WHERE id = $1',
+        [id]
+      );
+
+      if (oldResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Role level not found' });
+      }
+
+      const oldData = oldResult.rows[0];
+
+      const result = await pool.query(
+        `UPDATE role_levels
+         SET
+            "levelCode"      = $1,
+            "levelName"      = $2,
+            "department"     = $3,
+            "levelOrder"     = $4,
+            "canApprove"     = $5,
+            "canReject"      = $6,
+            "maxAmountLimit" = $7,
+            "isActive"       = $8,
+            "updatedAt"      = NOW()
+         WHERE id = $9
+         RETURNING *`,
+        [
+          levelCode ?? oldData.levelCode,
+          levelName ?? oldData.levelName,
+          department ?? oldData.department,
+          levelOrder ?? oldData.levelOrder,
+          canApprove !== undefined ? canApprove : oldData.canApprove,
+          canReject !== undefined ? canReject : oldData.canReject,
+          maxAmountLimit ?? oldData.maxAmountLimit,
+          isActive !== undefined ? isActive : oldData.isActive,
+          id,
+        ]
+      );
+
+      res.json(result.rows[0]);
+    } catch (error: any) {
+      console.error('[RoleLevels] Update error:', error);
+      res.status(500).json({
+        error: 'Failed to update role level',
+        detail: error.message,
+      });
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// DELETE role level
+// ---------------------------------------------------------------------------
+router.delete(
+  '/role-levels/:id',
+  authenticate,
+  authorizeExecutives,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+
+      const result = await pool.query(
+        'DELETE FROM role_levels WHERE id = $1 RETURNING id',
+        [id]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Role level not found' });
+      }
+
+      res.json({ message: 'Role level deleted successfully' });
+    } catch (error: any) {
+      console.error('[RoleLevels] Delete error:', error);
+      res.status(500).json({
+        error: 'Failed to delete role level',
+        detail: error.message,
+      });
+    }
+  }
+);
+
+// ===========================================================================
+// APPROVAL RULES ROUTES
+// ===========================================================================
 
 // ---------------------------------------------------------------------------
 // GET all approval rules
@@ -109,7 +320,6 @@ router.post(
         isActive,
       } = req.body;
 
-      // Validate required fields
       if (!ruleName || !productType || !approvalLevels) {
         return res.status(400).json({
           error: 'ruleName, productType, and approvalLevels are required',
@@ -138,7 +348,7 @@ router.post(
           maxSumInsured || null,
           minRiskScore || null,
           maxRiskScore || null,
-          JSON.stringify(approvalLevels), // JSONB – stringify the array/object
+          JSON.stringify(approvalLevels),
           isActive !== undefined ? isActive : true,
           req.user!.id,
         ]
@@ -176,7 +386,6 @@ router.put(
         isActive,
       } = req.body;
 
-      // Check if exists
       const oldResult = await pool.query(
         'SELECT * FROM approval_rules WHERE id = $1',
         [id]
@@ -251,37 +460,6 @@ router.delete(
       console.error('[ApprovalRules] Delete error:', error);
       res.status(500).json({
         error: 'Failed to delete rule',
-        detail: error.message,
-      });
-    }
-  }
-);
-
-// ---------------------------------------------------------------------------
-// GET role levels (for dropdowns)
-// ---------------------------------------------------------------------------
-router.get(
-  '/role-levels',
-  authenticate,
-  authorizeExecutives,
-  async (req: AuthRequest, res: Response) => {
-    try {
-      // Since there's no separate role_levels table, return the distinct
-      // approval levels from the rules table, or define them here
-      const roleLevels = [
-        { level: 1, name: 'Claim Officer I', role: 'CLAIM_OFFICER_I' },
-        { level: 2, name: 'Claim Officer II', role: 'CLAIM_OFFICER_II' },
-        { level: 3, name: 'Senior Claim Officer', role: 'SENIOR_CLAIM_OFFICER' },
-        { level: 4, name: 'Supervisor Claims', role: 'SUPERVISOR_CLAIMS' },
-        { level: 5, name: 'Manager Claims', role: 'MANAGER_CLAIMS' },
-        { level: 6, name: 'Head of Claims', role: 'HEAD_CLAIMS' },
-      ];
-
-      res.json(roleLevels);
-    } catch (error: any) {
-      console.error('[Approval] Role levels error:', error);
-      res.status(500).json({
-        error: 'Failed to fetch role levels',
         detail: error.message,
       });
     }
