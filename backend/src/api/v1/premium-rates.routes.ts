@@ -142,7 +142,7 @@ router.put(
            "riskFactor"  = $6,
            "isActive"    = $7,
            "updatedAt"   = NOW()
-         WHERE id = $9`,
+         WHERE id = $8`,
         [
           d.productId   ?? oldData.productId,      // $1
           d.productType ?? oldData.productType,     // $2
@@ -151,8 +151,7 @@ router.put(
           d.maxCoverage ?? oldData.maxCoverage,     // $5
           d.riskFactor  ?? oldData.riskFactor,      // $6
           d.isActive    ?? oldData.isActive,        // $7
-          d.updatedAt   ?? oldData.updatedAt,       // $8
-          id,                                       // $9
+          id,                                       // $8
         ]
       );
 
@@ -161,6 +160,28 @@ router.put(
         'SELECT * FROM premium_rates WHERE id = $1',
         [id]
       );
+
+      // Audit log
+      await createAuditLog(
+        req.user!.id,
+        req.user!.email,
+        req.user!.role,
+        'UPDATE',
+        'PREMIUM_RATE',
+        id,
+        oldData,
+        updated.rows[0],
+        getClientIp(req),
+        getHeaderString(req, 'user-agent')
+      );
+
+      res.json(updated.rows[0]);
+    } catch (error) {
+      console.error('[PremiumRates] Update error:', error);
+      res.status(500).json({ error: 'Failed to update premium rate' });
+    }
+  }
+);
 
       // Audit log
       await createAuditLog(
