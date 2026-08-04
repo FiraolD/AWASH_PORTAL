@@ -136,23 +136,21 @@ router.put(
          SET
            "productId"   = $1,
            "productType" = $2,
-           "rateName"    = $3,
-           "baseRate"    = $4,
-           "minCoverage" = $5,
-           "maxCoverage" = $6,
-           "riskFactor"  = $7,
-           "isActive"    = $8,
+           "baseRate"    = $3,
+           "minCoverage" = $4,
+           "maxCoverage" = $5,
+           "riskFactor"  = $6,
+           "isActive"    = $7,
            "updatedAt"   = NOW()
          WHERE id = $9`,
         [
           d.productId   ?? oldData.productId,      // $1
           d.productType ?? oldData.productType,     // $2
-          d.rateName    ?? oldData.rateName,        // $3
-          d.baseRate    ?? oldData.baseRate,        // $4
-          d.minCoverage ?? oldData.minCoverage,     // $5
-          d.maxCoverage ?? oldData.maxCoverage,     // $6
-          d.riskFactor  ?? oldData.riskFactor,      // $7
-          d.isActive    ?? oldData.isActive,        // $8
+          d.baseRate    ?? oldData.baseRate,        // $3
+          d.minCoverage ?? oldData.minCoverage,     // $4
+          d.maxCoverage ?? oldData.maxCoverage,     // $5
+          d.riskFactor  ?? oldData.riskFactor,      // $6
+          d.isActive    ?? oldData.isActive,        // $7
           id,                                       // $9
         ]
       );
