@@ -743,126 +743,206 @@ export default function ApprovalRulesConfigPage() {
       {/* ================================================================ */}
       {/* ROLE LEVEL FORM MODAL (NEW) */}
       {/* ================================================================ */}
-      {showRoleLevelForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <Card className="max-h-[90vh] w-full max-w-lg overflow-y-auto">
-            <CardHeader>
-              <CardTitle>
-                {editingRoleLevel ? 'Edit Role Level' : 'Add Role Level'}
-              </CardTitle>
-              <CardDescription>
-                Define the approval role, its permissions, and amount limits
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Level Code <span className="text-red-500">*</span></Label>
-                  <Input
-                    value={roleLevelForm.levelCode}
-                    onChange={(e) => setRoleLevelForm({ ...roleLevelForm, levelCode: e.target.value })}
-                    placeholder="e.g., CLAIM_OFFICER_I"
-                    disabled={!!editingRoleLevel}
-                  />
-                  {editingRoleLevel && (
-                    <p className="text-xs text-gray-400 mt-1">Code cannot be changed after creation</p>
-                  )}
-                </div>
-                <div>
-                  <Label>Level Name <span className="text-red-500">*</span></Label>
-                  <Input
-                    value={roleLevelForm.levelName}
-                    onChange={(e) => setRoleLevelForm({ ...roleLevelForm, levelName: e.target.value })}
-                    placeholder="e.g., Claim Officer I"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Department</Label>
-                  <Select
-                    value={roleLevelForm.department}
-                    onValueChange={(value) => setRoleLevelForm({ ...roleLevelForm, department: value })}
-                  >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {DEPARTMENTS.map((dept) => (
-                        <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Level Order</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={roleLevelForm.levelOrder}
-                    onChange={(e) =>
-                      setRoleLevelForm({ ...roleLevelForm, levelOrder: parseInt(e.target.value) || 1 })
-                    }
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label>Max Amount Limit (ETB)</Label>
+     {/* ================================================================ */}
+{/* ROLE LEVEL FORM MODAL – Updated with dropdown for Level Code */}
+{/* ================================================================ */}
+{showRoleLevelForm && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <Card className="max-h-[90vh] w-full max-w-lg overflow-y-auto">
+      <CardHeader>
+        <CardTitle>
+          {editingRoleLevel ? 'Edit Role Level' : 'Add Role Level'}
+        </CardTitle>
+        <CardDescription>
+          Define the approval role, its permissions, and amount limits
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          {/* ===== LEVEL CODE – Now a dropdown ===== */}
+          <div>
+            <Label>Level Code <span className="text-red-500">*</span></Label>
+            {editingRoleLevel ? (
+              // When editing, show the code as read-only text
+              <>
                 <Input
-                  type="number"
-                  min="0"
-                  value={roleLevelForm.maxAmountLimit}
-                  onChange={(e) => setRoleLevelForm({ ...roleLevelForm, maxAmountLimit: e.target.value })}
-                  placeholder="Leave empty for no limit"
+                  value={roleLevelForm.levelCode}
+                  disabled
+                  className="bg-gray-100 cursor-not-allowed"
                 />
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label>Can Approve</Label>
-                  <Switch
-                    checked={roleLevelForm.canApprove}
-                    onCheckedChange={(checked) => setRoleLevelForm({ ...roleLevelForm, canApprove: checked })}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <Label>Can Reject</Label>
-                  <Switch
-                    checked={roleLevelForm.canReject}
-                    onCheckedChange={(checked) => setRoleLevelForm({ ...roleLevelForm, canReject: checked })}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <Label>Active</Label>
-                  <Switch
-                    checked={roleLevelForm.isActive}
-                    onCheckedChange={(checked) => setRoleLevelForm({ ...roleLevelForm, isActive: checked })}
-                  />
-                </div>
-              </div>
-            </CardContent>
-            <div className="flex justify-end gap-2 border-t p-6">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowRoleLevelForm(false);
-                  setEditingRoleLevel(null);
-                }}
+                <p className="text-xs text-gray-400 mt-1">Code cannot be changed after creation</p>
+              </>
+            ) : (
+              // When creating, show a dropdown of all available roles
+              <Select
+                value={roleLevelForm.levelCode}
+                onValueChange={(value) => setRoleLevelForm({ ...roleLevelForm, levelCode: value })}
               >
-                Cancel
-              </Button>
-              <Button onClick={handleSaveRoleLevel} disabled={saveRoleLevelMutation.isPending}>
-                <Save className="mr-2 h-4 w-4" />
-                {saveRoleLevelMutation.isPending
-                  ? 'Saving...'
-                  : editingRoleLevel
-                    ? 'Update Role Level'
-                    : 'Add Role Level'}
-              </Button>
-            </div>
-          </Card>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a role code..." />
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  {/* Customer Roles */}
+                  <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase">
+                    Customer
+                  </div>
+                  <SelectItem value="CUSTOMER">CUSTOMER</SelectItem>
+                  <SelectItem value="CUSTOMER_ADMIN">CUSTOMER_ADMIN</SelectItem>
+                  <SelectItem value="CUSTOMER_SUPPORT">CUSTOMER_SUPPORT</SelectItem>
+                  <SelectItem value="CUSTOMER_RELATION_OFFICER">CUSTOMER_RELATION_OFFICER</SelectItem>
+
+                  {/* Underwriting Roles */}
+                  <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase border-t">
+                    Underwriting
+                  </div>
+                  <SelectItem value="UNDERWRITING_OFFICER_I">UNDERWRITING_OFFICER_I</SelectItem>
+                  <SelectItem value="UNDERWRITING_OFFICER_II">UNDERWRITING_OFFICER_II</SelectItem>
+                  <SelectItem value="SENIOR_UNDERWRITING_OFFICER">SENIOR_UNDERWRITING_OFFICER</SelectItem>
+                  <SelectItem value="SUPERVISOR_UNDERWRITING">SUPERVISOR_UNDERWRITING</SelectItem>
+                  <SelectItem value="MANAGER_UNDERWRITING">MANAGER_UNDERWRITING</SelectItem>
+                  <SelectItem value="HEAD_UNDERWRITING">HEAD_UNDERWRITING</SelectItem>
+                  <SelectItem value="UNDERWRITING_ADMIN">UNDERWRITING_ADMIN</SelectItem>
+
+                  {/* Claims Roles */}
+                  <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase border-t">
+                    Claims
+                  </div>
+                  <SelectItem value="CLAIM_OFFICER_I">CLAIM_OFFICER_I</SelectItem>
+                  <SelectItem value="CLAIM_OFFICER_II">CLAIM_OFFICER_II</SelectItem>
+                  <SelectItem value="SENIOR_CLAIM_OFFICER">SENIOR_CLAIM_OFFICER</SelectItem>
+                  <SelectItem value="SUPERVISOR_CLAIMS">SUPERVISOR_CLAIMS</SelectItem>
+                  <SelectItem value="MANAGER_CLAIMS">MANAGER_CLAIMS</SelectItem>
+                  <SelectItem value="HEAD_CLAIMS">HEAD_CLAIMS</SelectItem>
+                  <SelectItem value="CLAIMS_ADMIN">CLAIMS_ADMIN</SelectItem>
+
+                  {/* Master Admin / Executives */}
+                  <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase border-t">
+                    Admin / Executives
+                  </div>
+                  <SelectItem value="MASTER_ADMIN">MASTER_ADMIN</SelectItem>
+                  <SelectItem value="SYSTEM_ADMIN">SYSTEM_ADMIN</SelectItem>
+                  <SelectItem value="SUPER_ADMIN">SUPER_ADMIN</SelectItem>
+                  <SelectItem value="CEO">CEO</SelectItem>
+                  <SelectItem value="COO">COO</SelectItem>
+                  <SelectItem value="CFO">CFO</SelectItem>
+                  <SelectItem value="CTO">CTO</SelectItem>
+                  <SelectItem value="CCO">CCO</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+            {!editingRoleLevel && !roleLevelForm.levelCode && (
+              <p className="text-xs text-amber-600 mt-1">Select a role code from the list to avoid errors</p>
+            )}
+          </div>
+
+          {/* Level Name */}
+          <div>
+            <Label>Level Name <span className="text-red-500">*</span></Label>
+            <Input
+              value={roleLevelForm.levelName}
+              onChange={(e) => setRoleLevelForm({ ...roleLevelForm, levelName: e.target.value })}
+              placeholder="e.g., Claim Officer I"
+            />
+          </div>
         </div>
-      )}
+
+        <div className="grid grid-cols-2 gap-4">
+          {/* Department */}
+          <div>
+            <Label>Department</Label>
+            <Select
+              value={roleLevelForm.department}
+              onValueChange={(value) => setRoleLevelForm({ ...roleLevelForm, department: value })}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="CLAIMS">CLAIMS</SelectItem>
+                <SelectItem value="UNDERWRITING">UNDERWRITING</SelectItem>
+                <SelectItem value="ADMIN">ADMIN</SelectItem>
+                <SelectItem value="EXECUTIVE">EXECUTIVE</SelectItem>
+                <SelectItem value="CUSTOMER">CUSTOMER</SelectItem>
+                <SelectItem value="FINANCE">FINANCE</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Level Order */}
+          <div>
+            <Label>Level Order</Label>
+            <Input
+              type="number"
+              min="1"
+              value={roleLevelForm.levelOrder}
+              onChange={(e) =>
+                setRoleLevelForm({ ...roleLevelForm, levelOrder: parseInt(e.target.value) || 1 })
+              }
+            />
+          </div>
+        </div>
+
+        {/* Max Amount Limit */}
+        <div>
+          <Label>Max Amount Limit (ETB)</Label>
+          <Input
+            type="number"
+            min="0"
+            value={roleLevelForm.maxAmountLimit}
+            onChange={(e) => setRoleLevelForm({ ...roleLevelForm, maxAmountLimit: e.target.value })}
+            placeholder="Leave empty for no limit"
+          />
+          <p className="text-xs text-gray-400 mt-1">
+            Maximum amount this role can approve. Leave empty for unlimited.
+          </p>
+        </div>
+
+        {/* Permission toggles */}
+        <div className="space-y-3 border rounded-lg p-4">
+          <p className="text-sm font-medium text-gray-700">Permissions</p>
+          <div className="flex items-center justify-between">
+            <Label>Can Approve</Label>
+            <Switch
+              checked={roleLevelForm.canApprove}
+              onCheckedChange={(checked) => setRoleLevelForm({ ...roleLevelForm, canApprove: checked })}
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <Label>Can Reject</Label>
+            <Switch
+              checked={roleLevelForm.canReject}
+              onCheckedChange={(checked) => setRoleLevelForm({ ...roleLevelForm, canReject: checked })}
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <Label>Active</Label>
+            <Switch
+              checked={roleLevelForm.isActive}
+              onCheckedChange={(checked) => setRoleLevelForm({ ...roleLevelForm, isActive: checked })}
+            />
+          </div>
+        </div>
+      </CardContent>
+      <div className="flex justify-end gap-2 border-t p-6">
+        <Button
+          variant="outline"
+          onClick={() => {
+            setShowRoleLevelForm(false);
+            setEditingRoleLevel(null);
+          }}
+        >
+          Cancel
+        </Button>
+        <Button onClick={handleSaveRoleLevel} disabled={saveRoleLevelMutation.isPending}>
+          <Save className="mr-2 h-4 w-4" />
+          {saveRoleLevelMutation.isPending
+            ? 'Saving...'
+            : editingRoleLevel
+              ? 'Update Role Level'
+              : 'Add Role Level'}
+        </Button>
+      </div>
+    </Card>
+  </div>
+)}
     </div>
   );
 }
