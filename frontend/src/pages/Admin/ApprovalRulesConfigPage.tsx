@@ -52,14 +52,14 @@ interface Product {
 }
 
 type RulePayload = {
-  rule_name: string;
-  product_type: string;
-  min_sum_insured: number | null;
-  max_sum_insured: number | null;
-  min_risk_score: number | null;
-  max_risk_score: number | null;
-  approval_levels: string[];
-  is_active: boolean;
+  ruleName: string;          // Changed from rule_name
+  productType: string;       // Changed from product_type
+  minSumInsured: number | null;   // Changed from min_sum_insured
+  maxSumInsured: number | null;   // Changed from max_sum_insured
+  minRiskScore: number | null;    // Changed from min_risk_score
+  maxRiskScore: number | null;    // Changed from max_risk_score
+  approvalLevels: string[];       // Changed from approval_levels
+  isActive: boolean;              // Changed from is_active
 };
 
 type RoleLevelPayload = {
@@ -216,18 +216,17 @@ export default function ApprovalRulesConfigPage() {
   // RULE HANDLERS
   // ==========================================================================
   function buildPayload(rule: ApprovalRule): RulePayload {
-    return {
-      rule_name: rule.ruleName,
-      product_type: rule.productType,
-      min_sum_insured: asNumber(rule.minSumInsured) ?? null,
-      max_sum_insured: asNumber(rule.maxSumInsured) ?? null,
-      min_risk_score: asNumber(rule.minRiskScore) ?? 0,
-      max_risk_score: asNumber(rule.maxRiskScore) ?? 100,
-      approval_levels: rule.approvalLevels,
-      is_active: !rule.isActive,
-    };
-  }
-
+  return {
+    ruleName: rule.ruleName,
+    productType: rule.productType,
+    minSumInsured: asNumber(rule.minSumInsured) ?? null,
+    maxSumInsured: asNumber(rule.maxSumInsured) ?? null,
+    minRiskScore: asNumber(rule.minRiskScore) ?? 0,
+    maxRiskScore: asNumber(rule.maxRiskScore) ?? 100,
+    approvalLevels: rule.approvalLevels,
+    isActive: !rule.isActive,
+  };
+}
   const handleCreateRule = () => {
     setEditingRule(null);
     setRuleForm({
@@ -259,26 +258,26 @@ export default function ApprovalRulesConfigPage() {
   };
 
   const handleSaveRule = () => {
-    if (!ruleForm.ruleName.trim()) {
-      toast.error('Rule name is required');
-      return;
-    }
-    if (ruleForm.approvalLevels.length === 0) {
-      toast.error('At least one approval level is required');
-      return;
-    }
-    const payload: RulePayload = {
-      rule_name: ruleForm.ruleName.trim(),
-      product_type: ruleForm.productType,
-      min_sum_insured: toOptionalNumber(ruleForm.minSumInsured),
-      max_sum_insured: toOptionalNumber(ruleForm.maxSumInsured),
-      min_risk_score: toOptionalNumber(ruleForm.minRiskScore),
-      max_risk_score: toOptionalNumber(ruleForm.maxRiskScore),
-      approval_levels: ruleForm.approvalLevels,
-      is_active: ruleForm.isActive,
-    };
-    saveRuleMutation.mutate({ id: editingRule?.id, payload });
+  if (!ruleForm.ruleName.trim()) {
+    toast.error('Rule name is required');
+    return;
+  }
+  if (ruleForm.approvalLevels.length === 0) {
+    toast.error('At least one approval level is required');
+    return;
+  }
+  const payload: RulePayload = {
+    ruleName: ruleForm.ruleName.trim(),
+    productType: ruleForm.productType,
+    minSumInsured: toOptionalNumber(ruleForm.minSumInsured),
+    maxSumInsured: toOptionalNumber(ruleForm.maxSumInsured),
+    minRiskScore: toOptionalNumber(ruleForm.minRiskScore),
+    maxRiskScore: toOptionalNumber(ruleForm.maxRiskScore),
+    approvalLevels: ruleForm.approvalLevels,
+    isActive: ruleForm.isActive,
   };
+  saveRuleMutation.mutate({ id: editingRule?.id, payload });
+};
 
   const handleDeleteRule = (ruleId: string) => {
     if (confirm('Are you sure you want to deactivate this approval rule?')) {
