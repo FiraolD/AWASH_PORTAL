@@ -248,7 +248,11 @@ router.get('/my-policies', async (req, res) => {
   try {
     const userId = req.user?.id;
     const result = await pool.query(`
-      SELECT * FROM policies
+      SELECT 
+        *,
+        COALESCE("effectiveDate", "createdAt") as "effectiveDate",
+        COALESCE("expirationDate", NOW() + INTERVAL '1 year') as "expirationDate"
+      FROM policies
       WHERE "userId" = $1
       ORDER BY "createdAt" DESC
     `, [userId]);
