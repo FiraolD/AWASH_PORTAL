@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Users, Plus, Edit2, Trash2, RefreshCw, DollarSign, Package } from 'lucide-react';
+import { Users, Plus, Edit2, Trash2, RefreshCw, Package } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -27,7 +27,7 @@ import {
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
 // ---------------------------------------------------------------------------
-// Types – camelCase to match backend
+// Types
 // ---------------------------------------------------------------------------
 interface AssignmentRule {
   id: string;
@@ -42,19 +42,16 @@ interface AssignmentRule {
   updatedAt?: string;
 }
 
-// Updated product types to match your actual products
-const PRODUCT_TYPES = [
-  { value: 'ALL', label: 'All Products' },
-  { value: 'MOTOR', label: 'Motor Insurance' },
-  { value: 'HEALTH', label: 'Health Insurance' },
-  { value: 'FIRE', label: 'Fire Insurance' },
-  { value: 'TRAVEL', label: 'Travel Insurance' },
-  { value: 'LIFE', label: 'Life Insurance' },
-  { value: 'PROPERTY', label: 'Property Insurance' },
-  { value: 'MARINE', label: 'Marine Insurance' },
-];
+interface Product {
+  id: string;
+  name: string;
+  code: string;
+  description?: string;
+  requiresApproval?: boolean;
+  isActive?: boolean;
+}
 
-// Updated claims roles to match your auth system
+// Claims roles (these don't change often, so hardcoded is fine)
 const CLAIM_ROLES = [
   { value: 'CLAIM_OFFICER_I', label: 'Claim Officer I' },
   { value: 'CLAIM_OFFICER_II', label: 'Claim Officer II' },
@@ -70,11 +67,11 @@ const CLAIM_ROLES = [
 // ---------------------------------------------------------------------------
 export default function ClaimsAssignmentConfigPage() {
   const [rules, setRules] = React.useState<AssignmentRule[]>([]);
+  const [products, setProducts] = React.useState<Product[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [editingRule, setEditingRule] = React.useState<AssignmentRule | null>(null);
 
-  // Form state – camelCase
   const [formData, setFormData] = React.useState({
     ruleName: '',
     productType: 'ALL',
@@ -87,8 +84,12 @@ export default function ClaimsAssignmentConfigPage() {
 
   const { token } = useAuthStore();
 
+  // --------------------------------------------------------------------------
+  // Fetch data on mount
+  // --------------------------------------------------------------------------
   React.useEffect(() => {
     fetchRules();
+    fetchProducts();
   }, []);
 
   // --------------------------------------------------------------------------
@@ -109,21 +110,39 @@ export default function ClaimsAssignmentConfigPage() {
   // --------------------------------------------------------------------------
   const fetchRules = async () => {
     try {
-      setLoading(true);
       const response = await axios.get(`${API_URL}/claims-assignment`, {
         headers: getAuthHeaders(),
       });
-      setRules(response.data);
+      setRules(response.data || []);
     } catch (error) {
       console.error('Failed to fetch assignment rules:', error);
       toast.error('Failed to load assignment rules');
+    }
+  };
+
+  // --------------------------------------------------------------------------
+  // Fetch products from database
+  // --------------------------------------------------------------------------
+  const fetchProducts = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/products`, {
+        headers: getAuthHeaders(),
+      });
+      // Filter only active products
+      const activeProducts = (response.data || []).filter(
+        (p: Product) => p.isActive !== false
+      );
+      setProducts(activeProducts);
+    } catch (error) {
+      console.error('Failed to fetch products:', error);
+      toast.error('Failed to load products');
     } finally {
       setLoading(false);
     }
   };
 
   // --------------------------------------------------------------------------
-  // Save (create/update) rule
+  // Save rule
   // --------------------------------------------------------------------------
   const handleSubmit = async () => {
     if (!formData.ruleName || !formData.assignedRole) {
@@ -132,13 +151,17 @@ export default function ClaimsAssignmentConfigPage() {
     }
 
     try {
+      const minAmount = formData.minAmount ? parseFloat(String(formData.minAmount)) : 0;
+      const maxAmount = formData.maxAmount ? parseFloat(String(formData.maxAmount)) : null;
+      const priorityLevel = formData.priorityLevel ? parseInt(String(formData.priorityLevel)) : 1;
+
       const payload = {
-        ruleName: formData.ruleName,
+        ruleName: formData.ruleName.trim(),
         productType: formData.productType,
-        minAmount: parseFloat(formData.minAmount.toString()) || 0,
-        maxAmount: formData.maxAmount ? parseFloat(formData.maxAmount) : null,
+        minAmount: isNaN(minAmount) ? 0 : minAmount,
+        maxAmount: maxAmount && !isNaN(maxAmount) ? maxAmount : null,
         assignedRole: formData.assignedRole,
-        priorityLevel: parseInt(formData.priorityLevel.toString()) || 1,
+        priorityLevel: isNaN(priorityLevel) ? 1 : priorityLevel,
         isActive: formData.isActive,
       };
 
@@ -180,7 +203,7 @@ export default function ClaimsAssignmentConfigPage() {
   };
 
   // --------------------------------------------------------------------------
-  // Toggle rule active/inactive
+  // Toggle rule
   // --------------------------------------------------------------------------
   const handleToggle = async (rule: AssignmentRule) => {
     try {
@@ -192,7 +215,6 @@ export default function ClaimsAssignmentConfigPage() {
       toast.success(`Rule ${rule.isActive ? 'deactivated' : 'activated'} successfully`);
       fetchRules();
     } catch (error) {
-      console.error('Failed to toggle rule:', error);
       toast.error('Failed to toggle rule status');
     }
   };
@@ -205,10 +227,10 @@ export default function ClaimsAssignmentConfigPage() {
     setFormData({
       ruleName: rule.ruleName,
       productType: rule.productType,
-      minAmount: rule.minAmount,
+      minAmount: rule.minAmount || 0,
       maxAmount: rule.maxAmount?.toString() || '',
       assignedRole: rule.assignedRole,
-      priorityLevel: rule.priorityLevel,
+      priorityLevel: rule.priorityLevel || 1,
       isActive: rule.isActive,
     });
     setIsDialogOpen(true);
@@ -231,15 +253,16 @@ export default function ClaimsAssignmentConfigPage() {
   };
 
   // --------------------------------------------------------------------------
-  // Helper: get product label
+  // Helper: Get product name from code
   // --------------------------------------------------------------------------
   const getProductLabel = (code: string) => {
-    const product = PRODUCT_TYPES.find(p => p.value === code);
-    return product ? product.label : code;
+    if (code === 'ALL') return 'All Products';
+    const product = products.find(p => p.code === code);
+    return product ? product.name : code;
   };
 
   // --------------------------------------------------------------------------
-  // Helper: get role label
+  // Helper: Get role label
   // --------------------------------------------------------------------------
   const getRoleLabel = (code: string) => {
     const role = CLAIM_ROLES.find(r => r.value === code);
@@ -254,7 +277,7 @@ export default function ClaimsAssignmentConfigPage() {
       <div className="flex justify-center items-center h-96">
         <div className="text-center">
           <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#1A3E6F] border-t-transparent mx-auto mb-4" />
-          <p className="text-gray-500">Loading assignment rules...</p>
+          <p className="text-gray-500">Loading configuration...</p>
         </div>
       </div>
     );
@@ -296,7 +319,7 @@ export default function ClaimsAssignmentConfigPage() {
                 />
               </div>
 
-              {/* Product Type */}
+              {/* Product Type – dynamic from database */}
               <div className="space-y-2">
                 <Label>Product Type <span className="text-red-500">*</span></Label>
                 <Select
@@ -307,13 +330,29 @@ export default function ClaimsAssignmentConfigPage() {
                     <SelectValue placeholder="Select product type" />
                   </SelectTrigger>
                   <SelectContent>
-                    {PRODUCT_TYPES.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
+                    {/* "All Products" option */}
+                    <SelectItem value="ALL">
+                      <span className="font-medium">All Products</span>
+                      <span className="text-xs text-gray-400 ml-2">(catch-all rule)</span>
+                    </SelectItem>
+                    
+                    {/* Divider */}
+                    <div className="px-2 py-1.5 text-xs font-semibold text-gray-400 uppercase border-t mt-1 pt-1">
+                      Active Products
+                    </div>
+                    
+                    {/* Dynamic products from database */}
+                    {products.map((product) => (
+                      <SelectItem key={product.id} value={product.code}>
+                        {product.name}
+                        <span className="text-xs text-gray-400 ml-2">({product.code})</span>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-gray-400">
+                  {products.length} active product{products.length !== 1 ? 's' : ''} loaded from database
+                </p>
               </div>
 
               {/* Amount Range */}
@@ -365,11 +404,11 @@ export default function ClaimsAssignmentConfigPage() {
                 <Label>Priority Level</Label>
                 <Input
                   type="number"
-                  value={formData.priorityLevel}
+                  value={formData.priorityLevel || ''}
                   onChange={(e) =>
                     setFormData({ ...formData, priorityLevel: parseInt(e.target.value) || 1 })
                   }
-                  placeholder="Lower number = higher priority"
+                  placeholder="1"
                 />
                 <p className="text-xs text-gray-400">Lower numbers are evaluated first</p>
               </div>
@@ -427,7 +466,7 @@ export default function ClaimsAssignmentConfigPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {rules
+                  {[...rules]
                     .sort((a, b) => a.priorityLevel - b.priorityLevel)
                     .map((rule) => (
                       <tr key={rule.id} className="hover:bg-gray-50">
@@ -437,7 +476,9 @@ export default function ClaimsAssignmentConfigPage() {
                         </td>
                         <td className="py-3 text-sm">
                           ETB {rule.minAmount?.toLocaleString() ?? 0} –{' '}
-                          {rule.maxAmount ? `ETB ${rule.maxAmount.toLocaleString()}` : 'Unlimited'}
+                          {rule.maxAmount
+                            ? `ETB ${rule.maxAmount.toLocaleString()}`
+                            : 'Unlimited'}
                         </td>
                         <td className="py-3 text-sm">{getRoleLabel(rule.assignedRole)}</td>
                         <td className="py-3">{rule.priorityLevel}</td>
@@ -465,7 +506,11 @@ export default function ClaimsAssignmentConfigPage() {
                             >
                               <RefreshCw className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="sm" onClick={() => handleDelete(rule.id)}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(rule.id)}
+                            >
                               <Trash2 className="h-4 w-4 text-red-500" />
                             </Button>
                           </div>
