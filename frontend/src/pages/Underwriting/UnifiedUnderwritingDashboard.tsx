@@ -42,10 +42,13 @@ interface Policy {
   paymentReference?: string;
   createdAt: string;
   updatedAt: string;
+  submittedDate?: string;
   customerName?: string;
   customerEmail?: string;
   customerPhone?: string;
   productName?: string;
+  selectedPerils?: any[];
+  selectedRiders?: any[];
 }
 
 interface DashboardStats {
@@ -466,31 +469,296 @@ export default function UnifiedUnderwritingDashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* Details Modal */}
-      <Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Policy Details: {selectedPolicy?.policyNumber}</DialogTitle></DialogHeader>
-          {loadingDetails ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>
-          ) : policyDetails ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
-                <div><p className="text-xs text-gray-500">Policy Number</p><p className="font-medium">{policyDetails.policyNumber}</p></div>
-                <div><p className="text-xs text-gray-500">Status</p><Badge className={getStatusBadge(policyDetails.status).color}>{getStatusBadge(policyDetails.status).label}</Badge></div>
-                <div><p className="text-xs text-gray-500">Customer</p><p className="font-medium">{policyDetails.customerName}</p></div>
-                <div><p className="text-xs text-gray-500">Coverage</p><p className="font-medium">{formatCurrency(policyDetails.coverageAmount)}</p></div>
-                <div><p className="text-xs text-gray-500">Premium</p><p className="font-medium">{formatCurrency(policyDetails.premium || 0)}</p></div>
-                <div><p className="text-xs text-gray-500">Type</p><p className="font-medium">{policyDetails.type}</p></div>
-              </div>
-              <div className="flex justify-end pt-4 border-t">
-                <Button variant="outline" onClick={() => setIsDetailsModalOpen(false)}>Close</Button>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-12"><p className="text-gray-500">No policy details found</p></div>
+{/* ================================================================ */}
+{/* RICH DETAILS MODAL */}
+{/* ================================================================ */}
+<Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>
+  <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+    <DialogHeader>
+      <DialogTitle className="flex items-center gap-2">
+        <FileText className="h-5 w-5" />
+        Policy Details: {selectedPolicy?.policyNumber}
+      </DialogTitle>
+    </DialogHeader>
+
+    {loadingDetails ? (
+      <div className="flex justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    ) : policyDetails ? (
+      <div className="space-y-6">
+        {/* Status + Dates */}
+        <div className="flex items-center gap-3 flex-wrap">
+          {(() => {
+            const s = getStatusBadge(policyDetails.status);
+            return <Badge className={s.color}>{s.label}</Badge>;
+          })()}
+          <span className="text-sm text-gray-500">
+        Submitted: {formatDate(policyDetails.createdAt || policyDetails.submittedDate || new Date().toISOString())}
+          </span>
+          {policyDetails.updatedAt && (
+            <span className="text-sm text-gray-500">
+              | Last Updated: {formatDate(policyDetails.updatedAt)}
+            </span>
           )}
-        </DialogContent>
-      </Dialog>
+        </div>
+
+        {/* Policy Information */}
+        <div>
+          <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+            <Shield className="h-5 w-5 text-blue-600" />
+            Policy Information
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
+            <div>
+              <p className="text-xs text-gray-500">Policy Number</p>
+              <p className="font-medium text-lg">{policyDetails.policyNumber}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Product Type</p>
+              <p className="font-medium">{policyDetails.productName || policyDetails.type}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Status</p>
+              {(() => {
+                const s = getStatusBadge(policyDetails.status);
+                return <Badge className={s.color}>{s.label}</Badge>;
+              })()}
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Coverage Amount</p>
+              <p className="font-medium text-blue-600 text-lg">
+                {formatCurrency(policyDetails.coverageAmount)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Premium</p>
+              <p className="font-medium">
+                ETB {Number(policyDetails.premium || 0).toLocaleString()}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Premium Frequency</p>
+              <p className="font-medium">{policyDetails.premiumFrequency || 'ANNUALLY'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Effective Date</p>
+              <p className="font-medium">{formatDate(policyDetails.effectiveDate)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Expiration Date</p>
+              <p className="font-medium">{formatDate(policyDetails.expirationDate)}</p>
+            </div>
+            {policyDetails.adjustedPremium && (
+              <div>
+                <p className="text-xs text-gray-500">Adjusted Premium</p>
+                <p className="font-medium text-orange-600">
+                  ETB {Number(policyDetails.adjustedPremium).toLocaleString()}
+                </p>
+              </div>
+            )}
+            {policyDetails.totalPremium && (
+              <div>
+                <p className="text-xs text-gray-500">Total Premium</p>
+                <p className="font-medium text-green-600">
+                  ETB {Number(policyDetails.totalPremium).toLocaleString()}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Customer Information */}
+        <div>
+          <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+            <User className="h-5 w-5 text-blue-600" />
+            Customer Information
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+            <div>
+              <p className="text-xs text-gray-500">Full Name</p>
+              <p className="font-medium">{policyDetails.customerName || 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Email</p>
+              <p className="font-medium">{policyDetails.customerEmail || 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Phone</p>
+              <p className="font-medium">{policyDetails.customerPhone || 'N/A'}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Perils (if any) */}
+        {policyDetails.selectedPerils && policyDetails.selectedPerils.length > 0 && (
+          <div>
+            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-orange-600" />
+              Covered Perils
+            </h3>
+            <div className="space-y-2">
+              {policyDetails.selectedPerils.map((peril: any, idx: number) => (
+                <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div>
+                    <p className="font-medium">{peril.perilName || peril.name}</p>
+                    {peril.description && <p className="text-xs text-gray-500">{peril.description}</p>}
+                  </div>
+                  <Badge variant="outline">
+                    ETB {Number(peril.premium || 0).toLocaleString()}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Riders (if any) */}
+        {policyDetails.selectedRiders && policyDetails.selectedRiders.length > 0 && (
+          <div>
+            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+              <Shield className="h-5 w-5 text-purple-600" />
+              Optional Riders
+            </h3>
+            <div className="space-y-2">
+              {policyDetails.selectedRiders.map((rider: any, idx: number) => (
+                <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div>
+                    <p className="font-medium">{rider.riderName || rider.name}</p>
+                    {rider.description && <p className="text-xs text-gray-500">{rider.description}</p>}
+                  </div>
+                  <Badge variant="outline">
+                    ETB {Number(rider.premium || 0).toLocaleString()}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Vehicles (if any) */}
+        {policyDetails.productDetails?.vehicles && policyDetails.productDetails.vehicles.length > 0 && (
+          <div>
+            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+              <Car className="h-5 w-5 text-blue-600" />
+              Vehicles
+            </h3>
+            <div className="space-y-3">
+              {policyDetails.productDetails.vehicles.map((vehicle: any, idx: number) => (
+                <div key={idx} className="p-3 bg-gray-50 rounded-lg">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                    <div>
+                      <p className="text-xs text-gray-500">Make</p>
+                      <p className="font-medium">{vehicle.make || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Model</p>
+                      <p className="font-medium">{vehicle.model || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Year</p>
+                      <p className="font-medium">{vehicle.yearOfMake || vehicle.year || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Plate</p>
+                      <p className="font-medium">{vehicle.plateNumber || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Type</p>
+                      <p className="font-medium">{vehicle.vehicleType || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Usage</p>
+                      <p className="font-medium">{vehicle.usage || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Value</p>
+                      <p className="font-medium">ETB {Number(vehicle.vehicleValue || 0).toLocaleString()}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Underwriter Notes */}
+        {policyDetails.underwriterNotes && (
+          <div>
+            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+              <ClipboardList className="h-5 w-5 text-gray-600" />
+              Underwriter Notes
+            </h3>
+            <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
+              <p className="text-sm text-blue-800">{policyDetails.underwriterNotes}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Payment Reference */}
+        {policyDetails.paymentReference && (
+          <div>
+            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-orange-600" />
+              Payment Reference
+            </h3>
+            <div className="p-4 bg-orange-50 rounded-lg border border-orange-100">
+              <p className="text-lg font-bold text-orange-700">{policyDetails.paymentReference}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex gap-3 pt-4 border-t justify-end">
+          <Button variant="outline" onClick={() => setIsDetailsModalOpen(false)}>
+            Close
+          </Button>
+          {permissions.canReview && ['SUBMITTED', 'PENDING_UNDERWRITING'].includes(policyDetails.status) && (
+            <Button
+              className="bg-blue-600 hover:bg-blue-700"
+              onClick={() => {
+                setIsDetailsModalOpen(false);
+                setTimeout(() => openReviewModal(policyDetails, 'adjust'), 100);
+              }}
+            >
+              <ClipboardList className="h-4 w-4 mr-2" />
+              Review Policy
+            </Button>
+          )}
+          {permissions.canDirectApprove && ['SUBMITTED', 'PENDING_UNDERWRITING'].includes(policyDetails.status) && (
+            <Button
+              className="bg-green-600 hover:bg-green-700"
+              onClick={() => {
+                setIsDetailsModalOpen(false);
+                setTimeout(() => openReviewModal(policyDetails, 'direct_approve'), 100);
+              }}
+            >
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Direct Approve
+            </Button>
+          )}
+          {permissions.canFinalApprove && policyDetails.status === 'PENDING_FINAL_APPROVAL' && (
+            <Button
+              className="bg-purple-600 hover:bg-purple-700"
+              onClick={() => {
+                setIsDetailsModalOpen(false);
+                setTimeout(() => openReviewModal(policyDetails, 'final_approve'), 100);
+              }}
+            >
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Final Approve
+            </Button>
+          )}
+        </div>
+      </div>
+    ) : (
+      <div className="text-center py-12">
+        <AlertCircle className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+        <p className="text-gray-500">No policy details found</p>
+      </div>
+    )}
+  </DialogContent>
+</Dialog>
     </div>
   );
 }
