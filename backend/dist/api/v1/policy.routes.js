@@ -86,84 +86,58 @@ router.get('/:policyId/documents', async (req, res) => {
     try {
         const userId = req.user?.id;
         const { policyId } = req.params;
-        const policyCheck = await pool.query(`
-      SELECT id, "policyNumber" FROM policies 
-      WHERE id = $1 AND "userId" = $2
-    `, [policyId, userId]);
-        if (policyCheck.rows.length === 0) {
-            return res.status(404).json({ error: 'Policy not found' });
-        }
-        const policy = policyCheck.rows[0];
-        const documentsResult = await pool.query(`
-      SELECT 
-        id,
-        document_type as "documentType",
-        title,
-        file_url as "fileUrl",
-        generated_at as "generatedAt",
-        created_at as "createdAt"
-      FROM policy_documents
+        const result = await pool.query(`
+      SELECT * FROM policy_documents
       WHERE policy_id = $1
-      ORDER BY created_at DESC
     `, [policyId]);
-        const documents = documentsResult.rows.map(doc => ({
-            id: doc.id,
-            fileName: `${doc.title}.pdf`,
-            filePath: doc.fileUrl,
-            documentType: doc.documentType,
-            title: doc.title,
-            uploadedAt: doc.createdAt,
-            mimeType: 'application/pdf'
-        }));
-        const policyDocPath = await pool.query(`
-      SELECT "policyDocumentPath" FROM policies WHERE id = $1
-    `, [policyId]);
-        if (policyDocPath.rows[0]?.policyDocumentPath &&
-            fs.existsSync(policyDocPath.rows[0].policyDocumentPath) &&
-            documents.length === 0) {
-            documents.push({
-                id: policyId,
-                fileName: `Policy_${policy.policyNumber}.pdf`,
-                filePath: policyDocPath.rows[0].policyDocumentPath,
-                documentType: 'POLICY_SCHEDULE',
-                title: `Policy Schedule - ${policy.policyNumber}`,
-                uploadedAt: new Date(),
-                mimeType: 'application/pdf'
-            });
-        }
-        res.json(documents);
+        res.json(result.rows);
     }
     catch (error) {
-        console.error('Failed to fetch documents:', error);
-        res.status(500).json({ error: 'Failed to fetch documents' });
+        console.error('[Policies] Documents error:', error.message);
+        console.error('[Policies] Full error:', {
+            message: error.message,
+            routine: error.routine,
+            code: error.code,
+        });
+        res.status(500).json({
+            error: 'Failed to fetch documents',
+            detail: error.message,
+            code: error.code,
+        });
     }
 });
 // ==================== CUSTOMER POLICY ROUTES ====================
+// Get my policies (customer)
 router.get('/my-policies', async (req, res) => {
     try {
         const userId = req.user?.id;
+        // First, check what columns exist in the policies table
+        const columnsResult = await pool.query(`
+      SELECT column_name FROM information_schema.columns WHERE table_name = 'policies'
+    `);
+        console.log('[Policies] Available columns:', columnsResult.rows.map((r) => r.column_name));
         const result = await pool.query(`
-      SELECT 
-        p.id,
-        p."policyNumber",
-        p.type,
-        p."coverageAmount",
-        p.premium,
-        p.status,
-        p."createdAt",
-        p."effectiveDate",
-        p."expirationDate",
-        p."policyDocumentPath"
-      FROM policies p
-      WHERE p."userId" = $1
-      AND p.status IN ('PENDING_UNDERWRITING', 'AWAITING_CUSTOMER_APPROVAL', 'PENDING_FINAL_APPROVAL', 'ACTIVE')
-      ORDER BY p."createdAt" DESC
+      SELECT * FROM policies
+      WHERE "userId" = $1
+      ORDER BY "createdAt" DESC
     `, [userId]);
         res.json(result.rows);
     }
     catch (error) {
-        console.error('Failed to fetch policies:', error);
-        res.status(500).json({ error: 'Failed to fetch policies' });
+        console.error('[Policies] My-policies error:', error.message);
+        console.error('[Policies] Full error details:', {
+            message: error.message,
+            routine: error.routine,
+            code: error.code,
+            position: error.position,
+            table: error.table,
+            column: error.column,
+        });
+        res.status(500).json({
+            error: 'Failed to fetch policies',
+            detail: error.message,
+            code: error.code,
+        });
     }
 });
 router.get('/pending-decision', async (req, res) => {
