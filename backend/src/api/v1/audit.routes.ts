@@ -70,7 +70,35 @@ router.get('/', authenticate, authorizeExecutives, async (req: AuthRequest, res:
     res.status(500).json({ error: 'Failed to fetch audit logs' });
   }
 });
+// ---------------------------------------------------------------------------
+// GET distinct actions for filter dropdown
+// ---------------------------------------------------------------------------
+router.get('/actions', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await pool.query(
+      `SELECT DISTINCT action FROM audit_logs ORDER BY action ASC`
+    );
+    res.json(result.rows.map((row: any) => row.action));
+  } catch (error: any) {
+    console.error('[AuditLogs] Actions fetch error:', error.message);
+    res.status(500).json({ error: 'Failed to fetch actions' });
+  }
+});
 
+// ---------------------------------------------------------------------------
+// GET distinct entity types for filter dropdown
+// ---------------------------------------------------------------------------
+router.get('/entity-types', authenticate, authorizeExecutives, async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await pool.query(
+      `SELECT DISTINCT "entityType" FROM audit_logs ORDER BY "entityType" ASC`
+    );
+    res.json(result.rows.map((row: any) => row.entityType));
+  } catch (error: any) {
+    console.error('[AuditLogs] Entity types fetch error:', error.message);
+    res.status(500).json({ error: 'Failed to fetch entity types' });
+  }
+});
 // ---------------------------------------------------------------------------
 // Helper function to create audit logs (called by other routes)
 // ---------------------------------------------------------------------------
