@@ -1,21 +1,18 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   FileText, Clock, CheckCircle, XCircle, AlertCircle, RefreshCw, Loader2,
-  Search, Eye, ClipboardList, Activity, DollarSign, User, Shield, Car,
-  Heart, Flame, Plane, Users, BarChart3, Download, Ban, Send, ArrowLeft,
-  Copy
+  Search, Eye, ClipboardList, DollarSign, User, Shield, Car,
+  Heart, Flame, Plane, BarChart3, Ban, Send
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/Card';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Label } from '../../components/ui/Label';
 import { Badge } from '../../components/ui/Badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/Tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../components/ui/Dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/Dialog';
 import { Textarea } from '../../components/ui/Textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/Select';
-import { ScrollArea } from '../../components/ui/Scroll-area';
 import axiosInstance from '../../lib/axios';
 import { useAuthStore } from '../../stores/authStore';
 import { toast } from 'sonner';
@@ -42,7 +39,6 @@ interface Policy {
   paymentReference?: string;
   createdAt: string;
   updatedAt: string;
-  submittedDate?: string;
   customerName?: string;
   customerEmail?: string;
   customerPhone?: string;
@@ -66,11 +62,12 @@ interface DashboardStats {
 // ---------------------------------------------------------------------------
 const getStatusBadge = (status: string) => {
   const badges: Record<string, { label: string; color: string }> = {
-    SUBMITTED: { label: 'Submitted', color: 'bg-yellow-100 text-yellow-800' },
-    PENDING_UNDERWRITING: { label: 'Pending Underwriting', color: 'bg-yellow-100 text-yellow-800' },
-    UNDER_REVIEW: { label: 'Under Review', color: 'bg-blue-100 text-blue-800' },
-    AWAITING_CUSTOMER_APPROVAL: { label: 'Awaiting Customer', color: 'bg-orange-100 text-orange-800' },
-    PENDING_FINAL_APPROVAL: { label: 'Pending Final Approval', color: 'bg-purple-100 text-purple-800' },
+    PENDING_UNDERWRITING: { label: 'Pending Review', color: 'bg-yellow-100 text-yellow-800' },
+    APPROVED: { label: 'Approved', color: 'bg-blue-100 text-blue-800' },
+    PENDING_PAYMENT: { label: 'Pending Payment', color: 'bg-orange-100 text-orange-800' },
+    PAYMENT_RECEIVED: { label: 'Payment Received', color: 'bg-emerald-100 text-emerald-800' },
+    PENDING_FINAL_APPROVAL: { label: 'Pending Activation', color: 'bg-purple-100 text-purple-800' },
+    AWAITING_CUSTOMER_APPROVAL: { label: 'Awaiting Customer', color: 'bg-cyan-100 text-cyan-800' },
     ACTIVE: { label: 'Active', color: 'bg-green-100 text-green-800' },
     REJECTED: { label: 'Rejected', color: 'bg-red-100 text-red-800' },
     REJECTED_BY_CUSTOMER: { label: 'Rejected by Customer', color: 'bg-red-100 text-red-800' },
@@ -107,10 +104,10 @@ const usePermissions = (userRole: string) => {
     return {
       isOfficer, isSupervisor, isManager, isHead, isAdmin,
       canReview: true,
-      canAdjustPremium: isOfficer || isSupervisor || isManager || isHead || isAdmin,
+      canApprove: isSupervisor || isManager || isHead || isAdmin,
+      canGeneratePayment: isSupervisor || isManager || isHead || isAdmin,
       canFinalApprove: isSupervisor || isManager || isHead || isAdmin,
       canReject: isSupervisor || isManager || isHead || isAdmin,
-      canDirectApprove: isSupervisor || isManager || isHead || isAdmin,
       canViewAll: isManager || isHead || isAdmin,
       roleDisplayName: getRoleDisplayName(userRole),
     };
@@ -121,7 +118,6 @@ const usePermissions = (userRole: string) => {
 // Main Component
 // ---------------------------------------------------------------------------
 export default function UnifiedUnderwritingDashboard() {
-  const navigate = useNavigate();
   const { user } = useAuthStore();
   const userRole = user?.role?.toUpperCase() || '';
   const permissions = usePermissions(userRole);
@@ -147,15 +143,14 @@ export default function UnifiedUnderwritingDashboard() {
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
 
   const [reviewData, setReviewData] = useState({
-    decision: 'APPROVE',
     adjustedPremium: '',
     notes: '',
-    actionType: 'review' as 'review' | 'reject' | 'final_approve' | 'adjust' | 'direct_approve',
+    actionType: 'review' as 'review' | 'reject' | 'approve' | 'final_approve',
   });
   const [submitting, setSubmitting] = useState(false);
 
   // --------------------------------------------------------------------------
-  // Fetch dashboard data
+  // Fetch
   // --------------------------------------------------------------------------
   const fetchDashboardData = useCallback(async () => {
     setLoading(true);
@@ -165,7 +160,6 @@ export default function UnifiedUnderwritingDashboard() {
         axiosInstance.get('/underwriting/pending-review'),
         axiosInstance.get('/underwriting/stats'),
       ]);
-
       setPolicies(Array.isArray(policiesRes.data) ? policiesRes.data : []);
       setStats(statsRes.data || {
         pendingReviews: 0, pendingFinalApprovals: 0, pendingEndorsements: 0,
@@ -189,7 +183,7 @@ export default function UnifiedUnderwritingDashboard() {
   };
 
   // --------------------------------------------------------------------------
-  // Policy detail
+  // Detail
   // --------------------------------------------------------------------------
   const fetchPolicyDetails = async (policyId: string) => {
     setLoadingDetails(true);
@@ -210,12 +204,11 @@ export default function UnifiedUnderwritingDashboard() {
   };
 
   // --------------------------------------------------------------------------
-  // Review handlers
+  // Actions
   // --------------------------------------------------------------------------
-  const openReviewModal = (policy: Policy, actionType: 'review' | 'reject' | 'final_approve' | 'adjust' | 'direct_approve') => {
+  const openReviewModal = (policy: Policy, actionType: 'review' | 'reject' | 'approve' | 'final_approve') => {
     setSelectedPolicy(policy);
     setReviewData({
-      decision: actionType === 'reject' ? 'REJECT' : 'APPROVE',
       adjustedPremium: policy.premium?.toString() || '',
       notes: '',
       actionType,
@@ -227,15 +220,30 @@ export default function UnifiedUnderwritingDashboard() {
     if (!selectedPolicy) return;
     setSubmitting(true);
     try {
-      const endpoint = `/underwriting/policies/${selectedPolicy.id}/${reviewData.actionType === 'direct_approve' ? 'direct-approve' : reviewData.actionType === 'reject' ? 'reject' : reviewData.actionType === 'final_approve' ? 'final-approve' : 'adjust'}`;
+      let endpoint = '';
       const payload: any = { notes: reviewData.notes };
-      if (reviewData.actionType === 'adjust') {
-        payload.adjusted_premium = parseFloat(reviewData.adjustedPremium);
-        payload.underwriter_notes = reviewData.notes;
+
+      switch (reviewData.actionType) {
+        case 'review':
+          endpoint = `/underwriting/policies/${selectedPolicy.id}/adjust`;
+          payload.adjusted_premium = parseFloat(reviewData.adjustedPremium) || selectedPolicy.premium;
+          payload.underwriter_notes = reviewData.notes;
+          break;
+        case 'approve':
+          endpoint = `/underwriting/policies/${selectedPolicy.id}/direct-approve`;
+          payload.comments = reviewData.notes;
+          break;
+        case 'reject':
+          endpoint = `/underwriting/policies/${selectedPolicy.id}/reject`;
+          payload.reason = reviewData.notes;
+          break;
+        case 'final_approve':
+          endpoint = `/underwriting/policies/${selectedPolicy.id}/final-approve`;
+          break;
       }
 
       await axiosInstance.post(endpoint, payload);
-      toast.success(`${reviewData.actionType.replace('_', ' ')} completed successfully`);
+      toast.success(`${reviewData.actionType.replace('_', ' ')} completed`);
       setIsReviewModalOpen(false);
       setSelectedPolicy(null);
       fetchDashboardData();
@@ -246,28 +254,33 @@ export default function UnifiedUnderwritingDashboard() {
     }
   };
 
+  const handleGeneratePaymentRef = (policy: Policy) => {
+    setSelectedPolicy(policy);
+    setIsPaymentDialogOpen(true);
+  };
+
   // --------------------------------------------------------------------------
   // Filtering
   // --------------------------------------------------------------------------
   const filteredPolicies = policies.filter(policy => {
     const matchesSearch =
       policy.policyNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      policy.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (policy.customerName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       policy.type?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || policy.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
   // --------------------------------------------------------------------------
-  // Render helpers
+  // Render
   // --------------------------------------------------------------------------
   const renderStatsCards = () => (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       {[
-        { label: 'Pending Reviews', value: stats.pendingReviews, icon: Clock, color: 'text-yellow-600', bg: 'bg-yellow-100' },
-        { label: 'Pending Final', value: stats.pendingFinalApprovals, icon: FileText, color: 'text-purple-600', bg: 'bg-purple-100' },
-        { label: 'Active Policies', value: stats.totalActivePolicies, icon: Shield, color: 'text-green-600', bg: 'bg-green-100' },
-        { label: 'Rejected', value: stats.rejectedPolicies, icon: XCircle, color: 'text-red-600', bg: 'bg-red-100' },
+        { label: 'Pending Review', value: policies.filter(p => p.status === 'PENDING_UNDERWRITING').length, icon: Clock, color: 'text-yellow-600', bg: 'bg-yellow-100' },
+        { label: 'Approved', value: policies.filter(p => p.status === 'APPROVED').length, icon: CheckCircle, color: 'text-blue-600', bg: 'bg-blue-100' },
+        { label: 'Pending Payment', value: policies.filter(p => p.status === 'PENDING_PAYMENT').length, icon: DollarSign, color: 'text-orange-600', bg: 'bg-orange-100' },
+        { label: 'Active', value: stats.totalActivePolicies, icon: Shield, color: 'text-green-600', bg: 'bg-green-100' },
       ].map((card, idx) => (
         <Card key={idx} className="hover:shadow-md transition-shadow">
           <CardContent className="p-4">
@@ -284,7 +297,7 @@ export default function UnifiedUnderwritingDashboard() {
   );
 
   const renderPolicyList = (policyList: Policy[]) => {
-    if (!policyList || policyList.length === 0) {
+    if (!policyList?.length) {
       return (
         <Card>
           <CardContent className="text-center py-12">
@@ -300,11 +313,9 @@ export default function UnifiedUnderwritingDashboard() {
         {policyList.map((policy) => {
           const status = getStatusBadge(policy.status);
           const ProductIcon = PRODUCT_ICONS[policy.type] || PRODUCT_ICONS.default;
-
           return (
             <Card key={policy.id} className="hover:shadow-lg transition-all duration-200 border-l-4"
-              style={{ borderLeftColor: status.color.includes('yellow') ? '#eab308' : status.color.includes('blue') ? '#3b82f6' : status.color.includes('purple') ? '#8b5cf6' : status.color.includes('green') ? '#22c55e' : status.color.includes('red') ? '#ef4444' : '#6b7280' }}
-            >
+              style={{ borderLeftColor: status.color.includes('yellow') ? '#eab308' : status.color.includes('blue') ? '#3b82f6' : status.color.includes('orange') ? '#f97316' : status.color.includes('emerald') ? '#10b981' : status.color.includes('green') ? '#22c55e' : status.color.includes('red') ? '#ef4444' : '#6b7280' }}>
               <CardContent className="p-4">
                 <div className="flex justify-between items-start flex-wrap gap-4">
                   <div className="space-y-2 flex-1 min-w-[200px]">
@@ -318,25 +329,24 @@ export default function UnifiedUnderwritingDashboard() {
                       <div><p className="text-gray-500">Coverage</p><p className="font-medium text-blue-600">{formatCurrency(policy.coverageAmount)}</p></div>
                       <div><p className="text-gray-500">Premium</p><p className="font-medium">ETB {policy.premium?.toLocaleString()}</p></div>
                     </div>
+                    {policy.paymentReference && <p className="text-xs text-orange-600 font-medium">Ref: {policy.paymentReference}</p>}
                   </div>
                   <div className="flex gap-2 flex-wrap">
-                    <Button variant="outline" size="sm" onClick={() => handleViewPolicy(policy)}>
-                      <Eye className="h-4 w-4 mr-1" /> View
-                    </Button>
-                    {permissions.canReview && ['SUBMITTED', 'PENDING_UNDERWRITING'].includes(policy.status) && (
-                      <Button variant="outline" size="sm" onClick={() => openReviewModal(policy, 'adjust')}>
-                        <ClipboardList className="h-4 w-4 mr-1" /> Review
-                      </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleViewPolicy(policy)}><Eye className="h-4 w-4 mr-1" /> View</Button>
+                    {permissions.canReview && policy.status === 'PENDING_UNDERWRITING' && (
+                      <Button variant="outline" size="sm" onClick={() => openReviewModal(policy, 'review')}><ClipboardList className="h-4 w-4 mr-1" /> Review</Button>
                     )}
-                    {permissions.canDirectApprove && ['SUBMITTED', 'PENDING_UNDERWRITING'].includes(policy.status) && (
-                      <Button variant="default" size="sm" className="bg-green-600" onClick={() => openReviewModal(policy, 'direct_approve')}>
-                        <CheckCircle className="h-4 w-4 mr-1" /> Approve
-                      </Button>
+                    {permissions.canApprove && policy.status === 'PENDING_UNDERWRITING' && (
+                      <Button variant="default" size="sm" className="bg-blue-600" onClick={() => openReviewModal(policy, 'approve')}><CheckCircle className="h-4 w-4 mr-1" /> Approve</Button>
                     )}
-                    {permissions.canFinalApprove && policy.status === 'PENDING_FINAL_APPROVAL' && (
-                      <Button variant="default" size="sm" className="bg-blue-600" onClick={() => openReviewModal(policy, 'final_approve')}>
-                        <CheckCircle className="h-4 w-4 mr-1" /> Final Approve
-                      </Button>
+                    {permissions.canGeneratePayment && policy.status === 'APPROVED' && !policy.paymentReference && (
+                      <Button variant="default" size="sm" className="bg-orange-600" onClick={() => handleGeneratePaymentRef(policy)}><DollarSign className="h-4 w-4 mr-1" /> Payment Ref</Button>
+                    )}
+                    {permissions.canFinalApprove && policy.status === 'PAYMENT_RECEIVED' && (
+                      <Button variant="default" size="sm" className="bg-green-600" onClick={() => openReviewModal(policy, 'final_approve')}><CheckCircle className="h-4 w-4 mr-1" /> Activate</Button>
+                    )}
+                    {permissions.canReject && ['PENDING_UNDERWRITING', 'APPROVED'].includes(policy.status) && (
+                      <Button variant="outline" size="sm" className="text-red-600" onClick={() => openReviewModal(policy, 'reject')}><Ban className="h-4 w-4 mr-1" /> Reject</Button>
                     )}
                   </div>
                 </div>
@@ -378,7 +388,7 @@ export default function UnifiedUnderwritingDashboard() {
   }
 
   // ==========================================================================
-  // MAIN RENDER
+  // RENDER
   // ==========================================================================
   return (
     <div className="space-y-6">
@@ -408,12 +418,13 @@ export default function UnifiedUnderwritingDashboard() {
           </div>
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filter by status" /></SelectTrigger>
+          <SelectTrigger className="w-[200px]"><SelectValue placeholder="Filter by status" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="PENDING_UNDERWRITING">Pending Underwriting</SelectItem>
-            <SelectItem value="SUBMITTED">Submitted</SelectItem>
-            <SelectItem value="PENDING_FINAL_APPROVAL">Pending Final Approval</SelectItem>
+            <SelectItem value="PENDING_UNDERWRITING">Pending Review</SelectItem>
+            <SelectItem value="APPROVED">Approved</SelectItem>
+            <SelectItem value="PENDING_PAYMENT">Pending Payment</SelectItem>
+            <SelectItem value="PAYMENT_RECEIVED">Payment Received</SelectItem>
             <SelectItem value="ACTIVE">Active</SelectItem>
             <SelectItem value="REJECTED">Rejected</SelectItem>
           </SelectContent>
@@ -422,12 +433,14 @@ export default function UnifiedUnderwritingDashboard() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
-          <TabsTrigger value="queue">Queue ({policies.filter(p => ['SUBMITTED', 'PENDING_UNDERWRITING'].includes(p.status)).length})</TabsTrigger>
-          <TabsTrigger value="final">Final Approval ({policies.filter(p => p.status === 'PENDING_FINAL_APPROVAL').length})</TabsTrigger>
+          <TabsTrigger value="queue">Pending ({policies.filter(p => p.status === 'PENDING_UNDERWRITING').length})</TabsTrigger>
+          <TabsTrigger value="approved">Approved ({policies.filter(p => p.status === 'APPROVED').length})</TabsTrigger>
+          <TabsTrigger value="payment">Payment ({policies.filter(p => ['PENDING_PAYMENT', 'PAYMENT_RECEIVED'].includes(p.status)).length})</TabsTrigger>
           <TabsTrigger value="all">All ({filteredPolicies.length})</TabsTrigger>
         </TabsList>
-        <TabsContent value="queue">{renderPolicyList(filteredPolicies.filter(p => ['SUBMITTED', 'PENDING_UNDERWRITING'].includes(p.status)))}</TabsContent>
-        <TabsContent value="final">{renderPolicyList(filteredPolicies.filter(p => p.status === 'PENDING_FINAL_APPROVAL'))}</TabsContent>
+        <TabsContent value="queue">{renderPolicyList(filteredPolicies.filter(p => p.status === 'PENDING_UNDERWRITING'))}</TabsContent>
+        <TabsContent value="approved">{renderPolicyList(filteredPolicies.filter(p => p.status === 'APPROVED'))}</TabsContent>
+        <TabsContent value="payment">{renderPolicyList(filteredPolicies.filter(p => ['PENDING_PAYMENT', 'PAYMENT_RECEIVED'].includes(p.status)))}</TabsContent>
         <TabsContent value="all">{renderPolicyList(filteredPolicies)}</TabsContent>
       </Tabs>
 
@@ -435,7 +448,9 @@ export default function UnifiedUnderwritingDashboard() {
       <Dialog open={isReviewModalOpen} onOpenChange={setIsReviewModalOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{reviewData.actionType === 'direct_approve' ? 'Direct Approve' : reviewData.actionType === 'reject' ? 'Reject' : reviewData.actionType === 'final_approve' ? 'Final Approval' : 'Review Policy'}: {selectedPolicy?.policyNumber}</DialogTitle>
+            <DialogTitle>
+              {reviewData.actionType === 'approve' ? 'Approve Policy' : reviewData.actionType === 'reject' ? 'Reject Policy' : reviewData.actionType === 'final_approve' ? 'Activate Policy' : 'Review Policy'}: {selectedPolicy?.policyNumber}
+            </DialogTitle>
           </DialogHeader>
           {selectedPolicy && (
             <div className="space-y-4">
@@ -447,20 +462,19 @@ export default function UnifiedUnderwritingDashboard() {
                   <div><p className="text-gray-500">Status</p><Badge className={getStatusBadge(selectedPolicy.status).color}>{getStatusBadge(selectedPolicy.status).label}</Badge></div>
                 </div>
               </div>
-              {reviewData.actionType === 'adjust' && (
+              {reviewData.actionType === 'review' && (
                 <div>
                   <Label>Adjusted Premium (ETB)</Label>
                   <Input type="number" value={reviewData.adjustedPremium} onChange={(e) => setReviewData({ ...reviewData, adjustedPremium: e.target.value })} />
                 </div>
               )}
               <div>
-                <Label>Notes</Label>
+                <Label>{reviewData.actionType === 'reject' ? 'Rejection Reason' : 'Notes'}</Label>
                 <Textarea value={reviewData.notes} onChange={(e) => setReviewData({ ...reviewData, notes: e.target.value })} rows={3} />
               </div>
               <div className="flex gap-3 pt-4">
                 <Button onClick={handleSubmitReview} disabled={submitting} className="flex-1 bg-blue-600">
-                  {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
-                  Submit
+                  {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />} Submit
                 </Button>
                 <Button variant="outline" onClick={() => setIsReviewModalOpen(false)}>Cancel</Button>
               </div>
@@ -469,296 +483,72 @@ export default function UnifiedUnderwritingDashboard() {
         </DialogContent>
       </Dialog>
 
-{/* ================================================================ */}
-{/* RICH DETAILS MODAL */}
-{/* ================================================================ */}
-<Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>
-  <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-    <DialogHeader>
-      <DialogTitle className="flex items-center gap-2">
-        <FileText className="h-5 w-5" />
-        Policy Details: {selectedPolicy?.policyNumber}
-      </DialogTitle>
-    </DialogHeader>
-
-    {loadingDetails ? (
-      <div className="flex justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-      </div>
-    ) : policyDetails ? (
-      <div className="space-y-6">
-        {/* Status + Dates */}
-        <div className="flex items-center gap-3 flex-wrap">
-          {(() => {
-            const s = getStatusBadge(policyDetails.status);
-            return <Badge className={s.color}>{s.label}</Badge>;
-          })()}
-          <span className="text-sm text-gray-500">
-        Submitted: {formatDate(policyDetails.createdAt || policyDetails.submittedDate || new Date().toISOString())}
-          </span>
-          {policyDetails.updatedAt && (
-            <span className="text-sm text-gray-500">
-              | Last Updated: {formatDate(policyDetails.updatedAt)}
-            </span>
-          )}
-        </div>
-
-        {/* Policy Information */}
-        <div>
-          <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-            <Shield className="h-5 w-5 text-blue-600" />
-            Policy Information
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
-            <div>
-              <p className="text-xs text-gray-500">Policy Number</p>
-              <p className="font-medium text-lg">{policyDetails.policyNumber}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Product Type</p>
-              <p className="font-medium">{policyDetails.productName || policyDetails.type}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Status</p>
-              {(() => {
-                const s = getStatusBadge(policyDetails.status);
-                return <Badge className={s.color}>{s.label}</Badge>;
-              })()}
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Coverage Amount</p>
-              <p className="font-medium text-blue-600 text-lg">
-                {formatCurrency(policyDetails.coverageAmount)}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Premium</p>
-              <p className="font-medium">
-                ETB {Number(policyDetails.premium || 0).toLocaleString()}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Premium Frequency</p>
-              <p className="font-medium">{policyDetails.premiumFrequency || 'ANNUALLY'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Effective Date</p>
-              <p className="font-medium">{formatDate(policyDetails.effectiveDate)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Expiration Date</p>
-              <p className="font-medium">{formatDate(policyDetails.expirationDate)}</p>
-            </div>
-            {policyDetails.adjustedPremium && (
-              <div>
-                <p className="text-xs text-gray-500">Adjusted Premium</p>
-                <p className="font-medium text-orange-600">
-                  ETB {Number(policyDetails.adjustedPremium).toLocaleString()}
-                </p>
+      {/* Rich Details Modal */}
+      <Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><FileText className="h-5 w-5" /> Policy Details: {selectedPolicy?.policyNumber}</DialogTitle>
+          </DialogHeader>
+          {loadingDetails ? (
+            <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>
+          ) : policyDetails ? (
+            <div className="space-y-6">
+              <div className="flex items-center gap-3 flex-wrap">
+                {(() => { const s = getStatusBadge(policyDetails.status); return <Badge className={s.color}>{s.label}</Badge>; })()}
+                <span className="text-sm text-gray-500">Created: {formatDate(policyDetails.createdAt)}</span>
               </div>
-            )}
-            {policyDetails.totalPremium && (
-              <div>
-                <p className="text-xs text-gray-500">Total Premium</p>
-                <p className="font-medium text-green-600">
-                  ETB {Number(policyDetails.totalPremium).toLocaleString()}
-                </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
+                <div><p className="text-xs text-gray-500">Policy Number</p><p className="font-medium text-lg">{policyDetails.policyNumber}</p></div>
+                <div><p className="text-xs text-gray-500">Product</p><p className="font-medium">{policyDetails.productName || policyDetails.type}</p></div>
+                <div><p className="text-xs text-gray-500">Coverage</p><p className="font-medium text-blue-600 text-lg">{formatCurrency(policyDetails.coverageAmount)}</p></div>
+                <div><p className="text-xs text-gray-500">Premium</p><p className="font-medium">ETB {Number(policyDetails.premium || 0).toLocaleString()}</p></div>
+                <div><p className="text-xs text-gray-500">Frequency</p><p className="font-medium">{policyDetails.premiumFrequency || 'ANNUALLY'}</p></div>
+                <div><p className="text-xs text-gray-500">Effective</p><p className="font-medium">{formatDate(policyDetails.effectiveDate)}</p></div>
+                <div><p className="text-xs text-gray-500">Expiration</p><p className="font-medium">{formatDate(policyDetails.expirationDate)}</p></div>
+                <div><p className="text-xs text-gray-500">Customer</p><p className="font-medium">{policyDetails.customerName || 'N/A'}</p></div>
+                <div><p className="text-xs text-gray-500">Email</p><p className="font-medium">{policyDetails.customerEmail || 'N/A'}</p></div>
+                <div><p className="text-xs text-gray-500">Phone</p><p className="font-medium">{policyDetails.customerPhone || 'N/A'}</p></div>
+                {policyDetails.adjustedPremium && <div><p className="text-xs text-gray-500">Adjusted Premium</p><p className="font-medium text-orange-600">ETB {Number(policyDetails.adjustedPremium).toLocaleString()}</p></div>}
+                {policyDetails.paymentReference && <div><p className="text-xs text-gray-500">Payment Ref</p><p className="font-medium text-orange-600">{policyDetails.paymentReference}</p></div>}
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Customer Information */}
-        <div>
-          <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-            <User className="h-5 w-5 text-blue-600" />
-            Customer Information
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
-            <div>
-              <p className="text-xs text-gray-500">Full Name</p>
-              <p className="font-medium">{policyDetails.customerName || 'N/A'}</p>
+              {policyDetails.underwriterNotes && (
+                <div><h3 className="text-lg font-semibold mb-2">Underwriter Notes</h3><div className="p-4 bg-blue-50 rounded-lg"><p className="text-sm">{policyDetails.underwriterNotes}</p></div></div>
+              )}
+              <div className="flex gap-3 pt-4 border-t justify-end">
+                <Button variant="outline" onClick={() => setIsDetailsModalOpen(false)}>Close</Button>
+                {permissions.canReview && policyDetails.status === 'PENDING_UNDERWRITING' && (
+                  <Button className="bg-blue-600" onClick={() => { setIsDetailsModalOpen(false); setTimeout(() => openReviewModal(policyDetails, 'review'), 100); }}><ClipboardList className="h-4 w-4 mr-2" /> Review</Button>
+                )}
+                {permissions.canApprove && policyDetails.status === 'PENDING_UNDERWRITING' && (
+                  <Button className="bg-blue-600" onClick={() => { setIsDetailsModalOpen(false); setTimeout(() => openReviewModal(policyDetails, 'approve'), 100); }}><CheckCircle className="h-4 w-4 mr-2" /> Approve</Button>
+                )}
+                {permissions.canGeneratePayment && policyDetails.status === 'APPROVED' && !policyDetails.paymentReference && (
+                  <Button className="bg-orange-600" onClick={() => { setIsDetailsModalOpen(false); setTimeout(() => handleGeneratePaymentRef(policyDetails), 100); }}><DollarSign className="h-4 w-4 mr-2" /> Payment Ref</Button>
+                )}
+                {permissions.canFinalApprove && policyDetails.status === 'PAYMENT_RECEIVED' && (
+                  <Button className="bg-green-600" onClick={() => { setIsDetailsModalOpen(false); setTimeout(() => openReviewModal(policyDetails, 'final_approve'), 100); }}><CheckCircle className="h-4 w-4 mr-2" /> Activate</Button>
+                )}
+              </div>
             </div>
-            <div>
-              <p className="text-xs text-gray-500">Email</p>
-              <p className="font-medium">{policyDetails.customerEmail || 'N/A'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Phone</p>
-              <p className="font-medium">{policyDetails.customerPhone || 'N/A'}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Perils (if any) */}
-        {policyDetails.selectedPerils && policyDetails.selectedPerils.length > 0 && (
-          <div>
-            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-orange-600" />
-              Covered Perils
-            </h3>
-            <div className="space-y-2">
-              {policyDetails.selectedPerils.map((peril: any, idx: number) => (
-                <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div>
-                    <p className="font-medium">{peril.perilName || peril.name}</p>
-                    {peril.description && <p className="text-xs text-gray-500">{peril.description}</p>}
-                  </div>
-                  <Badge variant="outline">
-                    ETB {Number(peril.premium || 0).toLocaleString()}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Riders (if any) */}
-        {policyDetails.selectedRiders && policyDetails.selectedRiders.length > 0 && (
-          <div>
-            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-              <Shield className="h-5 w-5 text-purple-600" />
-              Optional Riders
-            </h3>
-            <div className="space-y-2">
-              {policyDetails.selectedRiders.map((rider: any, idx: number) => (
-                <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div>
-                    <p className="font-medium">{rider.riderName || rider.name}</p>
-                    {rider.description && <p className="text-xs text-gray-500">{rider.description}</p>}
-                  </div>
-                  <Badge variant="outline">
-                    ETB {Number(rider.premium || 0).toLocaleString()}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Vehicles (if any) */}
-        {policyDetails.productDetails?.vehicles && policyDetails.productDetails.vehicles.length > 0 && (
-          <div>
-            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-              <Car className="h-5 w-5 text-blue-600" />
-              Vehicles
-            </h3>
-            <div className="space-y-3">
-              {policyDetails.productDetails.vehicles.map((vehicle: any, idx: number) => (
-                <div key={idx} className="p-3 bg-gray-50 rounded-lg">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-                    <div>
-                      <p className="text-xs text-gray-500">Make</p>
-                      <p className="font-medium">{vehicle.make || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500">Model</p>
-                      <p className="font-medium">{vehicle.model || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500">Year</p>
-                      <p className="font-medium">{vehicle.yearOfMake || vehicle.year || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500">Plate</p>
-                      <p className="font-medium">{vehicle.plateNumber || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500">Type</p>
-                      <p className="font-medium">{vehicle.vehicleType || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500">Usage</p>
-                      <p className="font-medium">{vehicle.usage || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500">Value</p>
-                      <p className="font-medium">ETB {Number(vehicle.vehicleValue || 0).toLocaleString()}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Underwriter Notes */}
-        {policyDetails.underwriterNotes && (
-          <div>
-            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-              <ClipboardList className="h-5 w-5 text-gray-600" />
-              Underwriter Notes
-            </h3>
-            <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
-              <p className="text-sm text-blue-800">{policyDetails.underwriterNotes}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Payment Reference */}
-        {policyDetails.paymentReference && (
-          <div>
-            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-orange-600" />
-              Payment Reference
-            </h3>
-            <div className="p-4 bg-orange-50 rounded-lg border border-orange-100">
-              <p className="text-lg font-bold text-orange-700">{policyDetails.paymentReference}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Action Buttons */}
-        <div className="flex gap-3 pt-4 border-t justify-end">
-          <Button variant="outline" onClick={() => setIsDetailsModalOpen(false)}>
-            Close
-          </Button>
-          {permissions.canReview && ['SUBMITTED', 'PENDING_UNDERWRITING'].includes(policyDetails.status) && (
-            <Button
-              className="bg-blue-600 hover:bg-blue-700"
-              onClick={() => {
-                setIsDetailsModalOpen(false);
-                setTimeout(() => openReviewModal(policyDetails, 'adjust'), 100);
-              }}
-            >
-              <ClipboardList className="h-4 w-4 mr-2" />
-              Review Policy
-            </Button>
+          ) : (
+            <div className="text-center py-12"><p className="text-gray-500">No policy details found</p></div>
           )}
-          {permissions.canDirectApprove && ['SUBMITTED', 'PENDING_UNDERWRITING'].includes(policyDetails.status) && (
-            <Button
-              className="bg-green-600 hover:bg-green-700"
-              onClick={() => {
-                setIsDetailsModalOpen(false);
-                setTimeout(() => openReviewModal(policyDetails, 'direct_approve'), 100);
-              }}
-            >
-              <CheckCircle className="h-4 w-4 mr-2" />
-              Direct Approve
-            </Button>
-          )}
-          {permissions.canFinalApprove && policyDetails.status === 'PENDING_FINAL_APPROVAL' && (
-            <Button
-              className="bg-purple-600 hover:bg-purple-700"
-              onClick={() => {
-                setIsDetailsModalOpen(false);
-                setTimeout(() => openReviewModal(policyDetails, 'final_approve'), 100);
-              }}
-            >
-              <CheckCircle className="h-4 w-4 mr-2" />
-              Final Approve
-            </Button>
-          )}
-        </div>
-      </div>
-    ) : (
-      <div className="text-center py-12">
-        <AlertCircle className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-        <p className="text-gray-500">No policy details found</p>
-      </div>
-    )}
-  </DialogContent>
-</Dialog>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment Reference Generator */}
+      {selectedPolicy && (
+        <PaymentReferenceGenerator
+          policyId={selectedPolicy.id}
+          policyNumber={selectedPolicy.policyNumber}
+          coverageAmount={selectedPolicy.coverageAmount || 0}
+          customerName={selectedPolicy.customerName}
+          customerPhone={selectedPolicy.customerPhone}
+          customerEmail={selectedPolicy.customerEmail}
+          open={isPaymentDialogOpen}
+          onClose={() => { setIsPaymentDialogOpen(false); setSelectedPolicy(null); fetchDashboardData(); }}
+        />
+      )}
     </div>
   );
 }
