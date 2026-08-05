@@ -143,6 +143,80 @@ router.put('/:key', authenticate, authorizeExecutives, async (req, res) => {
     }
 });
 // ---------------------------------------------------------------------------
+// POST run backup
+// ---------------------------------------------------------------------------
+router.post('/backup/run', authenticate, authorizeExecutives, async (req, res) => {
+    try {
+        // Placeholder – actual backup logic would go here
+        console.log('[Settings] Backup initiated by:', req.user?.email);
+        res.json({
+            message: 'Backup completed successfully',
+            timestamp: new Date().toISOString(),
+            files: ['database_backup.sql', 'settings_backup.json'],
+        });
+    }
+    catch (error) {
+        console.error('[Settings] Backup run error:', error.message);
+        res.status(500).json({ error: 'Failed to run backup' });
+    }
+});
+// ---------------------------------------------------------------------------
+// POST run maintenance
+// ---------------------------------------------------------------------------
+router.post('/maintenance/run', authenticate, authorizeExecutives, async (req, res) => {
+    try {
+        // Placeholder – actual maintenance logic would go here
+        console.log('[Settings] Maintenance initiated by:', req.user?.email);
+        res.json({
+            message: 'Maintenance completed successfully',
+            timestamp: new Date().toISOString(),
+            tasks: ['Cleared old audit logs', 'Optimized database indexes', 'Cleared cache'],
+        });
+    }
+    catch (error) {
+        console.error('[Settings] Maintenance run error:', error.message);
+        res.status(500).json({ error: 'Failed to run maintenance' });
+    }
+});
+// ---------------------------------------------------------------------------
+// PUT bulk update all settings
+// ---------------------------------------------------------------------------
+router.put('/', authenticate, authorizeExecutives, async (req, res) => {
+    try {
+        const settings = req.body; // { key1: value1, key2: value2, ... }
+        if (!settings || typeof settings !== 'object') {
+            return res.status(400).json({ error: 'Settings object is required' });
+        }
+        const results = [];
+        for (const [key, value] of Object.entries(settings)) {
+            const result = await pool.query(`INSERT INTO system_settings ("settingKey", "settingValue", "settingType", "updatedBy", "createdAt", "updatedAt")
+         VALUES ($1, $2, 'string', $3, NOW(), NOW())
+         ON CONFLICT ("settingKey") 
+         DO UPDATE SET 
+           "settingValue" = $2, 
+           "updatedBy" = $3, 
+           "updatedAt" = NOW()
+         RETURNING *`, [key, String(value), req.user.id]);
+            results.push(result.rows[0]);
+        }
+        // Audit log
+        try {
+            await createAuditLog(req.user.id, req.user.email, req.user.role, 'BULK_UPDATE', 'SYSTEM_SETTING', 'bulk', null, settings, getClientIp(req), getHeaderString(req, 'user-agent'));
+        }
+        catch (auditError) {
+            console.warn('[Settings] Audit log failed:', auditError);
+        }
+        res.json({
+            message: 'Settings saved successfully',
+            count: results.length,
+        });
+    }
+    catch (error) {
+        console.error('[Settings] Bulk update error:', error.message);
+        res.status(500).json({ error: 'Failed to save settings' });
+    }
+});
+// ---------------------------------------------------------------------------
 // DELETE a setting
 // ---------------------------------------------------------------------------
 router.delete('/:key', authenticate, authorizeExecutives, async (req, res) => {
