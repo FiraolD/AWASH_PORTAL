@@ -8,16 +8,15 @@ import path from 'path';
 const router = Router();
 router.use(authenticate);
 // ==================== HELPER FUNCTIONS ====================
-// Get base rate from database
 async function getBaseRate(productType, coverageAmount) {
     const result = await pool.query(`
-    SELECT baseRate 
+    SELECT "baseRate" 
     FROM premium_rates 
-    WHERE product_type = $1 
-      AND $2 >= min_coverage 
-      AND (max_coverage IS NULL OR $2 <= max_coverage)
-      AND is_active = true
-    ORDER BY min_coverage ASC
+    WHERE "productType" = $1 
+      AND $2 >= "minCoverage" 
+      AND ("maxCoverage" IS NULL OR $2 <= "maxCoverage")
+      AND "isActive" = true
+    ORDER BY "minCoverage" ASC
     LIMIT 1
   `, [productType.toUpperCase(), coverageAmount]);
     if (result.rows.length > 0) {
@@ -26,7 +25,6 @@ async function getBaseRate(productType, coverageAmount) {
     console.warn(`No rate found for ${productType} with coverage ${coverageAmount}, using default`);
     return 0.03;
 }
-// Get peril premium
 async function getPerilPremium(perilId, coverageAmount) {
     const result = await pool.query(`
     SELECT "premiumRate", "calculationType" FROM perils WHERE id = $1 AND "isActive" = true
@@ -39,7 +37,6 @@ async function getPerilPremium(perilId, coverageAmount) {
     }
     return parseFloat(peril.premiumRate);
 }
-// Get rider premium
 async function getRiderPremium(riderId, coverageAmount) {
     const result = await pool.query(`
     SELECT "premiumRate", "calculationType" FROM riders WHERE id = $1 AND "isActive" = true
@@ -52,14 +49,13 @@ async function getRiderPremium(riderId, coverageAmount) {
     }
     return parseFloat(rider.premiumRate);
 }
-// Get VAT rate
 async function getVatRate() {
     try {
         const result = await pool.query(`
-      SELECT setting_value FROM system_settings WHERE setting_key = 'vatRate'
+      SELECT "settingValue" FROM system_settings WHERE "settingKey" = 'vatRate'
     `);
         if (result.rows.length > 0) {
-            const rate = parseFloat(result.rows[0].setting_value);
+            const rate = parseFloat(result.rows[0].settingValue);
             return isNaN(rate) ? 0.15 : rate;
         }
         return 0.15;
@@ -69,14 +65,13 @@ async function getVatRate() {
         return 0.15;
     }
 }
-// Get DRR rate
 async function getDrrRate() {
     try {
         const result = await pool.query(`
-      SELECT setting_value FROM system_settings WHERE setting_key = 'drrRate'
+      SELECT "settingValue" FROM system_settings WHERE "settingKey" = 'drrRate'
     `);
         if (result.rows.length > 0) {
-            const rate = parseFloat(result.rows[0].setting_value);
+            const rate = parseFloat(result.rows[0].settingValue);
             return isNaN(rate) ? 0.01 : rate;
         }
         return 0.01;
@@ -87,12 +82,10 @@ async function getDrrRate() {
     }
 }
 // ==================== POLICY DOCUMENTS ENDPOINT ====================
-// Get all documents for a policy
 router.get('/:policyId/documents', async (req, res) => {
     try {
         const userId = req.user?.id;
         const { policyId } = req.params;
-        // Verify policy belongs to user
         const policyCheck = await pool.query(`
       SELECT id, "policyNumber" FROM policies 
       WHERE id = $1 AND "userId" = $2
@@ -101,7 +94,6 @@ router.get('/:policyId/documents', async (req, res) => {
             return res.status(404).json({ error: 'Policy not found' });
         }
         const policy = policyCheck.rows[0];
-        // Get documents from policy_documents table
         const documentsResult = await pool.query(`
       SELECT 
         id,
@@ -114,7 +106,6 @@ router.get('/:policyId/documents', async (req, res) => {
       WHERE policy_id = $1
       ORDER BY created_at DESC
     `, [policyId]);
-        // Format documents for frontend
         const documents = documentsResult.rows.map(doc => ({
             id: doc.id,
             fileName: `${doc.title}.pdf`,
@@ -124,14 +115,12 @@ router.get('/:policyId/documents', async (req, res) => {
             uploadedAt: doc.createdAt,
             mimeType: 'application/pdf'
         }));
-        // Also check if there's a policy document path in policies table (for backward compatibility)
         const policyDocPath = await pool.query(`
       SELECT "policyDocumentPath" FROM policies WHERE id = $1
     `, [policyId]);
         if (policyDocPath.rows[0]?.policyDocumentPath &&
             fs.existsSync(policyDocPath.rows[0].policyDocumentPath) &&
             documents.length === 0) {
-            // Add the legacy document if no documents in policy_documents
             documents.push({
                 id: policyId,
                 fileName: `Policy_${policy.policyNumber}.pdf`,
@@ -150,7 +139,6 @@ router.get('/:policyId/documents', async (req, res) => {
     }
 });
 // ==================== CUSTOMER POLICY ROUTES ====================
-// Get my policies (customer)
 router.get('/my-policies', async (req, res) => {
     try {
         const userId = req.user?.id;
@@ -178,7 +166,6 @@ router.get('/my-policies', async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch policies' });
     }
 });
-// Get policies awaiting customer decision
 router.get('/pending-decision', async (req, res) => {
     try {
         const userId = req.user?.id;
@@ -204,7 +191,6 @@ router.get('/pending-decision', async (req, res) => {
         res.json([]);
     }
 });
-// Customer responds to offer (accept/reject)
 router.post('/:id/respond', async (req, res) => {
     try {
         const { decision, notes } = req.body;
@@ -278,7 +264,6 @@ router.post('/:id/respond', async (req, res) => {
     }
 });
 // ==================== CREATE POLICY ====================
-// Create new policy
 router.post('/', async (req, res) => {
     try {
         const userId = req.user?.id;
@@ -368,7 +353,6 @@ router.post('/', async (req, res) => {
                 monthlyPremium: totalPremium / termMonths
             }
         });
-        // Generate PDF in background
         setTimeout(() => {
             generatePolicyDocument(policyId).catch(err => {
                 console.error(`Background PDF generation failed for policy ${policyId}:`, err);
@@ -377,14 +361,13 @@ router.post('/', async (req, res) => {
     }
     catch (error) {
         console.error('Failed to create policy:', error);
-        res.status(500).json({ error: 'Failed to submit policy application', details: error.message });
+        res.status(500).json({ error: 'Failed to submit policy application', detail: error.message });
     }
 });
-// ==================== PDF GENERATION FUNCTION ====================
+// ==================== PDF GENERATION ====================
 async function generatePolicyDocument(policyId) {
     try {
         console.log(`Starting PDF generation for policy: ${policyId}`);
-        // Get policy details with customer info
         const policyResult = await pool.query(`
       SELECT p.*, u."firstName", u."lastName", u.email, u.phone, u.address,
              pr.name as productName
@@ -398,22 +381,18 @@ async function generatePolicyDocument(policyId) {
             return;
         }
         const policy = policyResult.rows[0];
-        console.log(`Generating PDF for policy: ${policy.policyNumber}`);
-        // Get perils for this policy
         const perilsResult = await pool.query(`
       SELECT pe."perilName", pe.description, pp."perilPremium"
       FROM policy_perils pp
       JOIN perils pe ON pe.id = pp."perilId"
       WHERE pp."policyId" = $1
     `, [policyId]);
-        // Get riders for this policy
         const ridersResult = await pool.query(`
       SELECT r."riderName", r.description, pr."riderPremium", r."maxLimit"
       FROM policy_riders pr
       JOIN riders r ON r.id = pr."riderId"
       WHERE pr."policyId" = $1
     `, [policyId]);
-        // Get vehicles if any
         let vehicles = [];
         try {
             if (policy.productDetails) {
@@ -425,11 +404,6 @@ async function generatePolicyDocument(policyId) {
         catch (e) {
             vehicles = [];
         }
-        // Calculate totals
-        const totalPerilPremium = perilsResult.rows.reduce((sum, p) => sum + parseFloat(p.perilPremium || 0), 0);
-        const totalRiderPremium = ridersResult.rows.reduce((sum, r) => sum + parseFloat(r.riderPremium || 0), 0);
-        const basePremium = parseFloat(policy.premium || 0);
-        const totalPremium = parseFloat(policy.totalPremium || basePremium);
         const policyData = {
             policyNumber: policy.policyNumber,
             customerName: `${policy.firstName} ${policy.lastName}`,
@@ -439,14 +413,11 @@ async function generatePolicyDocument(policyId) {
             productName: policy.productName || policy.type,
             productType: policy.type,
             coverageAmount: parseFloat(policy.coverageAmount || 0),
-            premium: basePremium,
-            totalPremium: totalPremium,
-            perilPremium: totalPerilPremium,
-            riderPremium: totalRiderPremium,
+            premium: parseFloat(policy.premium || 0),
+            totalPremium: parseFloat(policy.totalPremium || policy.premium || 0),
             premiumFrequency: policy.premiumFrequency || 'YEARLY',
             effectiveDate: policy.effectiveDate ? new Date(policy.effectiveDate) : new Date(),
             expirationDate: policy.expirationDate ? new Date(policy.expirationDate) : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-            coverageTier: policy.coverageTier || 'Standard',
             selectedPerils: perilsResult.rows.map(p => ({
                 perilName: p.perilName,
                 description: p.description,
@@ -460,224 +431,55 @@ async function generatePolicyDocument(policyId) {
             })),
             vehicles: vehicles
         };
-        // Create uploads directory
         const uploadsDir = path.join(process.cwd(), 'uploads', 'policies');
         if (!fs.existsSync(uploadsDir)) {
             fs.mkdirSync(uploadsDir, { recursive: true });
         }
-        // Generate PDF using the service
         const pdfPath = await generatePolicySchedule(policyData);
-        console.log(`PDF generated at: ${pdfPath}`);
-        // Verify file was created
         if (fs.existsSync(pdfPath)) {
-            const stats = fs.statSync(pdfPath);
-            console.log(`PDF file size: ${stats.size} bytes`);
-            // Save PDF path to policy table
             await pool.query(`
         UPDATE policies 
         SET "policyDocumentPath" = $1, "updatedAt" = NOW() 
         WHERE id = $2
       `, [pdfPath, policyId]);
-            // ========== INSERT INTO policy_documents TABLE ==========
             const documentTitle = `Policy Schedule - ${policy.policyNumber}`;
             const documentType = 'POLICY_SCHEDULE';
-            // Check if document already exists for this policy
             const existingDoc = await pool.query(`
         SELECT id FROM policy_documents WHERE policy_id = $1 AND document_type = $2
       `, [policyId, documentType]);
             if (existingDoc.rows.length > 0) {
-                // Update existing document
                 await pool.query(`
           UPDATE policy_documents 
-          SET file_url = $1, 
-              generated_at = NOW(), 
-              created_at = NOW(),
-              title = $2,
-              content = $3
-          WHERE policy_id = $4 AND document_type = $5
-        `, [pdfPath, documentTitle, JSON.stringify(policyData, null, 2), policyId, documentType]);
-                console.log(`Updated policy_documents record for policy ${policy.policyNumber}`);
+          SET file_url = $1, generated_at = NOW(), created_at = NOW(), title = $2
+          WHERE policy_id = $3 AND document_type = $4
+        `, [pdfPath, documentTitle, policyId, documentType]);
             }
             else {
-                // Insert new document
                 await pool.query(`
-          INSERT INTO policy_documents (
-            id, policy_id, document_type, title, content, file_url, generated_at, created_at
-          ) VALUES (
-            gen_random_uuid()::text, $1, $2, $3, $4, $5, NOW(), NOW()
-          )
-        `, [policyId, documentType, documentTitle, JSON.stringify(policyData, null, 2), pdfPath]);
-                console.log(`Inserted policy_documents record for policy ${policy.policyNumber}`);
+          INSERT INTO policy_documents (id, policy_id, document_type, title, file_url, generated_at, created_at)
+          VALUES (gen_random_uuid()::text, $1, $2, $3, $4, NOW(), NOW())
+        `, [policyId, documentType, documentTitle, pdfPath]);
             }
-            console.log(`Policy document path saved for policy ${policy.policyNumber}`);
-        }
-        else {
-            console.error(`PDF file was not created at ${pdfPath}`);
         }
     }
     catch (error) {
         console.error('Failed to generate policy document:', error);
-        // Don't throw, just log the error - policy creation shouldn't fail because of PDF
     }
 }
-// ==================== APPROVAL ENDPOINTS ====================
-// Get all pending policies for underwriting roles
-router.get('/pending-underwriting', async (req, res) => {
-    try {
-        const userRole = req.user?.role;
-        const underwritingRoles = [
-            'UNDERWRITER', 'SENIOR_UNDERWRITER', 'UNDERWRITING_MANAGER',
-            'CLAIM_OFFICER', 'CLAIM_OFFICER_I', 'CLAIM_OFFICER_II',
-            'SENIOR_CLAIM_OFFICER', 'SUPERVISOR_CLAIMS', 'MANAGER_CLAIMS', 'HEAD_CLAIMS'
-        ];
-        const directApprovalRoles = [
-            'MANAGER_CLAIMS', 'HEAD_CLAIMS', 'CLAIMS_ADMIN', 'CUSTOMER_ADMIN', 'MASTER_ADMIN'
-        ];
-        let whereClause = '';
-        let params = [];
-        if (underwritingRoles.includes(userRole)) {
-            whereClause = `WHERE p.status = 'PENDING_UNDERWRITING' AND (p."approvalType" = 'REVIEW_NEEDED' OR p."approvalType" IS NULL)`;
-        }
-        else if (directApprovalRoles.includes(userRole)) {
-            whereClause = `WHERE p.status = 'PENDING_UNDERWRITING' AND p."approvalType" = 'DIRECT_APPROVAL'`;
-        }
-        else {
-            return res.status(403).json({ error: 'Access denied' });
-        }
-        const query = `
-      SELECT 
-        p.id, p."policyNumber", p.type, p."coverageAmount", p.premium,
-        p.status, p."approvalType", p."createdAt",
-        u."firstName" || ' ' || u."lastName" as "customerName",
-        u.email as "customerEmail", u.phone as "customerPhone"
-      FROM policies p
-      JOIN users u ON u.id = p."userId"
-      ${whereClause}
-      ORDER BY p."createdAt" ASC
-    `;
-        const result = await pool.query(query, params);
-        res.json(result.rows);
-    }
-    catch (error) {
-        console.error('Failed to fetch pending policies:', error);
-        res.status(500).json({ error: 'Failed to fetch pending policies' });
-    }
-});
-// Direct approve policy
-router.post('/:id/direct-approve', async (req, res) => {
-    try {
-        const id = String(req.params.id);
-        const approverId = req.user?.id;
-        const approverRole = req.user?.role;
-        const { comments } = req.body;
-        const directApprovalRoles = [
-            'MANAGER_CLAIMS', 'HEAD_CLAIMS', 'CLAIMS_ADMIN', 'CUSTOMER_ADMIN', 'MASTER_ADMIN'
-        ];
-        if (!directApprovalRoles.includes(approverRole)) {
-            return res.status(403).json({ error: 'You do not have permission to directly approve policies' });
-        }
-        const policyResult = await pool.query(`SELECT * FROM policies WHERE id = $1`, [id]);
-        if (policyResult.rows.length === 0) {
-            return res.status(404).json({ error: 'Policy not found' });
-        }
-        const policy = policyResult.rows[0];
-        await pool.query('BEGIN');
-        await pool.query(`
-      UPDATE policies 
-      SET status = 'ACTIVE', "approvalType" = 'DIRECT_APPROVAL',
-          "directApprovedBy" = $1, "directApprovedAt" = NOW(), "updatedAt" = NOW()
-      WHERE id = $2
-    `, [approverId, id]);
-        await pool.query('COMMIT');
-        res.json({
-            message: 'Policy approved successfully',
-            policyId: id,
-            policyNumber: policy.policyNumber,
-            status: 'ACTIVE'
-        });
-    }
-    catch (error) {
-        await pool.query('ROLLBACK');
-        console.error('Failed to approve policy:', error);
-        res.status(500).json({ error: 'Failed to approve policy' });
-    }
-});
-// Review and adjust policy
-router.post('/:id/review-adjust', async (req, res) => {
-    try {
-        const id = String(req.params.id);
-        const underwriterId = req.user?.id;
-        const underwriterRole = req.user?.role;
-        const { adjustedPremium, underwriterNotes, decision, sendToCustomer } = req.body;
-        const underwritingRoles = [
-            'UNDERWRITER', 'SENIOR_UNDERWRITER', 'UNDERWRITING_MANAGER',
-            'CLAIM_OFFICER', 'CLAIM_OFFICER_I', 'CLAIM_OFFICER_II', 'SENIOR_CLAIM_OFFICER'
-        ];
-        if (!underwritingRoles.includes(underwriterRole)) {
-            return res.status(403).json({ error: 'You do not have permission to review policies' });
-        }
-        const policyResult = await pool.query(`SELECT * FROM policies WHERE id = $1`, [id]);
-        if (policyResult.rows.length === 0) {
-            return res.status(404).json({ error: 'Policy not found' });
-        }
-        const policy = policyResult.rows[0];
-        await pool.query('BEGIN');
-        let newStatus = '';
-        if (decision === 'APPROVE') {
-            newStatus = sendToCustomer ? 'AWAITING_CUSTOMER_APPROVAL' : 'ACTIVE';
-            await pool.query(`
-        UPDATE policies 
-        SET "adjustedPremium" = $1, "underwriterNotes" = $2, status = $3,
-            "underwriterId" = $4, "underwriterReviewedAt" = NOW(), "updatedAt" = NOW()
-        WHERE id = $5
-      `, [adjustedPremium || null, underwriterNotes, newStatus, underwriterId, id]);
-        }
-        else if (decision === 'REJECT') {
-            newStatus = 'REJECTED_BY_UNDERWRITER';
-            await pool.query(`
-        UPDATE policies 
-        SET status = $1, "underwriterNotes" = $2, "underwriterId" = $3,
-            "underwriterReviewedAt" = NOW(), "updatedAt" = NOW()
-        WHERE id = $4
-      `, [newStatus, underwriterNotes, underwriterId, id]);
-        }
-        await pool.query('COMMIT');
-        if (newStatus === 'ACTIVE') {
-            generatePolicyDocument(id).catch(err => console.error('Failed to generate policy document:', err));
-        }
-        res.json({
-            message: `Policy ${decision.toLowerCase()}d successfully`,
-            policyId: id,
-            policyNumber: policy.policyNumber,
-            status: newStatus
-        });
-    }
-    catch (error) {
-        await pool.query('ROLLBACK');
-        console.error('Failed to review policy:', error);
-        res.status(500).json({ error: 'Failed to review policy' });
-    }
-});
 // ==================== PREMIUM CALCULATION ====================
 router.post('/calculate-premium', async (req, res) => {
     try {
         const { productType, coverageAmount, termMonths = 12, vehicles = [], selectedPerils = [], selectedRiders = [] } = req.body;
-        console.log('=== PREMIUM CALCULATION REQUEST ===');
-        console.log('Product Type:', productType);
-        console.log('Coverage Amount:', coverageAmount);
         if (!productType || !coverageAmount) {
             return res.status(400).json({ error: 'Product type and coverage amount are required' });
-        }
-        if (coverageAmount < 100000) {
-            return res.status(400).json({ error: 'Coverage amount must be at least ETB 100,000' });
         }
         let baseRate = 0.03;
         try {
             const rateResult = await pool.query(`
-        SELECT baseRate FROM premium_rates 
-        WHERE product_type = $1 AND $2 >= min_coverage 
-          AND (max_coverage IS NULL OR $2 <= max_coverage) AND is_active = true
-        ORDER BY min_coverage ASC LIMIT 1
+        SELECT "baseRate" FROM premium_rates 
+        WHERE "productType" = $1 AND $2 >= "minCoverage" 
+          AND ("maxCoverage" IS NULL OR $2 <= "maxCoverage") AND "isActive" = true
+        ORDER BY "minCoverage" ASC LIMIT 1
       `, [productType.toUpperCase(), coverageAmount]);
             if (rateResult.rows.length > 0) {
                 baseRate = parseFloat(rateResult.rows[0].baseRate);
@@ -705,11 +507,7 @@ router.post('/calculate-premium', async (req, res) => {
                         ? actualCoverage * parseFloat(peril.premiumRate)
                         : parseFloat(peril.premiumRate);
                     perilPremium += premium;
-                    perilBreakdown.push({
-                        id: perilId,
-                        name: peril.perilName || 'Unknown',
-                        premium: premium
-                    });
+                    perilBreakdown.push({ id: perilId, name: peril.perilName || 'Unknown', premium });
                 }
             }
             catch (err) {
@@ -730,11 +528,7 @@ router.post('/calculate-premium', async (req, res) => {
                         ? actualCoverage * parseFloat(rider.premiumRate)
                         : parseFloat(rider.premiumRate);
                     riderPremium += premium;
-                    riderBreakdown.push({
-                        id: riderId,
-                        name: rider.riderName || 'Unknown',
-                        premium: premium
-                    });
+                    riderBreakdown.push({ id: riderId, name: rider.riderName || 'Unknown', premium });
                 }
             }
             catch (err) {
@@ -766,14 +560,13 @@ router.post('/calculate-premium', async (req, res) => {
             riderPremium: Math.round(riderPremium * 100) / 100,
             perilBreakdown,
             riderBreakdown,
-            riskModifier: 1.0,
             coverageTier,
             baseRate: Math.round(baseRate * 100) / 100
         });
     }
     catch (error) {
         console.error('Premium calculation failed:', error);
-        res.status(500).json({ error: 'Failed to calculate premium', details: error.message });
+        res.status(500).json({ error: 'Failed to calculate premium', detail: error.message });
     }
 });
 // ==================== DOWNLOAD POLICY DOCUMENT ====================
@@ -792,10 +585,8 @@ router.get('/:policyId/download', async (req, res) => {
         if (!fs.existsSync(filePath)) {
             return res.status(404).json({ error: 'Policy document file not found' });
         }
-        // Restrict to only PDF and Excel files
-        const allowedExtensions = ['.pdf', '.xls', '.xlsx'];
         const ext = path.extname(filePath).toLowerCase();
-        if (!allowedExtensions.includes(ext)) {
+        if (!['.pdf', '.xls', '.xlsx'].includes(ext)) {
             return res.status(403).json({ error: 'Only PDF and Excel files can be downloaded.' });
         }
         res.download(filePath, `policy_${policyId}${ext}`);
@@ -805,12 +596,10 @@ router.get('/:policyId/download', async (req, res) => {
         res.status(500).json({ error: 'Failed to download policy document' });
     }
 });
-// Download policy document
 router.get('/documents/:documentId/download', async (req, res) => {
     try {
         const { documentId } = req.params;
         const userId = req.user?.id;
-        // Get document from policy_documents table with policy ownership check
         const docResult = await pool.query(`
       SELECT pd.*, p."userId" as policy_owner_id, p."policyNumber"
       FROM policy_documents pd
@@ -821,21 +610,16 @@ router.get('/documents/:documentId/download', async (req, res) => {
             return res.status(404).json({ error: 'Document not found' });
         }
         const document = docResult.rows[0];
-        // Check if user owns the policy
         if (document.policy_owner_id !== userId && req.user?.role !== 'MASTER_ADMIN') {
             return res.status(403).json({ error: 'Access denied' });
         }
-        // Check if file exists
         if (!fs.existsSync(document.file_url)) {
             return res.status(404).json({ error: 'Document file not found' });
         }
-        // Restrict to only PDF and Excel files
-        const allowedExtensions = ['.pdf', '.xls', '.xlsx'];
         const ext = path.extname(document.file_url).toLowerCase();
-        if (!allowedExtensions.includes(ext)) {
+        if (!['.pdf', '.xls', '.xlsx'].includes(ext)) {
             return res.status(403).json({ error: 'Only PDF and Excel files can be downloaded.' });
         }
-        // Send file
         res.download(document.file_url, `${document.title}${ext}`);
     }
     catch (error) {
