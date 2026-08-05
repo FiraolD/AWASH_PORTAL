@@ -12,7 +12,7 @@ import roleLevelsRoutes from './role-levels.routes.js';
 import productsRoutes from './products.routes.js';
 import coverageTiersRoutes from './coverageTiers.routes.js';
 // Policies
-import policiesRoutes from './policy.routes.js';
+import policiesRoutes from './policies.routes.js';
 // Claims
 import claimsRoutes from './claim.routes.js';
 import claimsAssignmentRoutes from './claims-assignment.routes.js';
