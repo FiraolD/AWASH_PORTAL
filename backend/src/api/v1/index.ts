@@ -17,7 +17,7 @@ import productsRoutes from './products.routes.js';
 import coverageTiersRoutes from './coverageTiers.routes.js';
 
 // Policies
-import policiesRoutes from './policy.routes.js';
+import policiesRoutes from './policies.routes.js';
 
 // Claims
 import claimsRoutes from './claim.routes.js';
