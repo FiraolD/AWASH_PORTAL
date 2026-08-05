@@ -219,20 +219,42 @@ router.get('/stats', async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch policy stats', detail: error.message });
     }
 });
-// ==================== MY POLICIES (must be before /:policyId) ====================
 router.get('/my-policies', async (req, res) => {
     try {
         const userId = req.user?.id;
         const result = await pool.query(`
       SELECT 
-        *,
-        COALESCE("effectiveDate", "createdAt") as "effectiveDate",
-        COALESCE("expirationDate", NOW() + INTERVAL '1 year') as "expirationDate"
+        id,
+        "policyNumber",
+        type,
+        "coverageAmount",
+        premium,
+        status,
+        COALESCE("createdAt", NOW()) as "createdAt",
+        COALESCE("updatedAt", NOW()) as "updatedAt",
+        COALESCE("effectiveDate", NOW()) as "effectiveDate",
+        COALESCE("expirationDate", NOW() + INTERVAL '1 year') as "expirationDate",
+        "policyDocumentPath",
+        "adjustedPremium",
+        "totalPremium",
+        "underwriterNotes",
+        "premiumFrequency",
+        "productDetails",
+        "approvalType",
+        "userId"
       FROM policies
       WHERE "userId" = $1
       ORDER BY "createdAt" DESC
     `, [userId]);
-        res.json(result.rows);
+        // Ensure all date fields are valid strings
+        const safeRows = result.rows.map(row => ({
+            ...row,
+            createdAt: row.createdAt || new Date().toISOString(),
+            updatedAt: row.updatedAt || new Date().toISOString(),
+            effectiveDate: row.effectiveDate || new Date().toISOString(),
+            expirationDate: row.expirationDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+        }));
+        res.json(safeRows);
     }
     catch (error) {
         console.error('[Policies] My-policies error:', error.message);
