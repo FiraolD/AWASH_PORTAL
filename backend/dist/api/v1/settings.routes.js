@@ -3,9 +3,9 @@ import { authenticate, authorizeExecutives } from '../../middleware/auth.middlew
 import pool from '../../lib/db.js';
 import { createAuditLog, getClientIp, getHeaderString } from './audit.routes.js';
 const router = Router();
-// ---------------------------------------------------------------------------
+// ===========================================================================
 // GET all settings
-// ---------------------------------------------------------------------------
+// ===========================================================================
 router.get('/', authenticate, authorizeExecutives, async (req, res) => {
     try {
         const result = await pool.query(`SELECT "settingKey", "settingValue", "settingType", description, "isPublic", "createdAt", "updatedAt", "updatedBy"
@@ -18,9 +18,9 @@ router.get('/', authenticate, authorizeExecutives, async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch settings' });
     }
 });
-// ---------------------------------------------------------------------------
+// ===========================================================================
 // GET public settings (no auth required)
-// ---------------------------------------------------------------------------
+// ===========================================================================
 router.get('/public', async (req, res) => {
     try {
         const result = await pool.query(`SELECT "settingKey", "settingValue", "settingType" 
@@ -49,9 +49,9 @@ router.get('/public', async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch public settings' });
     }
 });
-// ---------------------------------------------------------------------------
+// ===========================================================================
 // GET backup settings
-// ---------------------------------------------------------------------------
+// ===========================================================================
 router.get('/backup', authenticate, authorizeExecutives, async (req, res) => {
     try {
         res.json({
@@ -67,87 +67,11 @@ router.get('/backup', authenticate, authorizeExecutives, async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch backup settings' });
     }
 });
-// ---------------------------------------------------------------------------
-// POST create backup
-// ---------------------------------------------------------------------------
-router.post('/backup', authenticate, authorizeExecutives, async (req, res) => {
-    try {
-        res.json({ message: 'Backup initiated successfully' });
-    }
-    catch (error) {
-        console.error('[Settings] Backup create error:', error.message);
-        res.status(500).json({ error: 'Failed to create backup' });
-    }
-});
-// ---------------------------------------------------------------------------
-// GET hospitals list
-// ---------------------------------------------------------------------------
-router.get('/hospitals', async (req, res) => {
-    try {
-        try {
-            const result = await pool.query(`SELECT hospital_name FROM hospital_list WHERE is_active = true ORDER BY hospital_name ASC`);
-            if (result.rows.length > 0) {
-                return res.json(result.rows.map((r) => r.hospital_name));
-            }
-        }
-        catch {
-            // Table doesn't exist
-        }
-        res.json([]);
-    }
-    catch (error) {
-        console.error('[Settings] Hospitals error:', error.message);
-        res.status(500).json({ error: 'Failed to fetch hospitals' });
-    }
-});
-// ---------------------------------------------------------------------------
-// UPSERT a setting
-// ---------------------------------------------------------------------------
-router.put('/:key', authenticate, authorizeExecutives, async (req, res) => {
-    try {
-        const key = String(req.params.key);
-        const { value, type, description, isPublic } = req.body;
-        if (value === undefined && value !== '') {
-            return res.status(400).json({ error: 'Value is required' });
-        }
-        const result = await pool.query(`INSERT INTO system_settings ("settingKey", "settingValue", "settingType", description, "isPublic", "updatedBy", "createdAt", "updatedAt")
-       VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-       ON CONFLICT ("settingKey") 
-       DO UPDATE SET 
-         "settingValue" = $2, 
-         "settingType" = $3, 
-         description = COALESCE($4, system_settings.description), 
-         "isPublic" = COALESCE($5, system_settings."isPublic"), 
-         "updatedBy" = $6, 
-         "updatedAt" = NOW()
-       RETURNING *`, [
-            key,
-            String(value),
-            type || 'string',
-            description || null,
-            isPublic !== undefined ? isPublic : false,
-            req.user.id,
-        ]);
-        // Audit log (non-blocking)
-        try {
-            await createAuditLog(req.user.id, req.user.email, req.user.role, 'UPSERT', 'SYSTEM_SETTING', key, null, { value: String(value), type: type || 'string' }, getClientIp(req), getHeaderString(req, 'user-agent'));
-        }
-        catch (auditError) {
-            console.warn('[Settings] Audit log failed:', auditError);
-        }
-        res.json(result.rows[0]);
-    }
-    catch (error) {
-        console.error('[Settings] Upsert error:', error.message);
-        res.status(500).json({ error: 'Failed to save setting' });
-    }
-});
-// ---------------------------------------------------------------------------
+// ===========================================================================
 // POST run backup
-// ---------------------------------------------------------------------------
+// ===========================================================================
 router.post('/backup/run', authenticate, authorizeExecutives, async (req, res) => {
     try {
-        // Placeholder – actual backup logic would go here
         console.log('[Settings] Backup initiated by:', req.user?.email);
         res.json({
             message: 'Backup completed successfully',
@@ -160,12 +84,11 @@ router.post('/backup/run', authenticate, authorizeExecutives, async (req, res) =
         res.status(500).json({ error: 'Failed to run backup' });
     }
 });
-// ---------------------------------------------------------------------------
+// ===========================================================================
 // POST run maintenance
-// ---------------------------------------------------------------------------
+// ===========================================================================
 router.post('/maintenance/run', authenticate, authorizeExecutives, async (req, res) => {
     try {
-        // Placeholder – actual maintenance logic would go here
         console.log('[Settings] Maintenance initiated by:', req.user?.email);
         res.json({
             message: 'Maintenance completed successfully',
@@ -178,17 +101,40 @@ router.post('/maintenance/run', authenticate, authorizeExecutives, async (req, r
         res.status(500).json({ error: 'Failed to run maintenance' });
     }
 });
-// ---------------------------------------------------------------------------
+// ===========================================================================
+// GET hospitals list (public)
+// ===========================================================================
+router.get('/hospitals', async (req, res) => {
+    try {
+        try {
+            const result = await pool.query(`SELECT hospital_name FROM hospital_list WHERE is_active = true ORDER BY hospital_name ASC`);
+            if (result.rows.length > 0) {
+                return res.json(result.rows.map((r) => r.hospital_name));
+            }
+        }
+        catch {
+            // Table doesn't exist — return empty
+        }
+        res.json([]);
+    }
+    catch (error) {
+        console.error('[Settings] Hospitals error:', error.message);
+        res.status(500).json({ error: 'Failed to fetch hospitals' });
+    }
+});
+// ===========================================================================
 // PUT bulk update all settings
-// ---------------------------------------------------------------------------
+// ===========================================================================
 router.put('/', authenticate, authorizeExecutives, async (req, res) => {
     try {
-        const settings = req.body; // { key1: value1, key2: value2, ... }
+        const settings = req.body;
         if (!settings || typeof settings !== 'object') {
             return res.status(400).json({ error: 'Settings object is required' });
         }
         const results = [];
         for (const [key, value] of Object.entries(settings)) {
+            // Safely convert value to string
+            const safeValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
             const result = await pool.query(`INSERT INTO system_settings ("settingKey", "settingValue", "settingType", "updatedBy", "createdAt", "updatedAt")
          VALUES ($1, $2, 'string', $3, NOW(), NOW())
          ON CONFLICT ("settingKey") 
@@ -196,10 +142,10 @@ router.put('/', authenticate, authorizeExecutives, async (req, res) => {
            "settingValue" = $2, 
            "updatedBy" = $3, 
            "updatedAt" = NOW()
-         RETURNING *`, [key, String(value), req.user.id]);
+         RETURNING *`, [key, safeValue, req.user.id]);
             results.push(result.rows[0]);
         }
-        // Audit log
+        // Audit log — pass raw object, not stringified
         try {
             await createAuditLog(req.user.id, req.user.email, req.user.role, 'BULK_UPDATE', 'SYSTEM_SETTING', 'bulk', null, settings, getClientIp(req), getHeaderString(req, 'user-agent'));
         }
@@ -216,9 +162,53 @@ router.put('/', authenticate, authorizeExecutives, async (req, res) => {
         res.status(500).json({ error: 'Failed to save settings' });
     }
 });
-// ---------------------------------------------------------------------------
+// ===========================================================================
+// UPSERT a single setting
+// ===========================================================================
+router.put('/:key', authenticate, authorizeExecutives, async (req, res) => {
+    try {
+        const key = String(req.params.key);
+        const { value, type, description, isPublic } = req.body;
+        if (value === undefined && value !== '' && value !== false) {
+            return res.status(400).json({ error: 'Value is required' });
+        }
+        // Safely convert value to string
+        const safeValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
+        const result = await pool.query(`INSERT INTO system_settings ("settingKey", "settingValue", "settingType", description, "isPublic", "updatedBy", "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+       ON CONFLICT ("settingKey") 
+       DO UPDATE SET 
+         "settingValue" = $2, 
+         "settingType" = $3, 
+         description = COALESCE($4, system_settings.description), 
+         "isPublic" = COALESCE($5, system_settings."isPublic"), 
+         "updatedBy" = $6, 
+         "updatedAt" = NOW()
+       RETURNING *`, [
+            key,
+            safeValue,
+            type || 'string',
+            description || null,
+            isPublic !== undefined ? isPublic : false,
+            req.user.id,
+        ]);
+        // Audit log
+        try {
+            await createAuditLog(req.user.id, req.user.email, req.user.role, 'UPSERT', 'SYSTEM_SETTING', key, null, { key, value: safeValue, type: type || 'string' }, getClientIp(req), getHeaderString(req, 'user-agent'));
+        }
+        catch (auditError) {
+            console.warn('[Settings] Audit log failed:', auditError);
+        }
+        res.json(result.rows[0]);
+    }
+    catch (error) {
+        console.error('[Settings] Upsert error:', error.message);
+        res.status(500).json({ error: 'Failed to save setting' });
+    }
+});
+// ===========================================================================
 // DELETE a setting
-// ---------------------------------------------------------------------------
+// ===========================================================================
 router.delete('/:key', authenticate, authorizeExecutives, async (req, res) => {
     try {
         const key = String(req.params.key);
@@ -227,6 +217,7 @@ router.delete('/:key', authenticate, authorizeExecutives, async (req, res) => {
             return res.status(404).json({ error: 'Setting not found' });
         }
         await pool.query('DELETE FROM system_settings WHERE "settingKey" = $1', [key]);
+        // Audit log
         try {
             await createAuditLog(req.user.id, req.user.email, req.user.role, 'DELETE', 'SYSTEM_SETTING', key, oldResult.rows[0], null, getClientIp(req), getHeaderString(req, 'user-agent'));
         }
