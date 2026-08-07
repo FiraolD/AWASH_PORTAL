@@ -11,7 +11,7 @@ router.get('/admin/tickets', authenticate, authorize('CUSTOMER_ADMIN', 'MASTER_A
                 t.id,
                 t."ticketNumber",
                 t.subject,
-                t.message as description,
+                t.message,
                 t.priority,
                 t.status,
                 t."createdAt",
@@ -47,7 +47,7 @@ router.get('/tickets', authenticate, async (req, res) => {
                 t.id,
                 t."ticketNumber",
                 t.subject,
-                t.message as description,
+                t.message,
                 t.priority,
                 t.status,
                 t."createdAt",
@@ -97,7 +97,7 @@ router.get('/tickets/:id', authenticate, async (req, res) => {
                 t.id,
                 t."ticketNumber",
                 t.subject,
-                t.message as description,
+                t.message,
                 t.priority,
                 t.status,
                 t."createdAt",
@@ -173,7 +173,8 @@ router.post('/tickets', authenticate, async (req, res) => {
         if (userRole !== 'CUSTOMER') {
             return res.status(403).json({ error: 'Only customers can create support tickets' });
         }
-        const { subject, message, priority = 'medium', category = 'general' } = req.body;
+        // ✅ Accept both 'message' and 'description' from frontend
+        const { subject, message = req.body.description, priority = 'medium', category = 'general' } = req.body;
         if (!subject || !message) {
             return res.status(400).json({ error: 'Subject and message are required' });
         }
