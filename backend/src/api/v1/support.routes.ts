@@ -220,7 +220,7 @@ router.post('/tickets', authenticate, async (req: AuthRequest, res) => {
                 id, "ticketNumber", "userId", subject, message, priority, 
                 category, status, "createdAt", "updatedAt"
             ) VALUES (
-                gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, 'open', NOW(), NOW()
+                gen_random_uuid()::uuid, $1, $2, $3, $4, $5, $6, 'open', NOW(), NOW()
             ) RETURNING *
         `;
 
@@ -235,7 +235,7 @@ router.post('/tickets', authenticate, async (req: AuthRequest, res) => {
             INSERT INTO support_responses (
                 id, "ticketId", "userId", message, "isInternal", "createdAt"
             ) VALUES (
-                gen_random_uuid()::text, $1, $2, $3, false, NOW()
+                gen_random_uuid()::uuid, $1, $2, $3, false, NOW()
             )
         `;
         
@@ -303,7 +303,7 @@ router.patch('/tickets/:id/status', authenticate, authorize('CUSTOMER_ADMIN', 'M
                 INSERT INTO support_responses (
                     id, "ticketId", "userId", message, "isInternal", "createdAt"
                 ) VALUES (
-                    gen_random_uuid()::text, $1, $2, $3, true, NOW()
+                    gen_random_uuid()::uuid, $1, $2, $3, true, NOW()
                 )
             `;
             await pool.query(responseQuery, [id, userId, `Ticket status changed to ${status} by ${req.user!.email}`]);
@@ -356,7 +356,7 @@ router.post('/tickets/:id/responses', authenticate, async (req: AuthRequest, res
             INSERT INTO support_responses (
                 id, "ticketId", "userId", message, "isInternal", "createdAt"
             ) VALUES (
-                gen_random_uuid()::text, $1, $2, $3, $4, NOW()
+                gen_random_uuid()::uuid, $1, $2, $3, $4, NOW()
             ) RETURNING *
         `;
         

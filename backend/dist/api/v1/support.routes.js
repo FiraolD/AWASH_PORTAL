@@ -185,7 +185,7 @@ router.post('/tickets', authenticate, async (req, res) => {
                 id, "ticketNumber", "userId", subject, message, priority, 
                 category, status, "createdAt", "updatedAt"
             ) VALUES (
-                gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, 'open', NOW(), NOW()
+                gen_random_uuid()::uuid, $1, $2, $3, $4, $5, $6, 'open', NOW(), NOW()
             ) RETURNING *
         `;
         const ticketResult = await pool.query(insertQuery, [
@@ -197,7 +197,7 @@ router.post('/tickets', authenticate, async (req, res) => {
             INSERT INTO support_responses (
                 id, "ticketId", "userId", message, "isInternal", "createdAt"
             ) VALUES (
-                gen_random_uuid()::text, $1, $2, $3, false, NOW()
+                gen_random_uuid()::uuid, $1, $2, $3, false, NOW()
             )
         `;
         await pool.query(responseQuery, [ticket.id, userId, `Ticket created: ${message.substring(0, 100)}...`]);
@@ -252,7 +252,7 @@ router.patch('/tickets/:id/status', authenticate, authorize('CUSTOMER_ADMIN', 'M
                 INSERT INTO support_responses (
                     id, "ticketId", "userId", message, "isInternal", "createdAt"
                 ) VALUES (
-                    gen_random_uuid()::text, $1, $2, $3, true, NOW()
+                    gen_random_uuid()::uuid, $1, $2, $3, true, NOW()
                 )
             `;
             await pool.query(responseQuery, [id, userId, `Ticket status changed to ${status} by ${req.user.email}`]);
@@ -296,7 +296,7 @@ router.post('/tickets/:id/responses', authenticate, async (req, res) => {
             INSERT INTO support_responses (
                 id, "ticketId", "userId", message, "isInternal", "createdAt"
             ) VALUES (
-                gen_random_uuid()::text, $1, $2, $3, $4, NOW()
+                gen_random_uuid()::uuid, $1, $2, $3, $4, NOW()
             ) RETURNING *
         `;
         const responseResult = await pool.query(responseQuery, [id, userId, message, isInternalResponse]);
