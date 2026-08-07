@@ -2,7 +2,7 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import pool from '../../lib/db.js';
-import { generateToken } from '../../middleware/auth.middleware.js';
+import { generateToken, authenticate } from '../../middleware/auth.middleware.js';
 import { sendVerificationEmail } from '../../services/email.service.js';
 
 const router = Router();
@@ -51,18 +51,18 @@ router.post('/signup', async (req, res: Response) => {
       }
     }
 
-    // Hash password
+    // Hash the password
     const salt = await bcrypt.genSalt(12);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    const passwordHash = await bcrypt.hash(password, salt);
 
     // Generate verification token
     const verificationToken = crypto.randomBytes(32).toString('hex');
     const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
-    // Create user
+    // Create user – using "passwordHash" column
     const result = await pool.query(
       `INSERT INTO users (
-        id, "firstName", "lastName", email, phone, passwordHash, role,
+        id, "firstName", "lastName", email, phone, "passwordHash", role,
         "emailVerified", "verificationToken", "verificationTokenExpires",
         "isActive", address, "createdAt", "updatedAt"
       ) VALUES (
@@ -74,7 +74,7 @@ router.post('/signup', async (req, res: Response) => {
         lastName.trim(),
         email.toLowerCase().trim(),
         phone?.trim() || null,
-        hashedPassword,
+        passwordHash,           // ✅ Hashed password stored in "passwordHash"
         verificationToken,
         verificationTokenExpires,
         address?.trim() || null,
@@ -89,10 +89,9 @@ router.post('/signup', async (req, res: Response) => {
       console.log(`Verification email sent to ${user.email}`);
     } catch (emailError) {
       console.error('Failed to send verification email:', emailError);
-      // Don't fail the signup – user can request a new verification email
     }
 
-    // Generate JWT token (user can log in but will be restricted until email verified)
+    // Generate JWT token
     const token = generateToken({
       id: user.id,
       email: user.email,
@@ -157,7 +156,6 @@ router.get('/verify-email', async (req, res: Response) => {
       [user.id]
     );
 
-    // Redirect to login page with success message
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     res.redirect(`${frontendUrl}/login?verified=true&email=${encodeURIComponent(user.email)}`);
   } catch (error: any) {
@@ -178,7 +176,6 @@ router.post('/resend-verification', async (req, res: Response) => {
       return res.status(400).json({ error: 'Email is required' });
     }
 
-    // Find user
     const result = await pool.query(
       `SELECT id, email, "firstName", "emailVerified" FROM users WHERE email = $1`,
       [email.toLowerCase().trim()]
@@ -205,7 +202,6 @@ router.post('/resend-verification', async (req, res: Response) => {
       [verificationToken, verificationTokenExpires, user.id]
     );
 
-    // Send email
     await sendVerificationEmail(user.email, user.firstName, verificationToken);
 
     res.json({ message: 'Verification email sent. Please check your inbox.' });
@@ -226,14 +222,15 @@ router.post('/login', async (req, res: Response) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
+    // Find user – select "passwordHash" column
     const result = await pool.query(
-      `SELECT id, email, password, "firstName", "lastName", role, "emailVerified", "isActive"
+      `SELECT id, email, "passwordHash", role, "firstName", "lastName", "emailVerified", "isActive"
        FROM users WHERE email = $1`,
       [email.toLowerCase().trim()]
     );
 
     if (result.rows.length === 0) {
-      return res.status(401).json({ error: 'Invalid email or password' });
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     const user = result.rows[0];
@@ -242,11 +239,13 @@ router.post('/login', async (req, res: Response) => {
       return res.status(403).json({ error: 'Your account has been deactivated. Please contact support.' });
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    // Compare password using "passwordHash" column
+    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
-      return res.status(401).json({ error: 'Invalid email or password' });
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    // Generate token
     const token = generateToken({
       id: user.id,
       email: user.email,
@@ -269,6 +268,28 @@ router.post('/login', async (req, res: Response) => {
   } catch (error: any) {
     console.error('[Auth] Login error:', error.message);
     res.status(500).json({ error: 'Failed to log in' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET PROFILE
+// ---------------------------------------------------------------------------
+router.get('/profile', authenticate, async (req, res: Response) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, email, role, "firstName", "lastName", phone, address, "emailVerified", "createdAt"
+       FROM users WHERE id = $1`,
+      [req.user!.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error: any) {
+    console.error('[Auth] Profile error:', error.message);
+    res.status(500).json({ error: 'Failed to fetch profile' });
   }
 });
 
