@@ -73,7 +73,7 @@ export const AuthController = {
             if (result.rows.length > 0) {
                 const user = result.rows[0];
                 const resetToken = jwt.sign({ id: user.id, email: user.email }, config.jwt.secret, { expiresIn: '1h' });
-                await EmailService.sendPasswordResetEmail(user.email, `${user.firstName} ${user.lastName}`, resetToken);
+                await EmailService.sendPasswordResetEmail(user.email, resetToken);
             }
             res.json({ message: 'If an account exists, you will receive a password reset email.' });
         }

@@ -2,7 +2,7 @@ import { Response } from 'express';
 import pool from '../lib/db.js';
 import { AuthRequest } from '../middleware/auth.middleware.js';
 import { generatePolicyNumber } from '../lib/numbering.js';
-import { EmailService } from '../services/email.service.js';
+import { EmailService, sendVerificationEmail } from '../services/email.service.js';
 import { premiumCalculationService } from '../services/premiumCalculation.service.js';
 
 export const PolicyController = {

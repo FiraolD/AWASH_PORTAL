@@ -3,7 +3,7 @@ import { Response } from 'express';
 import pool from '../lib/db.js';
 import { AuthRequest } from '../api/middleware/auth.middleware.js';
 import { generateClaimNumber } from '../lib/numbering.js';
-import { EmailService } from '../services/email.service.js';
+import { EmailService, sendVerificationEmail } from '../services/email.service.js';
 import { findMatchingRule, assignClaimToOfficer } from '../services/claimAssignment.service.js';
 
 export const ClaimController = {
@@ -230,11 +230,7 @@ export const ClaimController = {
         );
         if (userResult.rows.length > 0) {
           const customer = userResult.rows[0];
-          await EmailService.sendClaimSubmittedEmail(
-            customer.email,
-            `${customer.firstName} ${customer.lastName}`,
-            claim.claimNumber
-          );
+          await EmailService.sendClaimSubmittedEmail(customer.email, claim.claimNumber);
         }
       } catch (emailError) {
         console.error('Failed to send claim email:', emailError);

@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import pool from '../lib/db.js';
-import { EmailService } from '../services/email.service.js';
+import { EmailService, sendVerificationEmail } from '../services/email.service.js';
 import { config } from '../config/index.js';
 import { AuthRequest } from '../middleware/auth.middleware.js';
 
@@ -122,13 +122,9 @@ export const AuthController = {
           { expiresIn: '1h' }
         );
 
-        await EmailService.sendPasswordResetEmail(
-          user.email,
-          `${user.firstName} ${user.lastName}`,
-          resetToken
-        );
-      }
-
+        
+      
+await EmailService.sendPasswordResetEmail(user.email, resetToken);}
       res.json({ message: 'If an account exists, you will receive a password reset email.' });
     } catch (error) {
       console.error('Forgot password error:', error);

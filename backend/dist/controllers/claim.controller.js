@@ -177,7 +177,7 @@ export const ClaimController = {
                 const userResult = await pool.query(`SELECT "firstName", "lastName", email FROM users WHERE id = $1`, [userId]);
                 if (userResult.rows.length > 0) {
                     const customer = userResult.rows[0];
-                    await EmailService.sendClaimSubmittedEmail(customer.email, `${customer.firstName} ${customer.lastName}`, claim.claimNumber);
+                    await EmailService.sendClaimSubmittedEmail(customer.email, claim.claimNumber);
                 }
             }
             catch (emailError) {

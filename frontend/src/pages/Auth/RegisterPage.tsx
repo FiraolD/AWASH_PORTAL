@@ -1,140 +1,193 @@
-import * as React from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
+import { Eye, EyeOff, Mail, Lock, User, Phone, MapPin, Shield } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Label } from '../../components/ui/Label';
+import axios from 'axios';
 import { toast } from 'sonner';
-import { motion } from 'framer-motion';
 
-const registerSchema = z.object({
-  firstName: z.string().min(2, 'First name is required'),
-  lastName: z.string().min(2, 'Last name is required'),
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-  confirmPassword: z.string(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-});
-
-type RegisterFormValues = z.infer<typeof registerSchema>;
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = React.useState(false);
-  const logoUrl = "./src/assets/awash_logo.jpg";
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<RegisterFormValues>({
-    resolver: zodResolver(registerSchema),
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    password: '',
+    confirmPassword: '',
+    address: '',
   });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [registrationComplete, setRegistrationComplete] = useState(false);
 
-  const onSubmit = async (data: RegisterFormValues) => {
-    setIsLoading(true);
-    try {
-      await new Promise(r => setTimeout(r, 1500));
-      toast.success('Registration successful! Please login.');
-      navigate('/login');
-    } catch (error) {
-      toast.error('Registration failed. Please check your email address.');
-    } finally {
-      setIsLoading(false);
+  const handleChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors(prev => { const newErrors = { ...prev }; delete newErrors[field]; return newErrors; });
     }
   };
 
-  return (
-    <div className="flex min-h-screen">
-      <div className="relative hidden w-1/2 bg-[#1a3668] lg:block overflow-hidden">
-        <img
-          src="https://images.unsplash.com/photo-1557804506-669a67965ba0?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80"
-          alt="Trust and Protection"
-          className="h-full w-full object-cover opacity-30"
-        />
-        <div className="absolute inset-0 bg-gradient-to-br from-[#1a3668]/90 to-[#e31e24]/20"></div>
-        <div className="absolute inset-0 flex items-center justify-center p-12 text-white">
-          <div className="max-w-md text-center space-y-6">
-            <motion.div
-               initial={{ opacity: 0, scale: 0.9 }}
-               animate={{ opacity: 1, scale: 1 }}
-               className="inline-block bg-white p-4 rounded-3xl shadow-2xl"
-            >
-               <img src={logoUrl} alt="Awash Logo" className="h-20 w-auto" />
-            </motion.div>
-            <h1 className="text-5xl font-extrabold leading-tight tracking-tight">We Flow With You.</h1>
-            <p className="text-xl text-blue-100/90 font-medium">
-              Join the most trusted insurance provider in Ethiopia.
+  const validate = () => {
+    const newErrors: Record<string, string> = {};
+    if (!formData.firstName.trim()) newErrors.firstName = 'First name is required';
+    if (!formData.lastName.trim()) newErrors.lastName = 'Last name is required';
+    if (!formData.email.trim()) newErrors.email = 'Email is required';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Invalid email format';
+    if (!formData.password) newErrors.password = 'Password is required';
+    else if (formData.password.length < 8) newErrors.password = 'Password must be at least 8 characters';
+    if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validate()) return;
+
+    setLoading(true);
+    try {
+      const res = await axios.post(`${API_URL}/auth/signup`, {
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        email: formData.email.trim().toLowerCase(),
+        phone: formData.phone.trim() || undefined,
+        password: formData.password,
+        address: formData.address.trim() || undefined,
+      });
+
+      // Store token and user data
+      localStorage.setItem('awash-auth-storage', JSON.stringify({
+        state: {
+          user: res.data.user,
+          token: res.data.token,
+        },
+      }));
+
+      setRegistrationComplete(true);
+      toast.success('Account created! Please check your email to verify.');
+    } catch (error: any) {
+      const message = error.response?.data?.error || 'Failed to create account';
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (registrationComplete) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <Card className="max-w-md w-full">
+          <CardContent className="p-8 text-center">
+            <div className="h-16 w-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Mail className="h-8 w-8 text-green-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Check Your Email</h2>
+            <p className="text-gray-600 mb-6">
+              We've sent a verification link to <strong>{formData.email}</strong>. 
+              Please click the link in the email to activate your account.
             </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex w-full flex-col justify-center px-4 md:w-1/2 lg:px-12 xl:px-24">
-        <motion.div 
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="mx-auto w-full max-w-md space-y-8"
-        >
-          <div className="text-center md:text-left">
-            <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-lg p-1.5 border border-slate-100 overflow-hidden">
-              <img src={logoUrl} alt="Awash Logo" className="h-full w-full object-contain" />
-            </div>
-            <h2 className="text-3xl font-extrabold tracking-tight text-[#111827]">Create your account</h2>
-            <p className="mt-2 text-sm text-[#6B7280]">
-              "Where There Is Awash, There Is Peace Of Mind"
+            <p className="text-sm text-gray-500 mb-6">
+              Didn't receive the email? Check your spam folder or{' '}
+              <button className="text-blue-600 hover:underline">resend verification</button>.
             </p>
-          </div>
-
-          <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="firstName">First Name</Label>
-                <Input id="firstName" placeholder="John" {...register('firstName')} />
-                {errors.firstName && <p className="text-xs text-red-500">{errors.firstName.message}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name</Label>
-                <Input id="lastName" placeholder="Doe" {...register('lastName')} />
-                {errors.lastName && <p className="text-xs text-red-500">{errors.lastName.message}</p>}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="email">Email address</Label>
-              <Input id="email" type="email" placeholder="john@example.com" {...register('email')} />
-              {errors.email && <p className="text-xs text-red-500">{errors.email.message}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" placeholder="password" {...register('password')} />
-              {errors.password && <p className="text-xs text-red-500">{errors.password.message}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <Input id="confirmPassword" type="password" placeholder="password" {...register('confirmPassword')} />
-              {errors.confirmPassword && <p className="text-xs text-red-500">{errors.confirmPassword.message}</p>}
-            </div>
-
-            <Button type="submit" className="w-full mt-6 bg-[#1a3668] text-white hover:bg-[#1a3668]/90" isLoading={isLoading}>
-              Register Account
+            <Button onClick={() => navigate('/login')} className="w-full">
+              Go to Login
             </Button>
-          </form>
-
-          <p className="text-center text-sm text-[#6B7280]">
-            Already have an account?{' '}
-            <Link to="/login" className="font-semibold text-[#1a3668] hover:underline">
-              Sign in
-            </Link>
-          </p>
-        </motion.div>
+          </CardContent>
+        </Card>
       </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+      <Card className="max-w-lg w-full">
+        <CardHeader className="text-center">
+          <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+            <Shield className="h-6 w-6 text-blue-600" />
+          </div>
+          <CardTitle className="text-2xl">Create Your Account</CardTitle>
+          <CardDescription>Join Awash Insurance and get protected today</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>First Name *</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input className="pl-10" placeholder="John" value={formData.firstName} onChange={(e) => handleChange('firstName', e.target.value)} />
+                </div>
+                {errors.firstName && <p className="text-xs text-red-500 mt-1">{errors.firstName}</p>}
+              </div>
+              <div>
+                <Label>Last Name *</Label>
+                <Input placeholder="Doe" value={formData.lastName} onChange={(e) => handleChange('lastName', e.target.value)} />
+                {errors.lastName && <p className="text-xs text-red-500 mt-1">{errors.lastName}</p>}
+              </div>
+            </div>
+
+            <div>
+              <Label>Email *</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input className="pl-10" type="email" placeholder="john@example.com" value={formData.email} onChange={(e) => handleChange('email', e.target.value)} />
+              </div>
+              {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
+            </div>
+
+            <div>
+              <Label>Phone</Label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input className="pl-10" type="tel" placeholder="+251 9XX XXX XXXX" value={formData.phone} onChange={(e) => handleChange('phone', e.target.value)} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Password *</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input className="pl-10 pr-10" type={showPassword ? 'text' : 'password'} placeholder="Min. 8 characters" value={formData.password} onChange={(e) => handleChange('password', e.target.value)} />
+                  <button type="button" className="absolute right-3 top-1/2 transform -translate-y-1/2" onClick={() => setShowPassword(!showPassword)}>
+                    {showPassword ? <EyeOff className="h-4 w-4 text-gray-400" /> : <Eye className="h-4 w-4 text-gray-400" />}
+                  </button>
+                </div>
+                {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}
+              </div>
+              <div>
+                <Label>Confirm Password *</Label>
+                <Input type="password" placeholder="Confirm password" value={formData.confirmPassword} onChange={(e) => handleChange('confirmPassword', e.target.value)} />
+                {errors.confirmPassword && <p className="text-xs text-red-500 mt-1">{errors.confirmPassword}</p>}
+              </div>
+            </div>
+
+            <div>
+              <Label>Address</Label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input className="pl-10" placeholder="Your address (optional)" value={formData.address} onChange={(e) => handleChange('address', e.target.value)} />
+              </div>
+            </div>
+
+            <Button type="submit" disabled={loading} className="w-full bg-[#1A3E6F]">
+              {loading ? 'Creating Account...' : 'Create Account'}
+            </Button>
+
+            <p className="text-center text-sm text-gray-600">
+              Already have an account?{' '}
+              <Link to="/login" className="text-blue-600 hover:underline font-medium">Sign in</Link>
+            </p>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

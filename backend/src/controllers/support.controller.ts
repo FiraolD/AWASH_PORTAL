@@ -2,7 +2,7 @@ import { Response } from 'express';
 import pool from '../lib/db.js';
 import { AuthRequest } from '../api/middleware/auth.middleware.js';
 import { generateTicketNumber } from '../lib/numbering.js';
-import { EmailService } from '../services/email.service.js';
+import { EmailService, sendVerificationEmail } from '../services/email.service.js';
 
 export const SupportController = {
   // Get user's tickets

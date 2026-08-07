@@ -1,6 +1,4 @@
-﻿// src/middleware/auth.middleware.ts
-
-import { Request, Response, NextFunction } from 'express';
+﻿import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import pool from '../../lib/db.js';
 
@@ -14,21 +12,48 @@ export interface AuthRequest extends Request {
     role: string;
     firstName?: string;
     lastName?: string;
+    emailVerified?: boolean;
   };
 }
 
+export interface TokenPayload {
+  id: string;
+  email: string;
+  role: string;
+  emailVerified?: boolean;
+}
+
 // ---------------------------------------------------------------------------
-// Role definitions (centralized)
+// JWT Configuration
+// ---------------------------------------------------------------------------
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+//const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+const JWT_EXPIRES_IN = 7 * 24 * 60 * 60;
+
+// ---------------------------------------------------------------------------
+// Generate JWT Token
+// ---------------------------------------------------------------------------
+export function generateToken(payload: TokenPayload): string {
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+}
+
+// ---------------------------------------------------------------------------
+// Verify JWT Token
+// ---------------------------------------------------------------------------
+export function verifyToken(token: string): TokenPayload {
+  return jwt.verify(token, JWT_SECRET) as TokenPayload;
+}
+
+// ---------------------------------------------------------------------------
+// Role definitions
 // ---------------------------------------------------------------------------
 export const ROLES = {
   // Customer
   CUSTOMER: 'CUSTOMER',
-  
-  // Customer Admin / Support
   CUSTOMER_ADMIN: 'CUSTOMER_ADMIN',
   CUSTOMER_SUPPORT: 'CUSTOMER_SUPPORT',
   CUSTOMER_RELATION_OFFICER: 'CUSTOMER_RELATION_OFFICER',
-  
+
   // Underwriting
   UNDERWRITING_OFFICER_I: 'UNDERWRITING_OFFICER_I',
   UNDERWRITING_OFFICER_II: 'UNDERWRITING_OFFICER_II',
@@ -37,7 +62,7 @@ export const ROLES = {
   MANAGER_UNDERWRITING: 'MANAGER_UNDERWRITING',
   HEAD_UNDERWRITING: 'HEAD_UNDERWRITING',
   UNDERWRITING_ADMIN: 'UNDERWRITING_ADMIN',
-  
+
   // Claims
   CLAIM_OFFICER_I: 'CLAIM_OFFICER_I',
   CLAIM_OFFICER_II: 'CLAIM_OFFICER_II',
@@ -46,7 +71,7 @@ export const ROLES = {
   MANAGER_CLAIMS: 'MANAGER_CLAIMS',
   HEAD_CLAIMS: 'HEAD_CLAIMS',
   CLAIMS_ADMIN: 'CLAIMS_ADMIN',
-  
+
   // Master Admin / Executives
   MASTER_ADMIN: 'MASTER_ADMIN',
   SYSTEM_ADMIN: 'SYSTEM_ADMIN',
@@ -54,76 +79,37 @@ export const ROLES = {
   CEO: 'CEO',
   COO: 'COO',
   CFO: 'CFO',
+  CTO: 'CTO',
+  CCO: 'CCO',
   ADMIN: 'ADMIN',
 } as const;
 
 // ---------------------------------------------------------------------------
-// Role groups (for convenience)
+// Role groups
 // ---------------------------------------------------------------------------
 export const ROLE_GROUPS = {
-  // All claims staff
   CLAIMS_STAFF: [
-    ROLES.CLAIM_OFFICER_I,
-    ROLES.CLAIM_OFFICER_II,
-    ROLES.SENIOR_CLAIM_OFFICER,
-    ROLES.SUPERVISOR_CLAIMS,
-    ROLES.MANAGER_CLAIMS,
-    ROLES.HEAD_CLAIMS,
-    ROLES.CLAIMS_ADMIN,
+    ROLES.CLAIM_OFFICER_I, ROLES.CLAIM_OFFICER_II, ROLES.SENIOR_CLAIM_OFFICER,
+    ROLES.SUPERVISOR_CLAIMS, ROLES.MANAGER_CLAIMS, ROLES.HEAD_CLAIMS, ROLES.CLAIMS_ADMIN,
   ],
-  
-  // Claims officers (reviewers – cannot approve/reject)
   CLAIMS_REVIEWERS: [
-    ROLES.CLAIM_OFFICER_I,
-    ROLES.CLAIM_OFFICER_II,
-    ROLES.SENIOR_CLAIM_OFFICER,
+    ROLES.CLAIM_OFFICER_I, ROLES.CLAIM_OFFICER_II, ROLES.SENIOR_CLAIM_OFFICER,
   ],
-  
-  // Claims approvers (can approve/reject)
   CLAIMS_APPROVERS: [
-    ROLES.SUPERVISOR_CLAIMS,
-    ROLES.MANAGER_CLAIMS,
-    ROLES.HEAD_CLAIMS,
-    ROLES.CLAIMS_ADMIN,
+    ROLES.SUPERVISOR_CLAIMS, ROLES.MANAGER_CLAIMS, ROLES.HEAD_CLAIMS, ROLES.CLAIMS_ADMIN,
   ],
-  
-  // Admin / Executives
   EXECUTIVES: [
-    ROLES.MASTER_ADMIN,
-    ROLES.SYSTEM_ADMIN,
-    ROLES.SUPER_ADMIN,
-    ROLES.CEO,
-    ROLES.COO,
-    ROLES.CFO,
-    ROLES.ADMIN,
+    ROLES.MASTER_ADMIN, ROLES.SYSTEM_ADMIN, ROLES.SUPER_ADMIN,
+    ROLES.CEO, ROLES.COO, ROLES.CFO, ROLES.CTO, ROLES.CCO, ROLES.ADMIN,
   ],
-  
-  // Underwriting staff
   UNDERWRITING_STAFF: [
-    ROLES.UNDERWRITING_OFFICER_I,
-    ROLES.UNDERWRITING_OFFICER_II,
-    ROLES.SENIOR_UNDERWRITING_OFFICER,
-    ROLES.MANAGER_UNDERWRITING,
-    ROLES.HEAD_UNDERWRITING,
-    ROLES.UNDERWRITING_ADMIN,
-  ],
-  
-  // Customer-facing roles
-  CUSTOMER_FACING: [
-    ROLES.CUSTOMER,
-    ROLES.CUSTOMER_ADMIN,
-    ROLES.CUSTOMER_SUPPORT,
-    ROLES.CUSTOMER_RELATION_OFFICER,
-  ],
-  
-  // All authenticated users (everyone)
-  ALL_AUTHENTICATED: [
-    ...Object.values(ROLES),
+    ROLES.UNDERWRITING_OFFICER_I, ROLES.UNDERWRITING_OFFICER_II, ROLES.SENIOR_UNDERWRITING_OFFICER,
+    ROLES.SUPERVISOR_UNDERWRITING, ROLES.MANAGER_UNDERWRITING, ROLES.HEAD_UNDERWRITING, ROLES.UNDERWRITING_ADMIN,
   ],
 };
 
 // ---------------------------------------------------------------------------
-// JWT Authentication Middleware
+// Authentication Middleware
 // ---------------------------------------------------------------------------
 export const authenticate = async (
   req: AuthRequest,
@@ -132,26 +118,25 @@ export const authenticate = async (
 ): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       res.status(401).json({ error: 'Access denied. No token provided.' });
       return;
     }
 
     const token = authHeader.split(' ')[1];
-    
+
     if (!token) {
       res.status(401).json({ error: 'Access denied. No token provided.' });
       return;
     }
 
     // Verify JWT
-    const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-    const decoded = jwt.verify(token, JWT_SECRET) as { id: string; email: string; role: string };
+    const decoded = verifyToken(token);
 
     // Verify user still exists in database
     const userResult = await pool.query(
-      `SELECT id, email, role, "firstName", "lastName", "status" 
+      `SELECT id, email, role, "firstName", "lastName", "emailVerified", "isActive"
        FROM users WHERE id = $1`,
       [decoded.id]
     );
@@ -163,7 +148,7 @@ export const authenticate = async (
 
     const user = userResult.rows[0];
 
-    if (!user.status) {
+    if (!user.isActive) {
       res.status(403).json({ error: 'Account is deactivated. Contact admin.' });
       return;
     }
@@ -175,10 +160,10 @@ export const authenticate = async (
       role: user.role,
       firstName: user.firstName,
       lastName: user.lastName,
+      emailVerified: user.emailVerified,
     };
 
     console.log(`[AUTH] User authenticated: ${user.email} (${user.role})`);
-    
     next();
   } catch (error: any) {
     if (error.name === 'JsonWebTokenError') {
@@ -214,7 +199,7 @@ export const authorize = (...allowedRoles: string[]) => {
 
     if (!isAllowed) {
       console.log(`[AUTHORIZE] ACCESS DENIED – ${userRole} not in allowed list`);
-      res.status(403).json({ 
+      res.status(403).json({
         error: 'Insufficient permissions',
         userRole,
         requiredRoles: allowedRoles,
@@ -228,35 +213,16 @@ export const authorize = (...allowedRoles: string[]) => {
 };
 
 // ---------------------------------------------------------------------------
-// Convenience middleware using role groups
+// Convenience authorization middleware
 // ---------------------------------------------------------------------------
-
-// Allow all claims staff
 export const authorizeClaimsStaff = authorize(...ROLE_GROUPS.CLAIMS_STAFF);
-
-// Allow claims approvers only
 export const authorizeClaimsApprovers = authorize(...ROLE_GROUPS.CLAIMS_APPROVERS, ...ROLE_GROUPS.EXECUTIVES);
-
-// Allow claims reviewers (officers) only
-export const authorizeClaimsReviewers = authorize(...ROLE_GROUPS.CLAIMS_REVIEWERS);
-
-// Allow all claims staff + executives
-export const authorizeClaimsAll = authorize(
-  ...ROLE_GROUPS.CLAIMS_STAFF,
-  ...ROLE_GROUPS.EXECUTIVES
-);
-
-// Allow executives only
+export const authorizeClaimsAll = authorize(...ROLE_GROUPS.CLAIMS_STAFF, ...ROLE_GROUPS.EXECUTIVES);
 export const authorizeExecutives = authorize(...ROLE_GROUPS.EXECUTIVES);
-
-// Allow customers only
-export const authorizeCustomer = authorize(ROLES.CUSTOMER);
-
-// Allow any authenticated user
-export const authorizeAny = authorize(...ROLE_GROUPS.ALL_AUTHENTICATED);
+export const authorizeUnderwriting = authorize(...ROLE_GROUPS.UNDERWRITING_STAFF, ...ROLE_GROUPS.EXECUTIVES);
 
 // ---------------------------------------------------------------------------
-// Optional: Soft auth – attaches user if token present, but doesn't block
+// Optional: Soft authentication (attaches user if token present, doesn't block)
 // ---------------------------------------------------------------------------
 export const softAuthenticate = async (
   req: AuthRequest,
@@ -265,19 +231,17 @@ export const softAuthenticate = async (
 ): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      // No token – continue without user
       next();
       return;
     }
 
     const token = authHeader.split(' ')[1];
-    const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-    const decoded = jwt.verify(token, JWT_SECRET) as { id: string; email: string; role: string };
+    const decoded = verifyToken(token);
 
     const userResult = await pool.query(
-      `SELECT id, email, role, "firstName", "lastName" FROM users WHERE id = $1`,
+      `SELECT id, email, role, "firstName", "lastName", "emailVerified" FROM users WHERE id = $1`,
       [decoded.id]
     );
 
@@ -288,11 +252,12 @@ export const softAuthenticate = async (
         role: userResult.rows[0].role,
         firstName: userResult.rows[0].firstName,
         lastName: userResult.rows[0].lastName,
+        emailVerified: userResult.rows[0].emailVerified,
       };
     }
   } catch {
     // Invalid token – continue without user
   }
-  
+
   next();
 };
