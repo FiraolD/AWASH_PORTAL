@@ -17,7 +17,7 @@ interface Ticket {
   id: string;
   ticketNumber: string;
   subject: string;
-  description: string;
+  message: string;
   priority: string;
   status: string;
   createdAt: string;
@@ -292,10 +292,10 @@ export default function SupportTicketsPage() {
                     </div>
                   </div>
 
-                  {/* Description */}
+                  {/* message */}
                   <div className="space-y-2">
-                    <h3 className="font-semibold text-[#111827]">Description</h3>
-                    <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">{selectedTicket.description}</p>
+                    <h3 className="font-semibold text-[#111827]">message</h3>
+                    <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">{selectedTicket.message}</p>
                   </div>
 
                   {/* Update Status */}
