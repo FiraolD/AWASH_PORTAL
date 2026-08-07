@@ -44,7 +44,7 @@ router.post('/signup', async (req, res) => {
         const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
         // Create user
         const result = await pool.query(`INSERT INTO users (
-        id, "firstName", "lastName", email, phone, password, role,
+        id, "firstName", "lastName", email, phone, passwordHash, role,
         "emailVerified", "verificationToken", "verificationTokenExpires",
         "isActive", address, "createdAt", "updatedAt"
       ) VALUES (

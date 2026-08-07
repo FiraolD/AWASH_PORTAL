@@ -1,117 +1,98 @@
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import pool from '../lib/db.js';
-import { EmailService } from '../services/email.service.js';
-import { config } from '../config/index.js';
-export const AuthController = {
-    register: async (req, res) => {
-        try {
-            const { email, password, firstName, lastName, phone } = req.body;
-            if (!email || !password || !firstName || !lastName) {
-                return res.status(400).json({ error: 'All fields are required' });
-            }
-            const existingUser = await pool.query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
-            if (existingUser.rows.length > 0) {
-                return res.status(400).json({ error: 'Email already registered' });
-            }
-            const hashedPassword = await bcrypt.hash(password, 10);
-            const result = await pool.query(`
-        INSERT INTO users (id, email, "passwordHash", "firstName", "lastName", phone, role, status, "createdAt", "updatedAt")
-        VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, 'CUSTOMER', 'ACTIVE', NOW(), NOW())
-        RETURNING id, email, "firstName", "lastName", role
-      `, [email.toLowerCase(), hashedPassword, firstName, lastName, phone || null]);
-            const user = result.rows[0];
-            await EmailService.sendWelcomeEmail(email, `${firstName} ${lastName}`);
-            const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, config.jwt.secret, { expiresIn: config.jwt.expiresIn });
-            res.status(201).json({
-                success: true,
-                message: 'Registration successful',
-                user: {
-                    id: user.id,
-                    email: user.email,
-                    firstName: user.firstName,
-                    lastName: user.lastName,
-                    role: user.role,
-                },
-                token,
-            });
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const pool = require('../config/database');
+const { validationResult } = require('express-validator');
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_EXPIRES_IN = '7d';
+// ---------------------------------------------------------------------------
+// REGISTER
+// ---------------------------------------------------------------------------
+exports.register = async (req, res) => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ errors: errors.array() });
         }
-        catch (error) {
-            console.error('Registration error:', error);
-            res.status(500).json({ error: 'Registration failed' });
+        const { name, email, password } = req.body;
+        // Check if user exists
+        const existingUser = await pool.query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
+        if (existingUser.rows.length > 0) {
+            return res.status(409).json({ error: 'An account with this email already exists' });
         }
-    },
-    login: async (req, res) => {
-        try {
-            const { email, password } = req.body;
-            const result = await pool.query('SELECT * FROM users WHERE email = $1', [email.toLowerCase()]);
-            const user = result.rows[0];
-            if (!user) {
-                return res.status(401).json({ error: 'Invalid credentials' });
-            }
-            const isValidPassword = await bcrypt.compare(password, user.passwordHash);
-            if (!isValidPassword) {
-                return res.status(401).json({ error: 'Invalid credentials' });
-            }
-            if (user.status !== 'ACTIVE') {
-                return res.status(401).json({ error: 'Account is inactive' });
-            }
-            await pool.query('UPDATE users SET "lastLoginAt" = NOW() WHERE id = $1', [user.id]);
-            const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, config.jwt.secret, { expiresIn: config.jwt.expiresIn });
-            const { passwordHash, ...userWithoutPassword } = user;
-            res.json({ success: true, user: userWithoutPassword, token });
+        // Hash password
+        const hashedPassword = await bcrypt.hash(password, 12);
+        // Create user – use "passwordHash" column
+        const result = await pool.query(`INSERT INTO users (id, email, "passwordHash", role, "createdAt", "updatedAt")
+       VALUES (gen_random_uuid(), $1, $2, 'CUSTOMER', NOW(), NOW())
+       RETURNING id, email, role`, [email.toLowerCase(), hashedPassword]);
+        // Generate token
+        const token = jwt.sign({ id: result.rows[0].id, email: result.rows[0].email, role: result.rows[0].role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+        res.status(201).json({
+            user: { id: result.rows[0].id, email: result.rows[0].email, role: result.rows[0].role },
+            token,
+        });
+    }
+    catch (error) {
+        console.error('[Auth] Register error:', error.message);
+        res.status(500).json({ error: 'Registration failed' });
+    }
+};
+// ---------------------------------------------------------------------------
+// LOGIN
+// ---------------------------------------------------------------------------
+exports.login = async (req, res) => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ errors: errors.array() });
         }
-        catch (error) {
-            console.error('Login error:', error);
-            res.status(500).json({ error: 'Internal server error' });
+        const { email, password } = req.body;
+        // Find user – select "passwordHash"
+        const result = await pool.query('SELECT id, email, "passwordHash", role, "firstName", "lastName", "isActive" FROM users WHERE email = $1', [email.toLowerCase().trim()]);
+        if (result.rows.length === 0) {
+            return res.status(401).json({ error: 'Invalid credentials' });
         }
-    },
-    forgotPassword: async (req, res) => {
-        try {
-            const { email } = req.body;
-            const result = await pool.query('SELECT id, email, "firstName", "lastName" FROM users WHERE email = $1', [email.toLowerCase()]);
-            if (result.rows.length > 0) {
-                const user = result.rows[0];
-                const resetToken = jwt.sign({ id: user.id, email: user.email }, config.jwt.secret, { expiresIn: '1h' });
-                await EmailService.sendPasswordResetEmail(user.email, resetToken);
-            }
-            res.json({ message: 'If an account exists, you will receive a password reset email.' });
+        const user = result.rows[0];
+        // Check if account is active
+        if (user.isActive === false) {
+            return res.status(403).json({ error: 'Account is deactivated. Contact support.' });
         }
-        catch (error) {
-            console.error('Forgot password error:', error);
-            res.status(500).json({ error: 'Failed to process request' });
+        // Compare password – use user.passwordHash
+        const isMatch = await bcrypt.compare(password, user.passwordHash);
+        if (!isMatch) {
+            return res.status(401).json({ error: 'Invalid credentials' });
         }
-    },
-    resetPassword: async (req, res) => {
-        try {
-            const { token, newPassword } = req.body;
-            let decoded;
-            try {
-                decoded = jwt.verify(token, config.jwt.secret);
-            }
-            catch {
-                return res.status(400).json({ error: 'Invalid or expired token' });
-            }
-            const hashedPassword = await bcrypt.hash(newPassword, 10);
-            await pool.query('UPDATE users SET "passwordHash" = $1, "updatedAt" = NOW() WHERE id = $2', [hashedPassword, decoded.id]);
-            res.json({ message: 'Password reset successfully' });
+        // Generate token
+        const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+        res.json({
+            user: {
+                id: user.id,
+                email: user.email,
+                role: user.role,
+                firstName: user.firstName,
+                lastName: user.lastName,
+            },
+            token,
+        });
+    }
+    catch (error) {
+        console.error('[Auth] Login error:', error.message);
+        res.status(500).json({ error: 'Login failed' });
+    }
+};
+// ---------------------------------------------------------------------------
+// GET PROFILE
+// ---------------------------------------------------------------------------
+exports.getProfile = async (req, res) => {
+    try {
+        const result = await pool.query('SELECT id, email, role, "firstName", "lastName", phone, address, "createdAt" FROM users WHERE id = $1', [req.user.id]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
         }
-        catch (error) {
-            console.error('Reset password error:', error);
-            res.status(500).json({ error: 'Failed to reset password' });
-        }
-    },
-    getCurrentUser: async (req, res) => {
-        try {
-            const result = await pool.query('SELECT id, email, "firstName", "lastName", role, status, phone, "avatarUrl", "createdAt", "lastLoginAt" FROM users WHERE id = $1', [req.user.id]);
-            if (result.rows.length === 0) {
-                return res.status(404).json({ error: 'User not found' });
-            }
-            res.json(result.rows[0]);
-        }
-        catch (error) {
-            console.error('Error fetching user:', error);
-            res.status(500).json({ error: 'Failed to fetch user' });
-        }
-    },
+        res.json(result.rows[0]);
+    }
+    catch (error) {
+        console.error('[Auth] Profile error:', error.message);
+        res.status(500).json({ error: 'Failed to fetch profile' });
+    }
 };
