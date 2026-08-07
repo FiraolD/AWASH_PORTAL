@@ -30,7 +30,7 @@ interface Ticket {
   id: string;
   ticket_number: string;
   subject: string;
-  description: string;
+  message: string;
   priority: 'low' | 'medium' | 'high';
   status: 'open' | 'in_progress' | 'resolved' | 'closed';
   created_at: string;
@@ -54,7 +54,7 @@ const SupportPage = () => {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [responses, setResponses] = useState<TicketResponse[]>([]);
-  const [newTicket, setNewTicket] = useState({ subject: '', description: '', priority: 'medium' });
+  const [newTicket, setNewTicket] = useState({ subject: '', message: '', priority: 'medium' });
   const [newResponse, setNewResponse] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -89,7 +89,7 @@ const SupportPage = () => {
   };
 
   const createTicket = async () => {
-    if (!newTicket.subject || !newTicket.description) {
+    if (!newTicket.subject || !newTicket.message) {
       toast.error('Please fill in all fields');
       return;
     }
@@ -98,12 +98,12 @@ const SupportPage = () => {
     try {
       const response = await axiosInstance.post('/support/tickets', {
         subject: newTicket.subject,
-        description: newTicket.description,
+        message: newTicket.message,
         priority: newTicket.priority.toUpperCase()
       });
       
       toast.success('Support ticket created successfully');
-      setNewTicket({ subject: '', description: '', priority: 'medium' });
+      setNewTicket({ subject: '', message: '', priority: 'medium' });
       setIsDialogOpen(false);
       fetchTickets();
     } catch (error: any) {
@@ -207,7 +207,7 @@ const SupportPage = () => {
               <div>
                 <Label>Subject</Label>
                 <Input 
-                  placeholder="Brief description of your issue"
+                  placeholder="Brief message of your issue"
                   value={newTicket.subject}
                   onChange={(e) => setNewTicket({ ...newTicket, subject: e.target.value })}
                 />
@@ -230,8 +230,8 @@ const SupportPage = () => {
                 <Textarea 
                   placeholder="Please provide detailed information about your issue..."
                   rows={5}
-                  value={newTicket.description}
-                  onChange={(e) => setNewTicket({ ...newTicket, description: e.target.value })}
+                  value={newTicket.message}
+                  onChange={(e) => setNewTicket({ ...newTicket, message: e.target.value })}
                 />
               </div>
               <Button onClick={createTicket} disabled={submitting} className="w-full">
@@ -320,7 +320,7 @@ const SupportPage = () => {
                       <ChevronRight className="h-4 w-4 text-gray-400" />
                     </div>
                   </div>
-                  <p className="text-sm text-gray-600 mt-2 line-clamp-2">{ticket.description}</p>
+                  <p className="text-sm text-gray-600 mt-2 line-clamp-2">{ticket.message}</p>
                   <p className="text-xs text-gray-400 mt-2">
                     Created: {new Date(ticket.created_at).toLocaleDateString()}
                   </p>
@@ -362,7 +362,7 @@ const SupportPage = () => {
                       {new Date(selectedTicket.created_at).toLocaleString()}
                     </span>
                   </div>
-                  <p className="text-gray-700">{selectedTicket.description}</p>
+                  <p className="text-gray-700">{selectedTicket.message}</p>
                 </div>
 
                 {/* Responses */}
