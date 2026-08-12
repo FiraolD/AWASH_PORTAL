@@ -100,7 +100,7 @@ const LoadingFallback = () => (
         </div>
       </div>
       <div className="text-center">
-        <p className="text-sm font-bold tracking-widest text-[#1a3668] uppercase">Awash Insurance</p>
+        <p className="text-sm font-bold tracking-widest text-[#1a3668] uppercase">SMART Insurance</p>
         <p className="text-[10px] font-medium text-[#E31E24] tracking-widest uppercase mt-1">Loading...</p>
       </div>
     </div>

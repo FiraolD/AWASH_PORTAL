@@ -27,8 +27,8 @@ const Header = () => {
            </div>
 
            <div className="hidden xl:flex flex-col">
-             <span className="text-sm font-bold text-[#1A3E6F] tracking-tight whitespace-nowrap">Where There Is Awash, There Is Peace Of Mind</span>
-             <span className="text-[10px] font-medium text-[#1A3E6F] tracking-widest uppercase">We Flow With You</span>
+             <span className="text-sm font-bold text-[#1A3E6F] tracking-tight whitespace-nowrap">With Smart Insurance, cover your risks and secure your future.</span>
+             <span className="text-[10px] font-medium text-[#1A3E6F] tracking-widest uppercase">SMART INSURANCE, SMART LIVING</span>
            </div>
 
            <div className="hidden md:relative md:block group">

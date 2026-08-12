@@ -102,7 +102,7 @@ export default function PaymentMethodsPage() {
          <Info className="h-5 w-5 text-[#1A3E6F] shrink-0 mt-0.5" />
          <div className="space-y-1">
             <h4 className="font-bold text-[#1A3E6F]">Security & Privacy</h4>
-            <p className="text-sm text-gray-600 leading-relaxed">Awash Insurance uses bank-level encryption (AES-256) to protect your payment information. We never store your full card number on our servers.</p>
+            <p className="text-sm text-gray-600 leading-relaxed">SMART Insurance uses bank-level encryption (AES-256) to protect your payment information. We never store your full card number on our servers.</p>
          </div>
       </div>
     </div>

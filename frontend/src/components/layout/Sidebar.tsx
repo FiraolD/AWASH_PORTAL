@@ -87,7 +87,7 @@ const Sidebar = () => {
                 <img src={logoUrl} alt="Awash Logo" className="h-full w-full object-contain" />
               </div>
               <div className="flex flex-col">
-                <span className="text-lg font-bold leading-tight tracking-tight">AWASH</span>
+                <span className="text-lg font-bold leading-tight tracking-tight">SMART</span>
                 <span className="text-[10px] font-medium tracking-[0.2em] text-blue-200/60">INSURANCE</span>
               </div>
             </div>

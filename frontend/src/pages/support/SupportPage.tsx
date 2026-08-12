@@ -383,7 +383,7 @@ const SupportPage = () => {
                           }`}>
                             {isFromAdmin && (
                               <p className="text-xs font-medium text-gray-600 mb-1">
-                                Awash Support
+                                SMART Support
                               </p>
                             )}
                             <p className="text-sm">{response.message}</p>
@@ -487,7 +487,7 @@ const SupportPage = () => {
                 <MessageCircle className="h-5 w-5 text-blue-600" />
                 <div>
                   <p className="font-medium">Email Support</p>
-                  <p className="text-sm text-gray-600">support@awashinsurance.com</p>
+                  <p className="text-sm text-gray-600">support@smartinsurance.com</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">

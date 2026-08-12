@@ -113,7 +113,7 @@ export default function RegisterPage() {
             <Shield className="h-6 w-6 text-blue-600" />
           </div>
           <CardTitle className="text-2xl">Create Your Account</CardTitle>
-          <CardDescription>Join Awash Insurance and get protected today</CardDescription>
+          <CardDescription>Join SMART Insurance and get protected today</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
