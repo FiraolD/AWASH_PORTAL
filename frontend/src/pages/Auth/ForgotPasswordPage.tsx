@@ -26,7 +26,7 @@ export default function ForgotPasswordPage() {
   const [isSubmitted, setIsSubmitted] = React.useState(false);
   const [submittedEmail, setSubmittedEmail] = React.useState('');
 
-  const logoUrl = "./src/assets/awash_logo.jpg";
+  const logoUrl = "./src/assets/awash_logo.png";
 
   const {
     register,

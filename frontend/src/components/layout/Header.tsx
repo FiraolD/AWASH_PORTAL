@@ -8,7 +8,7 @@ const Header = () => {
   const { setSidebarOpen } = useUIStore();
   const { user } = useAuthStore();
 
-  const logoUrl = "./assets/awash_logo.jpg";
+  const logoUrl = "./assets/awash_logo.png";
 
   return (
     <header className="fixed top-0 right-0 left-0 lg:left-72 z-40 flex h-20 items-center justify-between border-b border-slate-100 bg-white/80 px-6 backdrop-blur-xl md:px-10 transition-all duration-300">

@@ -45,7 +45,7 @@ const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const logoUrl = "./src/assets/awash_logo.jpg";
+  const logoUrl = "./src/assets/awash_logo.png";
 
   const handleLogout = () => {
     logout();

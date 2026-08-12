@@ -24,7 +24,7 @@ export default function LoginPage() {
   const { login, isLoading } = useAuthStore();
   const [showPassword, setShowPassword] = React.useState(false);
 
-  const logoUrl = "./src/assets/awash_logo.jpg";
+  const logoUrl = "./src/assets/awash_logo.png";
 
   const {
     register,

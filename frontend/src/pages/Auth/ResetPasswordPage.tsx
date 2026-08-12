@@ -39,7 +39,7 @@ export default function ResetPasswordPage() {
   const [isValidToken, setIsValidToken] = React.useState(true);
   const [isVerifying, setIsVerifying] = React.useState(true);
 
-  const logoUrl = "./src/assets/awash_logo.jpg";
+  const logoUrl = "./src/assets/awash_logo.png";
 
   const {
     register,
