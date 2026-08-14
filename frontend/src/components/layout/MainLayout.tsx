@@ -10,19 +10,19 @@ const MainLayout = () => {
   const { isSidebarCollapsed } = useUIStore();
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.12),_transparent_34%),linear-gradient(180deg,#f8fafc_0%,#eef4fb_100%)] text-slate-900">
       <Sidebar />
 
       <div
         className={cn(
-          'min-h-screen transition-[padding] duration-300 ease-in-out',
+          'min-h-screen transition-[padding,transform] duration-300 ease-out',
           isSidebarCollapsed ? 'lg:pl-24' : 'lg:pl-72'
         )}
       >
         <Header />
 
         <main className="mx-auto max-w-[1600px] px-4 pb-10 pt-28 sm:px-6 lg:px-8 xl:px-10">
-          <div className="min-h-[calc(100vh-12rem)] rounded-3xl border border-slate-200/80 bg-white/80 p-4 shadow-[0_16px_40px_rgba(15,23,42,0.04)] backdrop-blur-sm sm:p-6 lg:p-8">
+          <div className="min-h-[calc(100vh-12rem)] rounded-[22px] border border-slate-200/70 bg-white/[0.72] p-2 shadow-[0_12px_40px_rgba(15,23,42,0.04)] backdrop-blur-sm sm:p-4 lg:p-5">
             <Outlet />
           </div>
         </main>

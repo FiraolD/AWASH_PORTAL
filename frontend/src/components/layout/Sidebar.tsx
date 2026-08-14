@@ -18,24 +18,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { navigationConfig, hasPermission } from '../../lib/utils/rolePermissions';
 
 const iconMap: Record<string, any> = {
-  LayoutDashboard: LayoutDashboard,
-  FileText: FileText,
-  Shield: Shield,
-  CreditCard: CreditCard,
-  Users: Users,
-  Settings: Settings,
-  HelpCircle: HelpCircle,
-  User: User,
-  Package: Package,
-  Workflow: Workflow,
-  CheckSquare: CheckSquare,
-  FileSearch: FileSearch,
-  DollarSign: DollarSign,
-  Clock: Clock,
-  Activity: Activity,
-  AlertTriangle: AlertTriangle,
-  FileCheck: FileCheck,
-  Ticket: Ticket
+  LayoutDashboard, FileText, Shield, CreditCard, Users, Settings,
+  HelpCircle, User, Package, Workflow, CheckSquare, FileSearch,
+  DollarSign, Clock, Activity, AlertTriangle, FileCheck, Ticket
 };
 
 const Sidebar = () => {
@@ -74,24 +59,26 @@ const Sidebar = () => {
         )}
       </AnimatePresence>
 
-      <aside
+      <motion.aside
+        initial={false}
+        animate={{ width: isSidebarCollapsed ? 96 : 288 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 26, mass: 0.8 }}
         className={cn(
-          'fixed inset-y-0 left-0 z-50 border-r border-white/10 bg-[#1A3E6F] text-white shadow-[0_20px_60px_rgba(15,23,42,0.28)] transition-all duration-300 ease-in-out',
+          'fixed inset-y-0 left-0 z-50 overflow-hidden border-r border-white/10 bg-[linear-gradient(180deg,#173b6d_0%,#11335a_100%)] text-white shadow-[0_22px_70px_rgba(15,23,42,0.28)] will-change-transform',
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full',
-          'lg:translate-x-0',
-          isSidebarCollapsed ? 'w-24' : 'w-72'
+          'lg:translate-x-0'
         )}
       >
         <div className="flex h-full flex-col">
           <div className={cn('flex items-center justify-between border-b border-white/10 px-4 py-5', isSidebarCollapsed && 'px-3')}>
             <div className={cn('flex items-center gap-3 overflow-hidden', isSidebarCollapsed && 'justify-center')}>
-              <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-white p-1 shadow-lg shadow-slate-950/20">
+              <div className="h-10 w-10 shrink-0 overflow-hidden rounded-2xl bg-white p-1.5 shadow-[0_12px_30px_rgba(15,23,42,0.18)]">
                 <img src={logoUrl} alt="Awash Logo" className="h-full w-full object-contain" />
               </div>
               {!isSidebarCollapsed && (
                 <div className="flex min-w-0 flex-col leading-none">
                   <span className="text-base font-extrabold tracking-tight">SMART</span>
-                  <span className="text-[9px] font-semibold tracking-[0.22em] text-blue-200/70">INSURANCE</span>
+                  <span className="text-[9px] font-semibold tracking-[0.24em] text-blue-200/70">INSURANCE</span>
                 </div>
               )}
             </div>
@@ -99,7 +86,7 @@ const Sidebar = () => {
             <button
               type="button"
               onClick={() => setSidebarOpen(false)}
-              className="rounded-lg p-2 text-blue-100 transition-colors hover:bg-white/10 lg:hidden"
+              className="rounded-xl p-2 text-blue-100 transition-colors hover:bg-white/10 lg:hidden"
               aria-label="Close sidebar"
             >
               <Menu className="h-5 w-5" />
@@ -108,7 +95,7 @@ const Sidebar = () => {
             <button
               type="button"
               onClick={toggleSidebarCollapse}
-              className="hidden rounded-lg p-2 text-blue-100 transition-colors hover:bg-white/10 lg:flex"
+              className="hidden rounded-xl p-2 text-blue-100 transition-colors hover:bg-white/10 lg:flex"
               aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
               {isSidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
@@ -116,15 +103,15 @@ const Sidebar = () => {
           </div>
 
           {!isSidebarCollapsed && (
-            <div className="px-8 pb-5 pt-4">
-              <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-blue-200/60">We Flow With You</p>
+            <div className="px-8 pb-4 pt-4">
+              <p className="text-[9px] font-bold uppercase tracking-[0.24em] text-blue-200/60">We Flow With You</p>
             </div>
           )}
 
           <div className={cn('px-3 pb-4 pt-2', isSidebarCollapsed && 'px-2')}>
-            <div className={cn('rounded-2xl border border-white/10 bg-white/5 p-3', isSidebarCollapsed && 'p-2')}>
+            <div className={cn('rounded-2xl border border-white/10 bg-white/5 p-3 shadow-inner shadow-slate-950/10', isSidebarCollapsed && 'p-2')}>
               <div className={cn('flex items-center gap-3', isSidebarCollapsed && 'justify-center')}>
-                <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl border-2 border-white/20">
+                <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl border-2 border-white/20 shadow-[0_10px_24px_rgba(15,23,42,0.25)]">
                   <img
                     src={user?.avatarUrl || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'}
                     alt="User profile"
@@ -157,22 +144,22 @@ const Sidebar = () => {
                     to={item.href}
                     className={({ isActive: navActive }: NavLinkRenderProps) =>
                       cn(
-                        'group relative flex items-center rounded-xl transition-all duration-200',
+                        'group relative flex items-center rounded-2xl transition-all duration-200 ease-out before:absolute before:inset-y-1 before:left-1 before:w-0.5 before:rounded-full before:bg-transparent before:transition-colors before:duration-200',
                         isSidebarCollapsed ? 'justify-center px-2 py-3' : 'justify-between px-3 py-3.5',
                         navActive
-                          ? 'bg-white text-[#1A3E6F] shadow-lg shadow-black/10'
-                          : 'text-blue-100/70 hover:bg-white/5 hover:text-white'
+                          ? 'bg-white text-[#1A3E6F] shadow-[0_10px_24px_rgba(15,23,42,0.12)] before:bg-[#E31E24]'
+                          : 'text-blue-100/75 hover:bg-white/6 hover:text-white'
                       )
                     }
                     onClick={() => setSidebarOpen(false)}
                   >
                     <div className={cn('flex items-center gap-3.5', isSidebarCollapsed && 'justify-center')}>
-                      <IconComponent
-                        className={cn(
-                          'h-[18px] w-[18px] transition-transform group-hover:scale-110',
-                          isActive ? 'text-[#1A3E6F]' : 'text-blue-200/40 group-hover:text-white'
-                        )}
-                      />
+                      <span className={cn(
+                        'flex h-8 w-8 items-center justify-center rounded-xl transition-all duration-200',
+                        isActive ? 'bg-[#edf3ff] text-[#1A3E6F]' : 'bg-white/5 text-blue-200/60 group-hover:bg-white/10 group-hover:text-white'
+                      )}>
+                        <IconComponent className="h-[17px] w-[17px]" />
+                      </span>
                       {!isSidebarCollapsed && (
                         <span className="text-sm font-semibold tracking-wide">{item.title}</span>
                       )}
@@ -181,7 +168,7 @@ const Sidebar = () => {
                     {!isSidebarCollapsed && isActive && (
                       <motion.div
                         layoutId="activeIndicator"
-                        className="h-1.5 w-1.5 rounded-full bg-[#E31E24]"
+                        className="h-1.5 w-1.5 rounded-full bg-[#E31E24] shadow-[0_0_0_4px_rgba(227,30,36,0.12)]"
                       />
                     )}
                   </NavLink>
@@ -191,26 +178,28 @@ const Sidebar = () => {
           </div>
 
           <div className={cn('p-3', isSidebarCollapsed && 'px-2')}>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-2">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-2 shadow-inner shadow-slate-950/10">
               <button
                 onClick={handleLogout}
                 className={cn(
-                  'group flex w-full items-center rounded-xl text-sm font-bold text-blue-200/70 transition-colors hover:bg-red-500/10 hover:text-red-400',
+                  'group flex w-full items-center rounded-xl text-sm font-bold text-blue-200/75 transition-all duration-200 hover:bg-red-500/10 hover:text-red-300',
                   isSidebarCollapsed ? 'justify-center px-2 py-3' : 'justify-between px-3 py-3'
                 )}
               >
                 <div className={cn('flex items-center gap-3.5', isSidebarCollapsed && 'justify-center')}>
-                  <LogOut className="h-[18px] w-[18px]" />
+                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/5 transition-colors group-hover:bg-red-500/10">
+                    <LogOut className="h-[17px] w-[17px]" />
+                  </span>
                   {!isSidebarCollapsed && <span>Sign Out</span>}
                 </div>
                 {!isSidebarCollapsed && (
-                  <ChevronRight className="h-4 w-4 opacity-0 transition-all group-hover:translate-x-1 group-hover:opacity-100" />
+                  <ChevronRight className="h-4 w-4 opacity-0 transition-all duration-200 group-hover:translate-x-1 group-hover:opacity-100" />
                 )}
               </button>
             </div>
           </div>
         </div>
-      </aside>
+      </motion.aside>
     </>
   );
 };
