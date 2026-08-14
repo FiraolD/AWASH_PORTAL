@@ -8,6 +8,10 @@ import path from 'path';
 const router = Router();
 router.use(authenticate);
 // ==================== HELPER FUNCTIONS ====================
+const CUSTOMER_DECISION_PENDING_STATUSES = ['AWAITING_CUSTOMER_APPROVAL', 'PENDING'];
+function isCustomerDecisionPending(status) {
+    return CUSTOMER_DECISION_PENDING_STATUSES.includes((status || '').toUpperCase());
+}
 async function getBaseRate(productType, coverageAmount) {
     const result = await pool.query(`
     SELECT "baseRate" 
@@ -271,7 +275,8 @@ router.get('/pending-decision', async (req, res) => {
         p.premium as "originalPremium", p."adjustedPremium",
         p."underwriterNotes", p.status, p."updatedAt"
       FROM policies p
-      WHERE p."userId" = $1 AND p.status = 'AWAITING_CUSTOMER_APPROVAL'
+      WHERE p."userId" = $1
+        AND p.status IN ('AWAITING_CUSTOMER_APPROVAL', 'PENDING')
       ORDER BY p."updatedAt" DESC
     `, [userId]);
         res.json(result.rows);
@@ -445,7 +450,9 @@ router.post('/:id/respond', async (req, res) => {
         const { decision, notes } = req.body;
         const policyId = req.params.id;
         const userId = req.user?.id;
-        const currentPolicy = await pool.query('SELECT * FROM policies WHERE id = $1 AND "userId" = $2', [policyId, userId]);
+        const currentPolicy = await pool.query(`SELECT * FROM policies
+       WHERE id = $1 AND "userId" = $2
+         AND status IN ('AWAITING_CUSTOMER_APPROVAL', 'PENDING')`, [policyId, userId]);
         if (currentPolicy.rows.length === 0)
             return res.status(404).json({ error: 'Policy not found' });
         const policy = currentPolicy.rows[0];

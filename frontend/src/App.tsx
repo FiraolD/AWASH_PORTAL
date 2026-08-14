@@ -21,6 +21,7 @@ const LoginPage = React.lazy(() => import('./pages/Auth/LoginPage'));
 const RegisterPage = React.lazy(() => import('./pages/Auth/RegisterPage'));
 const ForgotPasswordPage = React.lazy(() => import('./pages/Auth/ForgotPasswordPage'));
 const ResetPasswordPage = React.lazy(() => import('./pages/Auth/ResetPasswordPage'));
+const ChangePasswordPage = React.lazy(() => import('./pages/Auth/ChangePasswordPage'));
 
 // ============================================
 // ADMIN PAGES
@@ -120,6 +121,7 @@ export default function App() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/change-password" element={<ChangePasswordPage />} />
 
         {/* Main Application Routes */}
         <Route

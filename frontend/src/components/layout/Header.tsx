@@ -106,7 +106,7 @@ const Header = () => {
               <UserRound className="mr-2 h-4 w-4" />
               Edit Profile
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate('/reset-password')} className="cursor-pointer rounded-xl px-3 py-2 text-sm font-medium text-slate-700 focus:bg-slate-100 focus:text-slate-900">
+            <DropdownMenuItem onClick={() => navigate('/change-password')} className="cursor-pointer rounded-xl px-3 py-2 text-sm font-medium text-slate-700 focus:bg-slate-100 focus:text-slate-900">
               <LockKeyhole className="mr-2 h-4 w-4" />
               Change Password
             </DropdownMenuItem>
