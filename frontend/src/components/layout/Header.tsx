@@ -110,10 +110,6 @@ const Header = () => {
               <LockKeyhole className="mr-2 h-4 w-4" />
               Change Password
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate('/profile')} className="cursor-pointer rounded-xl px-3 py-2 text-sm font-medium text-slate-700 focus:bg-slate-100 focus:text-slate-900">
-              <PencilLine className="mr-2 h-4 w-4" />
-              Account Settings
-            </DropdownMenuItem>
             <DropdownMenuSeparator className="my-1 bg-slate-200" />
             <DropdownMenuItem onClick={handleLogout} className="cursor-pointer rounded-xl px-3 py-2 text-sm font-medium text-red-600 focus:bg-red-50 focus:text-red-700">
               <LogOut className="mr-2 h-4 w-4" />
