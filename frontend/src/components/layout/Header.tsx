@@ -1,15 +1,29 @@
 import * as React from 'react';
-import { Menu, Bell, Search, Settings, HelpCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Menu, Bell, Search, Settings, HelpCircle, LogOut, UserRound, LockKeyhole, PencilLine, ChevronDown } from 'lucide-react';
 import { useUIStore } from '../../stores/uiStore';
 import { useAuthStore } from '../../stores/authStore';
 import { Button } from '../ui/Button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../ui/Dropdown-menu';
 import { cn } from '../../lib/utils';
 
 const Header = () => {
   const { setSidebarOpen, isSidebarCollapsed } = useUIStore();
-  const { user } = useAuthStore();
+  const { user, logout } = useAuthStore();
+  const navigate = useNavigate();
 
   const logoUrl = "./assets/awash_logo.png";
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   return (
     <header
@@ -67,20 +81,46 @@ const Header = () => {
           <span className="absolute right-3.5 top-3.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#E31E24] ring-2 ring-[#E31E24]/20" />
         </button>
 
-        <div className="flex items-center gap-3 border-l border-slate-200 pl-3 md:pl-4">
-          <div className="hidden text-right md:block">
-            <p className="text-sm font-bold text-slate-900">{user?.firstName} {user?.lastName}</p>
-            <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">
-              {user?.role?.replace(/_/g, ' ')}
-            </p>
-          </div>
-          <div className="relative cursor-pointer">
-            <div className="h-11 w-11 overflow-hidden rounded-2xl border-2 border-white shadow-[0_12px_28px_rgba(15,23,42,0.1)] ring-1 ring-slate-200 transition-all duration-200 hover:ring-[#1A3E6F]/30">
-              <img src={user?.avatarUrl} alt="User avatar" className="h-full w-full object-cover" />
-            </div>
-            <div className="absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full border-2 border-white bg-green-500 shadow-sm" />
-          </div>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white/90 px-2 py-1.5 text-left shadow-sm transition-all duration-200 hover:border-slate-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#1A3E6F]/15">
+              <div className="relative">
+                <div className="h-10 w-10 overflow-hidden rounded-xl border-2 border-white shadow-[0_12px_28px_rgba(15,23,42,0.1)] ring-1 ring-slate-200">
+                  <img src={user?.avatarUrl} alt="User avatar" className="h-full w-full object-cover" />
+                </div>
+                <div className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full border-2 border-white bg-green-500 shadow-sm" />
+              </div>
+
+              <div className="hidden text-left md:block">
+                <p className="text-sm font-bold text-slate-900">{user?.firstName} {user?.lastName}</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">
+                  {user?.role?.replace(/_/g, ' ')}
+                </p>
+              </div>
+
+              <ChevronDown className="h-4 w-4 text-slate-500" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_18px_40px_rgba(15,23,42,0.12)]" align="end">
+            <DropdownMenuItem onClick={() => navigate('/profile')} className="cursor-pointer rounded-xl px-3 py-2 text-sm font-medium text-slate-700 focus:bg-slate-100 focus:text-slate-900">
+              <UserRound className="mr-2 h-4 w-4" />
+              Edit Profile
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate('/reset-password')} className="cursor-pointer rounded-xl px-3 py-2 text-sm font-medium text-slate-700 focus:bg-slate-100 focus:text-slate-900">
+              <LockKeyhole className="mr-2 h-4 w-4" />
+              Change Password
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate('/profile')} className="cursor-pointer rounded-xl px-3 py-2 text-sm font-medium text-slate-700 focus:bg-slate-100 focus:text-slate-900">
+              <PencilLine className="mr-2 h-4 w-4" />
+              Account Settings
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="my-1 bg-slate-200" />
+            <DropdownMenuItem onClick={handleLogout} className="cursor-pointer rounded-xl px-3 py-2 text-sm font-medium text-red-600 focus:bg-red-50 focus:text-red-700">
+              <LogOut className="mr-2 h-4 w-4" />
+              Logout
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   );

@@ -177,27 +177,6 @@ const Sidebar = () => {
             </div>
           </div>
 
-          <div className={cn('p-3', isSidebarCollapsed && 'px-2')}>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-2 shadow-inner shadow-slate-950/10">
-              <button
-                onClick={handleLogout}
-                className={cn(
-                  'group flex w-full items-center rounded-xl text-sm font-bold text-blue-200/75 transition-all duration-200 hover:bg-red-500/10 hover:text-red-300',
-                  isSidebarCollapsed ? 'justify-center px-2 py-3' : 'justify-between px-3 py-3'
-                )}
-              >
-                <div className={cn('flex items-center gap-3.5', isSidebarCollapsed && 'justify-center')}>
-                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/5 transition-colors group-hover:bg-red-500/10">
-                    <LogOut className="h-[17px] w-[17px]" />
-                  </span>
-                  {!isSidebarCollapsed && <span>Sign Out</span>}
-                </div>
-                {!isSidebarCollapsed && (
-                  <ChevronRight className="h-4 w-4 opacity-0 transition-all duration-200 group-hover:translate-x-1 group-hover:opacity-100" />
-                )}
-              </button>
-            </div>
-          </div>
         </div>
       </motion.aside>
     </>

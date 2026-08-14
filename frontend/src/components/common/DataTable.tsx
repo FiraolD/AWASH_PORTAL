@@ -22,19 +22,19 @@ export function DataTable<T extends { id: string }>({
 }: DataTableProps<T>) {
   if (data.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500 border rounded-lg">
+      <div className="rounded-xl border border-slate-200 bg-slate-50/80 py-8 text-center text-sm text-slate-500">
         {emptyMessage}
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border">
+    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white/90 shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
       <Table>
         <TableHeader>
-          <TableRow className="bg-gray-50">
+          <TableRow className="bg-slate-50/80">
             {columns.map((column, index) => (
-              <TableHead key={index} className={cn('font-semibold', column.className)}>
+              <TableHead key={index} className={cn('font-semibold uppercase tracking-[0.12em] text-slate-500', column.className)}>
                 {column.header}
               </TableHead>
             ))}
@@ -44,11 +44,11 @@ export function DataTable<T extends { id: string }>({
           {data.map((item) => (
             <TableRow
               key={item.id}
-              className={cn(onRowClick && 'cursor-pointer hover:bg-gray-50')}
+              className={cn(onRowClick && 'cursor-pointer transition-colors hover:bg-slate-50/80')}
               onClick={() => onRowClick?.(item)}
             >
               {columns.map((column, colIndex) => (
-                <TableCell key={colIndex} className={column.className}>
+                <TableCell key={colIndex} className={cn('text-sm text-slate-600', column.className)}>
                   {typeof column.accessor === 'function'
                     ? column.accessor(item)
                     : (item[column.accessor] as React.ReactNode)}

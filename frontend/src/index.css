@@ -189,3 +189,17 @@
     letter-spacing: var(--tracking-normal);
   }
 }
+
+@layer components {
+  .page-header-title {
+    @apply text-xl font-semibold tracking-[-0.02em] text-slate-900 sm:text-2xl;
+  }
+
+  .page-header-subtitle {
+    @apply text-sm text-slate-500;
+  }
+
+  .page-header-actions {
+    @apply flex items-center gap-2;
+  }
+}
