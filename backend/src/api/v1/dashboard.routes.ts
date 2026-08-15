@@ -121,6 +121,93 @@ router.get('/stats', authenticate, async (req, res) => {
   }
 });
 
+// Get recent transaction notifications based on existing audit and transaction data
+router.get('/notifications', authenticate, async (req, res) => {
+  try {
+    const userRole = req.user?.role;
+    const userId = req.user?.id;
+
+    let query = `
+      SELECT 
+        a.id,
+        a.action,
+        a."entityType",
+        a."entityId",
+        a."createdAt",
+        a."newValues",
+        u."firstName",
+        u."lastName",
+        u.email
+      FROM audit_logs a
+      LEFT JOIN users u ON u.id = a."userId"
+      WHERE a."createdAt" >= NOW() - INTERVAL '30 days'
+    `;
+
+    const params: any[] = [];
+
+    if (userRole === 'CUSTOMER') {
+      query += ` AND (a."userId" = $1 OR a."entityType" IN ('POLICY', 'CLAIM', 'PAYMENT'))`;
+      params.push(userId);
+    }
+
+    query += ` ORDER BY a."createdAt" DESC LIMIT 25`;
+
+    const result = await pool.query(query, params);
+
+    const notifications = result.rows.map((entry: any) => {
+      const personName = [entry.firstName, entry.lastName].filter(Boolean).join(' ') || entry.email || 'System';
+      const payload = entry.newValues || {};
+      const entityType = (entry.entityType || '').toUpperCase();
+      let title = 'System update';
+      let message = `${entry.action} was recorded for ${entityType.toLowerCase()}.`;
+      let type: 'payment' | 'claim' | 'policy' | 'system' = 'system';
+
+      if (entityType === 'PAYMENT') {
+        title = 'Payment processed';
+        type = 'payment';
+        message = `Payment ${payload.referenceNumber || entry.entityId || 'record'} was processed for ${personName}.`;
+      } else if (entityType === 'CLAIM') {
+        title = 'Claim update';
+        type = 'claim';
+        message = `Claim ${payload.claimNumber || entry.entityId || 'record'} was updated by ${personName}.`;
+      } else if (entityType === 'POLICY') {
+        title = 'Policy update';
+        type = 'policy';
+        message = `Policy ${payload.policyNumber || entry.entityId || 'record'} was updated by ${personName}.`;
+      } else if (entityType === 'SUPPORT') {
+        title = 'Support ticket update';
+        type = 'system';
+        message = `Support request was updated by ${personName}.`;
+      } else if (entry.action) {
+        title = entry.action.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+        message = `${title} was recorded for ${personName}.`;
+      }
+
+      return {
+        id: entry.id,
+        type,
+        title,
+        message,
+        createdAt: entry.createdAt,
+        unread: true,
+      };
+    });
+
+    res.json({
+      notifications,
+      unreadCount: notifications.length,
+      lastUpdated: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    console.error('Failed to fetch notifications:', error);
+    res.status(500).json({
+      error: 'Failed to fetch notifications',
+      notifications: [],
+      unreadCount: 0,
+    });
+  }
+});
+
 // Get dashboard activities - SIMPLIFIED VERSION
 router.get('/activities', authenticate, async (req, res) => {
   try {

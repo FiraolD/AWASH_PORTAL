@@ -1,10 +1,9 @@
 import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Menu, Bell, Search, HelpCircle, LogOut, UserRound, LockKeyhole, ChevronDown } from 'lucide-react';
-import { toast } from 'sonner';
 import { useUIStore } from '../../stores/uiStore';
 import { useAuthStore } from '../../stores/authStore';
-import { Button } from '../ui/Button';
+import axiosInstance from '../../lib/axios';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,11 +14,28 @@ import {
 import { cn } from '../../lib/utils';
 
 type NotificationItem = {
-  id: number;
+  id: string | number;
   title: string;
   message: string;
   time: string;
   unread: boolean;
+  type: 'payment' | 'claim' | 'policy' | 'system';
+};
+
+const formatTimeAgo = (dateValue?: string) => {
+  if (!dateValue) return 'just now';
+
+  const diffMs = Date.now() - new Date(dateValue).getTime();
+  const diffMinutes = Math.max(0, Math.floor(diffMs / 60000));
+
+  if (diffMinutes < 1) return 'just now';
+  if (diffMinutes < 60) return `${diffMinutes} min ago`;
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours} hr ago`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays} day ago`;
 };
 
 const Header = () => {
@@ -30,49 +46,35 @@ const Header = () => {
   const logoUrl = './assets/awash_logo.png';
   const chatbotUrl = import.meta.env.VITE_CHATBOT_URL || 'https://example.com/chatbot';
 
-  const [notifications, setNotifications] = React.useState<NotificationItem[]>([
-    {
-      id: 1,
-      title: 'Renewal reminder',
-      message: 'Your motor policy renewal is due in 5 days.',
-      time: '2 min ago',
-      unread: true,
-    },
-    {
-      id: 2,
-      title: 'Claim update',
-      message: 'Your claim #AW-4021 has moved to underwriting review.',
-      time: '18 min ago',
-      unread: false,
-    },
-  ]);
+  const [notifications, setNotifications] = React.useState<NotificationItem[]>([]);
+
+  const fetchNotifications = React.useCallback(async () => {
+    try {
+      const response = await axiosInstance.get('/dashboard/notifications');
+      const items = (response.data?.notifications || []).map((notification: any) => ({
+        id: notification.id,
+        title: notification.title,
+        message: notification.message,
+        time: formatTimeAgo(notification.createdAt),
+        unread: Boolean(notification.unread),
+        type: notification.type || 'system',
+      }));
+
+      setNotifications(items.slice(0, 8));
+    } catch (error) {
+      console.error('Failed to load notifications:', error);
+    }
+  }, []);
 
   React.useEffect(() => {
+    fetchNotifications();
+
     const interval = window.setInterval(() => {
-      const liveMessages = [
-        'A new payout update was posted to your claim.',
-        'Your policy document is ready for download.',
-        'A premium reminder has been sent for your active policy.',
-      ];
-
-      const nextMessage = liveMessages[Math.floor(Math.random() * liveMessages.length)];
-
-      setNotifications((prev) => [
-        {
-          id: Date.now(),
-          title: 'Live update',
-          message: nextMessage,
-          time: 'just now',
-          unread: true,
-        },
-        ...prev,
-      ].slice(0, 5));
-
-      toast.info('New insurance update received');
+      fetchNotifications();
     }, 30000);
 
     return () => window.clearInterval(interval);
-  }, []);
+  }, [fetchNotifications]);
 
   const unreadCount = notifications.filter((item) => item.unread).length;
 
@@ -81,7 +83,13 @@ const Header = () => {
     navigate('/login');
   };
 
-  const markNotificationsRead = () => {
+  const markNotificationRead = (id: string | number) => {
+    setNotifications((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, unread: false } : item))
+    );
+  };
+
+  const markAllNotificationsRead = () => {
     setNotifications((prev) => prev.map((item) => ({ ...item, unread: false })));
   };
 
@@ -142,7 +150,6 @@ const Header = () => {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
-              onClick={markNotificationsRead}
               className="group relative rounded-2xl border border-slate-200 bg-slate-50 p-3 text-[#1A3E6F] shadow-sm transition-all duration-200 hover:bg-white hover:shadow-md"
               aria-label="Open notifications"
             >
@@ -154,22 +161,61 @@ const Header = () => {
               )}
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-80 rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_18px_40px_rgba(15,23,42,0.12)]" align="end">
-            <div className="mb-2 flex items-center justify-between px-2 py-1">
-              <p className="text-sm font-bold text-slate-900">Notifications</p>
-              <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">Live</span>
+          <DropdownMenuContent className="w-[360px] rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_18px_40px_rgba(15,23,42,0.12)]" align="end">
+            <div className="mb-2 flex items-center justify-between gap-3 px-2 py-1">
+              <div>
+                <p className="text-sm font-bold text-slate-900">Notifications</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">Live transactions</p>
+              </div>
+              {unreadCount > 0 && (
+                <button
+                  type="button"
+                  onClick={markAllNotificationsRead}
+                  className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900"
+                >
+                  Mark all read
+                </button>
+              )}
             </div>
             <DropdownMenuSeparator className="my-1 bg-slate-200" />
-            {notifications.map((notification) => (
-              <DropdownMenuItem key={notification.id} className="flex cursor-default flex-col items-start rounded-xl px-3 py-2 text-left focus:bg-slate-50">
-                <div className="flex w-full items-center justify-between gap-2">
-                  <span className="text-sm font-semibold text-slate-900">{notification.title}</span>
-                  {notification.unread && <span className="h-2.5 w-2.5 rounded-full bg-[#1A3E6F]" />}
-                </div>
-                <p className="mt-1 text-xs leading-5 text-slate-600">{notification.message}</p>
-                <span className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-400">{notification.time}</span>
-              </DropdownMenuItem>
-            ))}
+            <div className="max-h-[360px] overflow-y-auto">
+              {notifications.map((notification) => (
+                <DropdownMenuItem
+                  key={notification.id}
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    markNotificationRead(notification.id);
+                  }}
+                  className={cn(
+                    'flex cursor-pointer flex-col items-start rounded-xl px-3 py-2.5 text-left focus:bg-slate-50',
+                    notification.unread ? 'bg-[#1A3E6F]/[0.03]' : ''
+                  )}
+                >
+                  <div className="flex w-full items-start justify-between gap-2">
+                    <div className="flex items-start gap-2">
+                      <span
+                        className={cn(
+                          'mt-1 h-2.5 w-2.5 rounded-full',
+                          notification.type === 'payment' && 'bg-emerald-500',
+                          notification.type === 'claim' && 'bg-amber-500',
+                          notification.type === 'policy' && 'bg-blue-500',
+                          notification.type === 'system' && 'bg-violet-500'
+                        )}
+                      />
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">{notification.title}</p>
+                        <p className="mt-1 text-xs leading-5 text-slate-600">{notification.message}</p>
+                      </div>
+                    </div>
+                    {notification.unread && <span className="mt-1 h-2.5 w-2.5 rounded-full bg-[#1A3E6F]" />}
+                  </div>
+                  <div className="mt-2 flex w-full items-center justify-between gap-2">
+                    <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-slate-400">{notification.time}</span>
+                    {notification.unread && <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1A3E6F]">Unread</span>}
+                  </div>
+                </DropdownMenuItem>
+              ))}
+            </div>
           </DropdownMenuContent>
         </DropdownMenu>
 
