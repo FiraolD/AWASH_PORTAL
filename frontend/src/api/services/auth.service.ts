@@ -4,8 +4,11 @@ export const authService = {
   login: (email: string, password: string) =>
     apiClient.post('/auth/login', { email, password }),
 
-  register: (data: { email: string; password: string; firstName: string; lastName: string; phone?: string }) =>
-    apiClient.post('/auth/register', data),
+  register: (data: { email: string; password: string; firstName: string; lastName: string; phone?: string; address?: string }) =>
+    apiClient.post('/auth/signup', data),
+
+  resendActivation: (email: string) =>
+    apiClient.post('/auth/resend-verification', { email }),
 
   forgotPassword: (email: string) =>
     apiClient.post('/auth/forgot-password', { email }),

@@ -92,6 +92,69 @@ router.get('/stats', authenticate, async (req, res) => {
         });
     }
 });
+// Get recent user notifications from persistent database table
+router.get('/notifications', authenticate, async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        const result = await pool.query(`SELECT id, title, message, type, "isRead", "createdAt"
+       FROM notifications
+       WHERE "userId" = $1
+       ORDER BY "createdAt" DESC
+       LIMIT 25`, [userId]);
+        const notifications = result.rows.map((notification) => ({
+            id: notification.id,
+            title: notification.title,
+            message: notification.message,
+            type: notification.type || 'system',
+            createdAt: notification.createdAt,
+            unread: !notification.isRead,
+            isRead: Boolean(notification.isRead),
+        }));
+        res.json({
+            notifications,
+            unreadCount: notifications.filter((n) => n.unread).length,
+            lastUpdated: new Date().toISOString(),
+        });
+    }
+    catch (error) {
+        console.error('Failed to fetch notifications:', error);
+        res.status(500).json({
+            error: 'Failed to fetch notifications',
+            notifications: [],
+            unreadCount: 0,
+        });
+    }
+});
+router.post('/notifications/mark-read', authenticate, async (req, res) => {
+    try {
+        const { id } = req.body;
+        const userId = req.user?.id;
+        if (!id) {
+            return res.status(400).json({ error: 'Notification id is required' });
+        }
+        await pool.query(`UPDATE notifications
+       SET "isRead" = true, "readAt" = NOW(), "updatedAt" = NOW()
+       WHERE id = $1 AND "userId" = $2`, [id, userId]);
+        res.json({ success: true });
+    }
+    catch (error) {
+        console.error('Failed to mark notification as read:', error);
+        res.status(500).json({ error: 'Failed to update notification' });
+    }
+});
+router.post('/notifications/mark-all-read', authenticate, async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        await pool.query(`UPDATE notifications
+       SET "isRead" = true, "readAt" = NOW(), "updatedAt" = NOW()
+       WHERE "userId" = $1 AND "isRead" = false`, [userId]);
+        res.json({ success: true });
+    }
+    catch (error) {
+        console.error('Failed to mark all notifications as read:', error);
+        res.status(500).json({ error: 'Failed to update notifications' });
+    }
+});
 // Get dashboard activities - SIMPLIFIED VERSION
 router.get('/activities', authenticate, async (req, res) => {
     try {

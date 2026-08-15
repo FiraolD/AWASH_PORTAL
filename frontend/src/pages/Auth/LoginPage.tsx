@@ -23,8 +23,20 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const { login, isLoading } = useAuthStore();
   const [showPassword, setShowPassword] = React.useState(false);
+  const [searchParams] = React.useState(() => new URLSearchParams(window.location.search));
 
   const logoUrl = "./src/assets/awash_logo.png";
+
+  React.useEffect(() => {
+    const verified = searchParams.get('verified');
+    const email = searchParams.get('email');
+
+    if (verified === 'true') {
+      toast.success(`Email verified successfully${email ? ` for ${email}` : ''}. You can now log in.`);
+    } else if (verified === 'false') {
+      toast.error('Activation link is invalid or has expired. Please request a new one.');
+    }
+  }, [searchParams]);
 
   const {
     register,
@@ -39,8 +51,9 @@ export default function LoginPage() {
       await login(data.email, data.password);
       toast.success('Successfully logged in!');
       navigate('/dashboard');
-    } catch (error) {
-      toast.error('Invalid credentials. Please try again.');
+    } catch (error: any) {
+      const message = error?.response?.data?.error || error?.message || 'Invalid credentials. Please try again.';
+      toast.error(message);
     }
   };
 

@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-  
     "build": "tsc && echo '=== Build complete ===' && ls -la dist/middleware/ && ls -la dist/api/v1/",
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js"
@@ -11,7 +10,6 @@
   "dependencies": {
     "@prisma/client": "^7.7.0",
     "axios": "^1.18.1",
-    "process": "^0.11.10",
     "bcrypt": "^5.1.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
@@ -23,6 +21,7 @@
     "nodemailer": "^9.0.1",
     "pdfkit": "^0.18.0",
     "pg": "^8.20.0",
+    "process": "^0.11.10",
     "uuid": "^14.0.1",
     "winston": "^3.17.0",
     "zod": "^3.23.8"
@@ -37,6 +36,7 @@
     "@types/nodemailer": "^8.0.0",
     "@types/pdfkit": "^0.17.6",
     "@types/pg": "^8.20.0",
+    "prisma": "^7.9.1",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3"
   },

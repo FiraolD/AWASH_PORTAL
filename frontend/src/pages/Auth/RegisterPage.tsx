@@ -25,6 +25,7 @@ export default function RegisterPage() {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [registrationComplete, setRegistrationComplete] = useState(false);
+  const [resending, setResending] = useState(false);
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -61,21 +62,30 @@ export default function RegisterPage() {
         address: formData.address.trim() || undefined,
       });
 
-      // Store token and user data
-      localStorage.setItem('awash-auth-storage', JSON.stringify({
-        state: {
-          user: res.data.user,
-          token: res.data.token,
-        },
-      }));
-
       setRegistrationComplete(true);
-      toast.success('Account created! Please check your email to verify.');
+      toast.success('Account created! Please check your email to activate your account.');
     } catch (error: any) {
       const message = error.response?.data?.error || 'Failed to create account';
       toast.error(message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!formData.email.trim()) {
+      toast.error('Enter your email to resend the activation link.');
+      return;
+    }
+
+    setResending(true);
+    try {
+      await axios.post(`${API_URL}/auth/resend-verification`, { email: formData.email.trim().toLowerCase() });
+      toast.success('Activation link sent again. Please check your inbox.');
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Unable to resend the activation link.');
+    } finally {
+      setResending(false);
     }
   };
 
@@ -89,12 +99,14 @@ export default function RegisterPage() {
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Check Your Email</h2>
             <p className="text-gray-600 mb-6">
-              We've sent a verification link to <strong>{formData.email}</strong>. 
+              We've sent an activation link to <strong>{formData.email}</strong>.
               Please click the link in the email to activate your account.
             </p>
             <p className="text-sm text-gray-500 mb-6">
               Didn't receive the email? Check your spam folder or{' '}
-              <button className="text-blue-600 hover:underline">resend verification</button>.
+              <button type="button" className="text-blue-600 hover:underline" onClick={handleResendVerification} disabled={resending}>
+                {resending ? 'Sending...' : 'resend activation link'}
+              </button>.
             </p>
             <Button onClick={() => navigate('/login')} className="w-full">
               Go to Login

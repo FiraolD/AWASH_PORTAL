@@ -121,81 +121,33 @@ router.get('/stats', authenticate, async (req, res) => {
   }
 });
 
-// Get recent transaction notifications based on existing audit and transaction data
+// Get recent user notifications from persistent database table
 router.get('/notifications', authenticate, async (req, res) => {
   try {
-    const userRole = req.user?.role;
     const userId = req.user?.id;
 
-    let query = `
-      SELECT 
-        a.id,
-        a.action,
-        a."entityType",
-        a."entityId",
-        a."createdAt",
-        a."newValues",
-        u."firstName",
-        u."lastName",
-        u.email
-      FROM audit_logs a
-      LEFT JOIN users u ON u.id = a."userId"
-      WHERE a."createdAt" >= NOW() - INTERVAL '30 days'
-    `;
+    const result = await pool.query(
+      `SELECT id, title, message, type, "isRead", "createdAt"
+       FROM notifications
+       WHERE "userId" = $1
+       ORDER BY "createdAt" DESC
+       LIMIT 25`,
+      [userId]
+    );
 
-    const params: any[] = [];
-
-    if (userRole === 'CUSTOMER') {
-      query += ` AND (a."userId" = $1 OR a."entityType" IN ('POLICY', 'CLAIM', 'PAYMENT'))`;
-      params.push(userId);
-    }
-
-    query += ` ORDER BY a."createdAt" DESC LIMIT 25`;
-
-    const result = await pool.query(query, params);
-
-    const notifications = result.rows.map((entry: any) => {
-      const personName = [entry.firstName, entry.lastName].filter(Boolean).join(' ') || entry.email || 'System';
-      const payload = entry.newValues || {};
-      const entityType = (entry.entityType || '').toUpperCase();
-      let title = 'System update';
-      let message = `${entry.action} was recorded for ${entityType.toLowerCase()}.`;
-      let type: 'payment' | 'claim' | 'policy' | 'system' = 'system';
-
-      if (entityType === 'PAYMENT') {
-        title = 'Payment processed';
-        type = 'payment';
-        message = `Payment ${payload.referenceNumber || entry.entityId || 'record'} was processed for ${personName}.`;
-      } else if (entityType === 'CLAIM') {
-        title = 'Claim update';
-        type = 'claim';
-        message = `Claim ${payload.claimNumber || entry.entityId || 'record'} was updated by ${personName}.`;
-      } else if (entityType === 'POLICY') {
-        title = 'Policy update';
-        type = 'policy';
-        message = `Policy ${payload.policyNumber || entry.entityId || 'record'} was updated by ${personName}.`;
-      } else if (entityType === 'SUPPORT') {
-        title = 'Support ticket update';
-        type = 'system';
-        message = `Support request was updated by ${personName}.`;
-      } else if (entry.action) {
-        title = entry.action.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
-        message = `${title} was recorded for ${personName}.`;
-      }
-
-      return {
-        id: entry.id,
-        type,
-        title,
-        message,
-        createdAt: entry.createdAt,
-        unread: true,
-      };
-    });
+    const notifications = result.rows.map((notification: any) => ({
+      id: notification.id,
+      title: notification.title,
+      message: notification.message,
+      type: notification.type || 'system',
+      createdAt: notification.createdAt,
+      unread: !notification.isRead,
+      isRead: Boolean(notification.isRead),
+    }));
 
     res.json({
       notifications,
-      unreadCount: notifications.length,
+      unreadCount: notifications.filter((n: any) => n.unread).length,
       lastUpdated: new Date().toISOString(),
     });
   } catch (error: any) {
@@ -205,6 +157,47 @@ router.get('/notifications', authenticate, async (req, res) => {
       notifications: [],
       unreadCount: 0,
     });
+  }
+});
+
+router.post('/notifications/mark-read', authenticate, async (req, res) => {
+  try {
+    const { id } = req.body;
+    const userId = req.user?.id;
+
+    if (!id) {
+      return res.status(400).json({ error: 'Notification id is required' });
+    }
+
+    await pool.query(
+      `UPDATE notifications
+       SET "isRead" = true, "readAt" = NOW(), "updatedAt" = NOW()
+       WHERE id = $1 AND "userId" = $2`,
+      [id, userId]
+    );
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Failed to mark notification as read:', error);
+    res.status(500).json({ error: 'Failed to update notification' });
+  }
+});
+
+router.post('/notifications/mark-all-read', authenticate, async (req, res) => {
+  try {
+    const userId = req.user?.id;
+
+    await pool.query(
+      `UPDATE notifications
+       SET "isRead" = true, "readAt" = NOW(), "updatedAt" = NOW()
+       WHERE "userId" = $1 AND "isRead" = false`,
+      [userId]
+    );
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Failed to mark all notifications as read:', error);
+    res.status(500).json({ error: 'Failed to update notifications' });
   }
 });
 

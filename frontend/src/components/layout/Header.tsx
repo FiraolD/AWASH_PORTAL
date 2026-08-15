@@ -66,6 +66,24 @@ const Header = () => {
     }
   }, []);
 
+  const updateNotificationState = React.useCallback(async (request: () => Promise<any>, mode: 'single' | 'all', id?: string | number) => {
+    try {
+      await request();
+
+      if (mode === 'single' && id !== undefined) {
+        setNotifications((prev) =>
+          prev.map((item) => (item.id === id ? { ...item, unread: false } : item))
+        );
+      }
+
+      if (mode === 'all') {
+        setNotifications((prev) => prev.map((item) => ({ ...item, unread: false })));
+      }
+    } catch (error) {
+      console.error('Failed to update notification state:', error);
+    }
+  }, []);
+
   React.useEffect(() => {
     fetchNotifications();
 
@@ -84,13 +102,18 @@ const Header = () => {
   };
 
   const markNotificationRead = (id: string | number) => {
-    setNotifications((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, unread: false } : item))
+    updateNotificationState(
+      () => axiosInstance.post('/dashboard/notifications/mark-read', { id }),
+      'single',
+      id
     );
   };
 
   const markAllNotificationsRead = () => {
-    setNotifications((prev) => prev.map((item) => ({ ...item, unread: false })));
+    updateNotificationState(
+      () => axiosInstance.post('/dashboard/notifications/mark-all-read'),
+      'all'
+    );
   };
 
   return (

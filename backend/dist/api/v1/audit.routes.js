@@ -84,6 +84,24 @@ router.get('/entity-types', authenticate, authorizeExecutives, async (req, res) 
         res.status(500).json({ error: 'Failed to fetch entity types' });
     }
 });
+async function createNotificationRecord(userId, title, message, type = 'system') {
+    try {
+        if (!userId)
+            return;
+        await pool.query(`INSERT INTO notifications (
+        "userId",
+        title,
+        message,
+        type,
+        "isRead",
+        "createdAt",
+        "updatedAt"
+      ) VALUES ($1, $2, $3, $4, false, NOW(), NOW())`, [userId, title, message, type]);
+    }
+    catch (error) {
+        console.error('[Notification] Failed to create notification:', error.message);
+    }
+}
 // ---------------------------------------------------------------------------
 // Helper function to create audit logs (called by other routes)
 // ---------------------------------------------------------------------------
@@ -111,6 +129,29 @@ export async function createAuditLog(userId, userEmail, userRole, action, entity
             ipAddress || null,
             userAgent || null,
         ]);
+        if (userId && entityType) {
+            const formattedAction = action?.replace(/_/g, ' ') || 'Updated';
+            const normalizedType = (entityType || 'SYSTEM').toUpperCase();
+            let notificationType = 'system';
+            let title = `${formattedAction} ${normalizedType}`;
+            let message = `${formattedAction} was recorded for ${normalizedType.toLowerCase()}.`;
+            if (normalizedType === 'PAYMENT') {
+                notificationType = 'payment';
+                title = 'Payment processed';
+                message = `Payment ${entityId || 'record'} was processed successfully.`;
+            }
+            else if (normalizedType === 'CLAIM') {
+                notificationType = 'claim';
+                title = 'Claim update';
+                message = `Claim ${entityId || 'record'} was updated.`;
+            }
+            else if (normalizedType === 'POLICY') {
+                notificationType = 'policy';
+                title = 'Policy update';
+                message = `Policy ${entityId || 'record'} was updated.`;
+            }
+            await createNotificationRecord(userId, title, message, notificationType);
+        }
     }
     catch (error) {
         console.error('[AuditLog] Failed to create audit log:', error.message);

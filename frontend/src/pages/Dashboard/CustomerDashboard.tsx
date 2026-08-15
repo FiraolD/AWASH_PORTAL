@@ -311,7 +311,38 @@ export default function CustomerDashboard() {
           </Card>
         </Link>
       </div>
-
+{/* Quick Actions */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Link to="/customer/policies/new">
+          <Card className="hover:shadow-lg transition-all cursor-pointer border-2 border-dashed hover:border-blue-400 hover:bg-blue-50">
+            <CardContent className="p-6 text-center">
+              <Shield className="h-8 w-8 text-blue-500 mx-auto mb-2" />
+              <p className="font-medium">Buy New Policy</p>
+              <p className="text-sm text-gray-500">Get covered today</p>
+            </CardContent>
+          </Card>
+        </Link>
+        
+        <Link to="/customer/claims/new">
+          <Card className="hover:shadow-lg transition-all cursor-pointer border-2 border-dashed hover:border-yellow-400 hover:bg-yellow-50">
+            <CardContent className="p-6 text-center">
+              <AlertCircle className="h-8 w-8 text-yellow-500 mx-auto mb-2" />
+              <p className="font-medium">File a Claim</p>
+              <p className="text-sm text-gray-500">Submit new claim</p>
+            </CardContent>
+          </Card>
+        </Link>
+        
+        <Link to="/customer/support/new">
+          <Card className="hover:shadow-lg transition-all cursor-pointer border-2 border-dashed hover:border-green-400 hover:bg-green-50">
+            <CardContent className="p-6 text-center">
+              <Headphones className="h-8 w-8 text-green-500 mx-auto mb-2" />
+              <p className="font-medium">Contact Support</p>
+              <p className="text-sm text-gray-500">Get help</p>
+            </CardContent>
+          </Card>
+        </Link>
+      </div>
       {/* Pending Offers Section */}
       {pendingOffers > 0 && (
         <Card className="border-purple-500 border-2 shadow-lg">
@@ -493,38 +524,7 @@ export default function CustomerDashboard() {
         </CardContent>
       </Card>
 
-      {/* Quick Actions */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Link to="/customer/policies/new">
-          <Card className="hover:shadow-lg transition-all cursor-pointer border-2 border-dashed hover:border-blue-400 hover:bg-blue-50">
-            <CardContent className="p-6 text-center">
-              <Shield className="h-8 w-8 text-blue-500 mx-auto mb-2" />
-              <p className="font-medium">Buy New Policy</p>
-              <p className="text-sm text-gray-500">Get covered today</p>
-            </CardContent>
-          </Card>
-        </Link>
-        
-        <Link to="/customer/claims/new">
-          <Card className="hover:shadow-lg transition-all cursor-pointer border-2 border-dashed hover:border-yellow-400 hover:bg-yellow-50">
-            <CardContent className="p-6 text-center">
-              <AlertCircle className="h-8 w-8 text-yellow-500 mx-auto mb-2" />
-              <p className="font-medium">File a Claim</p>
-              <p className="text-sm text-gray-500">Submit new claim</p>
-            </CardContent>
-          </Card>
-        </Link>
-        
-        <Link to="/customer/support/new">
-          <Card className="hover:shadow-lg transition-all cursor-pointer border-2 border-dashed hover:border-green-400 hover:bg-green-50">
-            <CardContent className="p-6 text-center">
-              <Headphones className="h-8 w-8 text-green-500 mx-auto mb-2" />
-              <p className="font-medium">Contact Support</p>
-              <p className="text-sm text-gray-500">Get help</p>
-            </CardContent>
-          </Card>
-        </Link>
-      </div>
+      
     </div>
   );
 }

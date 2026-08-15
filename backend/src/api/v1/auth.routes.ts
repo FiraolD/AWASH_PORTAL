@@ -91,16 +91,8 @@ router.post('/signup', async (req, res: Response) => {
       console.error('Failed to send verification email:', emailError);
     }
 
-    // Generate JWT token
-    const token = generateToken({
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      emailVerified: false,
-    });
-
     res.status(201).json({
-      message: 'Account created successfully. Please check your email to verify your account.',
+      message: 'Account created successfully. Please check your email to activate your account.',
       user: {
         id: user.id,
         firstName: user.firstName,
@@ -109,7 +101,6 @@ router.post('/signup', async (req, res: Response) => {
         role: user.role,
         emailVerified: false,
       },
-      token,
     });
   } catch (error: any) {
     console.error('[Auth] Signup error:', error.message);
@@ -237,6 +228,12 @@ router.post('/login', async (req, res: Response) => {
 
     if (!user.isActive) {
       return res.status(403).json({ error: 'Your account has been deactivated. Please contact support.' });
+    }
+
+    if (!user.emailVerified) {
+      return res.status(403).json({
+        error: 'Please verify your email before logging in. Check your inbox for the activation link.',
+      });
     }
 
     // Compare password using "passwordHash" column
