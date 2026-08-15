@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, Bell, Search, Settings, HelpCircle, LogOut, UserRound, LockKeyhole, PencilLine, ChevronDown } from 'lucide-react';
+import { Menu, Bell, Search, HelpCircle, LogOut, UserRound, LockKeyhole, ChevronDown } from 'lucide-react';
+import { toast } from 'sonner';
 import { useUIStore } from '../../stores/uiStore';
 import { useAuthStore } from '../../stores/authStore';
 import { Button } from '../ui/Button';
@@ -13,16 +14,75 @@ import {
 } from '../ui/Dropdown-menu';
 import { cn } from '../../lib/utils';
 
+type NotificationItem = {
+  id: number;
+  title: string;
+  message: string;
+  time: string;
+  unread: boolean;
+};
+
 const Header = () => {
   const { setSidebarOpen, isSidebarCollapsed } = useUIStore();
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
 
-  const logoUrl = "./assets/awash_logo.png";
+  const logoUrl = './assets/awash_logo.png';
+  const chatbotUrl = import.meta.env.VITE_CHATBOT_URL || 'https://example.com/chatbot';
+
+  const [notifications, setNotifications] = React.useState<NotificationItem[]>([
+    {
+      id: 1,
+      title: 'Renewal reminder',
+      message: 'Your motor policy renewal is due in 5 days.',
+      time: '2 min ago',
+      unread: true,
+    },
+    {
+      id: 2,
+      title: 'Claim update',
+      message: 'Your claim #AW-4021 has moved to underwriting review.',
+      time: '18 min ago',
+      unread: false,
+    },
+  ]);
+
+  React.useEffect(() => {
+    const interval = window.setInterval(() => {
+      const liveMessages = [
+        'A new payout update was posted to your claim.',
+        'Your policy document is ready for download.',
+        'A premium reminder has been sent for your active policy.',
+      ];
+
+      const nextMessage = liveMessages[Math.floor(Math.random() * liveMessages.length)];
+
+      setNotifications((prev) => [
+        {
+          id: Date.now(),
+          title: 'Live update',
+          message: nextMessage,
+          time: 'just now',
+          unread: true,
+        },
+        ...prev,
+      ].slice(0, 5));
+
+      toast.info('New insurance update received');
+    }, 30000);
+
+    return () => window.clearInterval(interval);
+  }, []);
+
+  const unreadCount = notifications.filter((item) => item.unread).length;
 
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const markNotificationsRead = () => {
+    setNotifications((prev) => prev.map((item) => ({ ...item, unread: false })));
   };
 
   return (
@@ -68,18 +128,50 @@ const Header = () => {
 
       <div className="flex items-center gap-2 md:gap-3">
         <div className="mr-1 hidden items-center gap-1 sm:flex">
-          <Button variant="ghost" size="icon" className="rounded-xl text-slate-500 transition-all duration-200 hover:bg-[#1A3E6F]/5 hover:text-[#1A3E6F]">
+          <a
+            href={chatbotUrl}
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Open insurance chatbot"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-all duration-200 hover:border-[#1A3E6F]/20 hover:bg-[#1A3E6F]/5 hover:text-[#1A3E6F]"
+          >
             <HelpCircle className="h-5 w-5" />
-          </Button>
-          <Button variant="ghost" size="icon" className="rounded-xl text-slate-500 transition-all duration-200 hover:bg-[#1A3E6F]/5 hover:text-[#1A3E6F]">
-            <Settings className="h-5 w-5" />
-          </Button>
+          </a>
         </div>
 
-        <button className="group relative rounded-2xl border border-slate-200 bg-slate-50 p-3 text-[#1A3E6F] shadow-sm transition-all duration-200 hover:bg-white hover:shadow-md">
-          <Bell className="h-5 w-5 transition-transform duration-200 group-hover:rotate-12" />
-          <span className="absolute right-3.5 top-3.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#E31E24] ring-2 ring-[#E31E24]/20" />
-        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              onClick={markNotificationsRead}
+              className="group relative rounded-2xl border border-slate-200 bg-slate-50 p-3 text-[#1A3E6F] shadow-sm transition-all duration-200 hover:bg-white hover:shadow-md"
+              aria-label="Open notifications"
+            >
+              <Bell className="h-5 w-5 transition-transform duration-200 group-hover:rotate-12" />
+              {unreadCount > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-[#E31E24] px-1 text-[10px] font-bold text-white ring-2 ring-[#E31E24]/20">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-80 rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_18px_40px_rgba(15,23,42,0.12)]" align="end">
+            <div className="mb-2 flex items-center justify-between px-2 py-1">
+              <p className="text-sm font-bold text-slate-900">Notifications</p>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">Live</span>
+            </div>
+            <DropdownMenuSeparator className="my-1 bg-slate-200" />
+            {notifications.map((notification) => (
+              <DropdownMenuItem key={notification.id} className="flex cursor-default flex-col items-start rounded-xl px-3 py-2 text-left focus:bg-slate-50">
+                <div className="flex w-full items-center justify-between gap-2">
+                  <span className="text-sm font-semibold text-slate-900">{notification.title}</span>
+                  {notification.unread && <span className="h-2.5 w-2.5 rounded-full bg-[#1A3E6F]" />}
+                </div>
+                <p className="mt-1 text-xs leading-5 text-slate-600">{notification.message}</p>
+                <span className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-400">{notification.time}</span>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
