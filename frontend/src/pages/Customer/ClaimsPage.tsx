@@ -196,7 +196,7 @@ export default function ClaimsPage() {
           <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Something went wrong</h3>
           <p className="text-gray-500 mb-4">{error}</p>
-          <Button onClick={fetchClaims} className="bg-blue-600 hover:bg-blue-700">
+          <Button onClick={fetchClaims} className="bg-[#1A3E6F] hover:bg-[#153358]">
             <RefreshCw className="h-4 w-4 mr-2" />
             Try Again
           </Button>
@@ -228,7 +228,7 @@ export default function ClaimsPage() {
           {/* ✅ FIXED: Register New Claim button */}
           <Button
             onClick={() => navigate('/customer/claims/new')}
-            className="bg-blue-600 hover:bg-blue-700"
+            className="bg-[#1A3E6F] hover:bg-[#153358]"
           >
             <Plus className="h-4 w-4 mr-2" />
             Register New Claim
@@ -279,7 +279,7 @@ export default function ClaimsPage() {
             {claims.length === 0 && (
               <Button 
                 onClick={() => navigate('/customer/claims/new')} 
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-[#1A3E6F] hover:bg-[#153358]"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Register New Claim
