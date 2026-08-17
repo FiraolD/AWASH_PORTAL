@@ -9,6 +9,15 @@
   },
   "dependencies": {
     "@prisma/client": "^7.7.0",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^1.4.13",
+    "@types/node": "^22.20.1",
+    "@types/nodemailer": "^8.0.0",
+    "@types/pdfkit": "^0.17.6",
+    "@types/pg": "^8.20.0",
     "axios": "^1.18.1",
     "bcrypt": "^5.1.0",
     "bcryptjs": "^2.4.3",
@@ -22,26 +31,16 @@
     "path": "^0.12.7",
     "pdfkit": "^0.18.0",
     "pg": "^8.20.0",
+    "prisma": "^7.9.1",
     "process": "^0.11.10",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
     "uuid": "^14.0.1",
     "winston": "^3.17.0",
     "zod": "^3.23.8"
   },
-  "devDependencies": {
-    "@types/bcryptjs": "^2.4.6",
-    "@types/cors": "^2.8.17",
-    "@types/express": "^4.17.21",
-    "@types/jsonwebtoken": "^9.0.10",
-    "@types/multer": "^1.4.13",
-    "@types/node": "^22.20.1",
-    "@types/nodemailer": "^8.0.0",
-    "@types/pdfkit": "^0.17.6",
-    "@types/pg": "^8.20.0",
-    "prisma": "^7.9.1",
-    "tsx": "^4.19.2",
-    "typescript": "^5.6.3"
-  },
+  "devDependencies": {},
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18.0.0 <23.0.0"
   }
 }
