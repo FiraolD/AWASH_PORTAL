@@ -1,4 +1,16 @@
+import dotenv from 'dotenv';
 import nodemailer from 'nodemailer';
+
+dotenv.config();
+
+const getPrimaryUrl = (value: string | undefined, fallback: string) => {
+  const candidate = (value || fallback)
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean)[0] || fallback;
+
+  return candidate.replace(/\/+$/, '');
+};
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.gmail.com',
@@ -10,12 +22,21 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+const ensureEmailConfig = () => {
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    throw new Error('SMTP configuration is missing. Check SMTP_HOST, SMTP_USER, and SMTP_PASS in the backend environment.');
+  }
+};
+
 // ---------------------------------------------------------------------------
 // Individual email functions
 // ---------------------------------------------------------------------------
 
 export async function sendVerificationEmail(to: string, firstName: string, token: string): Promise<void> {
-  const verificationUrl = `${process.env.API_URL || 'http://localhost:5001'}/api/auth/verify-email?token=${token}`;
+  ensureEmailConfig();
+
+  const apiBaseUrl = getPrimaryUrl(process.env.API_URL, 'http://localhost:5001');
+  const verificationUrl = `${apiBaseUrl}/api/auth/verify-email?token=${token}`;
 
   const html = `
     <h1>Welcome to Awash Insurance</h1>
@@ -34,6 +55,8 @@ export async function sendVerificationEmail(to: string, firstName: string, token
 }
 
 export async function sendWelcomeEmail(to: string, fullName: string): Promise<void> {
+  ensureEmailConfig();
+
   await transporter.sendMail({
     from: `"Awash Insurance" <${process.env.SMTP_USER}>`,
     to,
@@ -43,7 +66,10 @@ export async function sendWelcomeEmail(to: string, fullName: string): Promise<vo
 }
 
 export async function sendPasswordResetEmail(to: string, resetToken: string): Promise<void> {
-  const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
+  ensureEmailConfig();
+
+  const frontendBaseUrl = getPrimaryUrl(process.env.FRONTEND_URL, 'http://localhost:3011');
+  const resetUrl = `${frontendBaseUrl}/reset-password?token=${resetToken}`;
   await transporter.sendMail({
     from: `"Awash Insurance" <${process.env.SMTP_USER}>`,
     to,
@@ -53,6 +79,8 @@ export async function sendPasswordResetEmail(to: string, resetToken: string): Pr
 }
 
 export async function sendClaimSubmittedEmail(to: string, claimNumber: string): Promise<void> {
+  ensureEmailConfig();
+
   await transporter.sendMail({
     from: `"Awash Insurance" <${process.env.SMTP_USER}>`,
     to,
@@ -62,6 +90,8 @@ export async function sendClaimSubmittedEmail(to: string, claimNumber: string): 
 }
 
 export async function sendStatusUpdateEmail(to: string, fullName: string, entity: string, entityNumber: string, status: string): Promise<void> {
+  ensureEmailConfig();
+
   await transporter.sendMail({
     from: `"Awash Insurance" <${process.env.SMTP_USER}>`,
     to,
@@ -71,6 +101,8 @@ export async function sendStatusUpdateEmail(to: string, fullName: string, entity
 }
 
 export async function sendPolicyCreatedEmail(to: string, fullName: string, policyNumber: string): Promise<void> {
+  ensureEmailConfig();
+
   await transporter.sendMail({
     from: `"Awash Insurance" <${process.env.SMTP_USER}>`,
     to,

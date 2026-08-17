@@ -147,11 +147,19 @@ router.get('/verify-email', async (req, res: Response) => {
       [user.id]
     );
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:3011')
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean)[0] || 'http://localhost:3011';
+
     res.redirect(`${frontendUrl}/login?verified=true&email=${encodeURIComponent(user.email)}`);
   } catch (error: any) {
     console.error('[Auth] Email verification error:', error.message);
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:3011')
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean)[0] || 'http://localhost:3011';
+
     res.redirect(`${frontendUrl}/login?verified=false`);
   }
 });
