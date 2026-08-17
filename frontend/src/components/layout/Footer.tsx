@@ -28,9 +28,9 @@ const Footer: React.FC = () => {
 
   return (
     <footer className="w-full bg-slate-950 text-slate-400">
-      <div className="mx-auto w-full px-4 py-5 sm:px-6 lg:px-8 xl:px-10">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-3">
+      <div className="mx-auto w-full px-3 py-4 sm:px-5 lg:px-8 xl:px-10">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center justify-center lg:justify-start">
             <Link to="/" className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1A3E6F]">
                 <Shield className="h-4 w-4 text-white" />
@@ -39,22 +39,22 @@ const Footer: React.FC = () => {
             </Link>
           </div>
 
-          <div className="flex flex-wrap items-center gap-4 text-sm text-slate-300">
+          <div className="flex flex-wrap items-center justify-center gap-3 text-center text-xs text-slate-300 sm:gap-4 sm:text-sm lg:justify-start lg:text-left">
             <div className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-slate-500" />
+              <MapPin className="h-4 w-4 shrink-0 text-slate-500" />
               <span>Bole Road, Addis Ababa</span>
             </div>
             <div className="flex items-center gap-2">
-              <Phone className="h-4 w-4 text-slate-500" />
+              <Phone className="h-4 w-4 shrink-0 text-slate-500" />
               <span>+251 11 555 1234</span>
             </div>
             <div className="flex items-center gap-2">
-              <Mail className="h-4 w-4 text-slate-500" />
+              <Mail className="h-4 w-4 shrink-0 text-slate-500" />
               <span>info@SMARTinsurance.com</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 text-slate-500">
+          <div className="flex items-center justify-center gap-3 text-slate-500 lg:justify-end">
             <a href="#" className="transition-colors hover:text-white" aria-label="Facebook">
               <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
             </a>
@@ -69,9 +69,9 @@ const Footer: React.FC = () => {
       </div>
 
       <div className="border-t border-slate-800">
-        <div className="mx-auto flex w-full flex-col items-center justify-between gap-2 px-4 py-3 text-xs text-slate-400 sm:flex-row sm:px-6 lg:px-8 xl:px-10">
-          <p>&copy; {currentYear} SMART Insurance S.C. All rights reserved.</p>
-          <div className="flex gap-4">
+        <div className="mx-auto flex w-full flex-col items-center justify-between gap-2 px-3 py-3 text-[11px] text-slate-400 sm:flex-row sm:px-5 sm:text-xs lg:px-8 xl:px-10">
+          <p className="text-center sm:text-left">&copy; {currentYear} SMART Insurance S.C. All rights reserved.</p>
+          <div className="flex gap-3 sm:gap-4">
             <Link to="/privacy" className="transition-colors hover:text-white">Privacy</Link>
             <Link to="/terms" className="transition-colors hover:text-white">Terms</Link>
             <Link to="/cookies" className="transition-colors hover:text-white">Cookies</Link>

@@ -119,8 +119,9 @@ const Header = () => {
   return (
     <header
       className={cn(
-        'fixed right-0 top-0 z-40 flex h-20 items-center justify-between border-b border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] px-4 shadow-[0_12px_35px_rgba(15,23,42,0.05)] backdrop-blur-xl transition-all duration-300 ease-out md:px-6 lg:px-8',
-        isSidebarCollapsed ? 'left-24' : 'left-72'
+        'fixed right-0 top-0 z-40 flex h-20 items-center justify-between border-b border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] px-3 shadow-[0_12px_35px_rgba(15,23,42,0.05)] backdrop-blur-xl transition-all duration-300 ease-out sm:px-4 md:px-6 lg:px-8',
+        'left-0 right-0 lg:left-auto',
+        isSidebarCollapsed ? 'lg:left-24' : 'lg:left-72'
       )}
     >
       <div className="flex items-center gap-4 md:gap-6">
@@ -137,7 +138,7 @@ const Header = () => {
             <img src={logoUrl} alt="Awash Insurance Logo" className="h-9 w-auto rounded-xl shadow-sm" />
           </div>
 
-          <div className="hidden xl:flex flex-col">
+          <div className="hidden min-w-0 xl:flex xl:flex-col">
             <span className="whitespace-nowrap text-sm font-bold tracking-tight text-[#1A3E6F]">
               With Smart Insurance, cover your risks and secure your future.
             </span>
@@ -184,7 +185,7 @@ const Header = () => {
               )}
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-[360px] rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_18px_40px_rgba(15,23,42,0.12)]" align="end">
+          <DropdownMenuContent className="w-[min(92vw,360px)] rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_18px_40px_rgba(15,23,42,0.12)]" align="end">
             <div className="mb-2 flex items-center justify-between gap-3 px-2 py-1">
               <div>
                 <p className="text-sm font-bold text-slate-900">Notifications</p>
@@ -244,22 +245,22 @@ const Header = () => {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white/90 px-2 py-1.5 text-left shadow-sm transition-all duration-200 hover:border-slate-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#1A3E6F]/15">
-              <div className="relative">
-                <div className="h-10 w-10 overflow-hidden rounded-xl border-2 border-white shadow-[0_12px_28px_rgba(15,23,42,0.1)] ring-1 ring-slate-200">
+            <button className="flex max-w-[220px] items-center gap-2 rounded-2xl border border-slate-200 bg-white/90 px-2 py-1.5 text-left shadow-sm transition-all duration-200 hover:border-slate-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#1A3E6F]/15 sm:gap-3">
+              <div className="relative shrink-0">
+                <div className="h-9 w-9 overflow-hidden rounded-xl border-2 border-white shadow-[0_12px_28px_rgba(15,23,42,0.1)] ring-1 ring-slate-200 sm:h-10 sm:w-10">
                   <img src={user?.avatarUrl} alt="User avatar" className="h-full w-full object-cover" />
                 </div>
-                <div className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full border-2 border-white bg-green-500 shadow-sm" />
+                <div className="absolute -bottom-1 -right-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-green-500 shadow-sm sm:h-3 sm:w-3" />
               </div>
 
-              <div className="hidden text-left md:block">
-                <p className="text-sm font-bold text-slate-900">{user?.firstName} {user?.lastName}</p>
-                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">
+              <div className="hidden min-w-0 text-left md:block">
+                <p className="truncate text-sm font-bold text-slate-900">{user?.firstName} {user?.lastName}</p>
+                <p className="truncate text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">
                   {user?.role?.replace(/_/g, ' ')}
                 </p>
               </div>
 
-              <ChevronDown className="h-4 w-4 text-slate-500" />
+              <ChevronDown className="hidden h-4 w-4 shrink-0 text-slate-500 sm:block" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_18px_40px_rgba(15,23,42,0.12)]" align="end">
