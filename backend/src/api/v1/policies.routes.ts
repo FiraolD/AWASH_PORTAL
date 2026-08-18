@@ -1,6 +1,7 @@
-import { Router } from 'express';
+import { Router, Response } from 'express';
 import pool from '../../lib/db.js';
 import { authenticate } from '../middleware/auth.middleware.js';
+import { AuthRequest } from '../middleware/auth.middleware.js';
 import { generatePolicyNumber } from '../../lib/numbering.js';
 import { generatePolicySchedule } from '../../services/PDFGenerator.service.js';
 import fs from 'fs';
@@ -12,10 +13,150 @@ router.use(authenticate);
 
 // ==================== HELPER FUNCTIONS ====================
 
-const CUSTOMER_DECISION_PENDING_STATUSES = ['AWAITING_CUSTOMER_APPROVAL', 'PENDING'];
+// Get product by code from database
+async function getProductByCode(code: string) {
+  try {
+    const result = await pool.query(
+      `SELECT id, code, name, description, "customFields", "isActive" 
+       FROM products WHERE code = $1`,
+      [code.toUpperCase()]
+    );
+    return result.rows[0] || null;
+  } catch (error) {
+    console.warn(`Product lookup failed for ${code}:`, error);
+    return null;
+  }
+}
 
-function isCustomerDecisionPending(status?: string | null): boolean {
-  return CUSTOMER_DECISION_PENDING_STATUSES.includes((status || '').toUpperCase());
+// Get product custom fields
+async function getProductCustomFields(productCode: string) {
+  const product = await getProductByCode(productCode);
+  if (!product) return [];
+  
+  try {
+    const fields = typeof product.customFields === 'string' 
+      ? JSON.parse(product.customFields) 
+      : product.customFields;
+    return Array.isArray(fields) ? fields : [];
+  } catch {
+    return [];
+  }
+}
+
+// Build risk objects based on product type and custom fields
+function buildRiskObjects(type: string, productDetails: any, vehicles: any[]): any[] {
+  const upperType = type?.toUpperCase() || 'GENERIC';
+  
+  switch (upperType) {
+    case 'MOTOR':
+    case 'MTCM':
+    case 'AUTO':
+      return (vehicles && vehicles.length > 0 ? vehicles : []).map(v => ({
+        riskType: 'VEHICLE',
+        make: v.make || '',
+        model: v.model || '',
+        yearOfMake: v.yearOfMake || v.year || '',
+        plateNumber: v.plateNumber || v.registrationNumber || '',
+        engineNumber: v.engineNumber || '',
+        chassisNumber: v.chassisNumber || '',
+        vehicleType: v.vehicleType || '',
+        usage: v.usage || '',
+        vehicleValue: v.vehicleValue || 0,
+      }));
+
+    case 'HEALTH':
+      if (productDetails?.insuredPersons && Array.isArray(productDetails.insuredPersons)) {
+        return productDetails.insuredPersons.map(p => ({
+          riskType: 'PERSON',
+          fullName: p.fullName || p.name || '',
+          dateOfBirth: p.dateOfBirth || '',
+          gender: p.gender || '',
+          age: p.age || '',
+          relationship: p.relationship || 'Self',
+          medicalConditions: p.medicalConditions || p.preExistingConditions || '',
+        }));
+      }
+      return [{
+        riskType: 'PERSON',
+        fullName: productDetails?.policyHolderName || '',
+        age: productDetails?.patientAge || '',
+        gender: productDetails?.patientGender || '',
+        relationship: 'Self',
+      }];
+
+    case 'LIFE':
+      return [{
+        riskType: 'PERSON',
+        fullName: productDetails?.insuredName || productDetails?.policyHolderName || '',
+        dateOfBirth: productDetails?.insuredDob || '',
+        gender: productDetails?.insuredGender || '',
+        beneficiaryName: productDetails?.beneficiaryName || '',
+        beneficiaryRelationship: productDetails?.beneficiaryRelationship || '',
+        beneficiaryPhone: productDetails?.beneficiaryPhone || '',
+      }];
+
+    case 'FIRE':
+    case 'PROPERTY':
+    case 'HOME':
+      if (productDetails?.properties && Array.isArray(productDetails.properties)) {
+        return productDetails.properties.map(p => ({
+          riskType: 'PROPERTY',
+          propertyAddress: p.propertyAddress || p.address || '',
+          propertyType: p.propertyType || '',
+          constructionType: p.constructionType || '',
+          yearBuilt: p.yearBuilt || '',
+          numberOfFloors: p.numberOfFloors || '',
+          propertyValue: p.propertyValue || p.estimatedValue || 0,
+        }));
+      }
+      return [{
+        riskType: 'PROPERTY',
+        propertyAddress: productDetails?.propertyAddress || '',
+        propertyType: productDetails?.propertyType || '',
+        propertyValue: productDetails?.propertyValue || 0,
+      }];
+
+    case 'TRAVEL':
+      if (productDetails?.trips && Array.isArray(productDetails.trips)) {
+        return productDetails.trips.map(t => ({
+          riskType: 'TRIP',
+          destination: t.destination || '',
+          departureDate: t.departureDate || t.travelDate || '',
+          returnDate: t.returnDate || '',
+          tripDuration: t.tripDuration || '',
+          numberOfTravelers: t.numberOfTravelers || 1,
+          travelPurpose: t.travelPurpose || '',
+        }));
+      }
+      return [{
+        riskType: 'TRIP',
+        destination: productDetails?.destination || '',
+        travelDate: productDetails?.travelDate || '',
+        returnDate: productDetails?.returnDate || '',
+      }];
+
+    case 'MARINE':
+      if (productDetails?.cargo && Array.isArray(productDetails.cargo)) {
+        return productDetails.cargo.map(c => ({
+          riskType: 'CARGO',
+          cargoType: c.cargoType || '',
+          cargoDescription: c.description || '',
+          cargoValue: c.cargoValue || c.value || 0,
+          origin: c.origin || '',
+          destination: c.destination || '',
+          vesselName: c.vesselName || '',
+        }));
+      }
+      return [{
+        riskType: 'CARGO',
+        cargoType: productDetails?.cargoType || '',
+        cargoValue: productDetails?.cargoValue || 0,
+      }];
+
+    default:
+      // Generic: try to extract any risk objects from productDetails
+      return productDetails?.riskObjects || [];
+  }
 }
 
 async function getBaseRate(productType: string, coverageAmount: number): Promise<number> {
@@ -34,7 +175,6 @@ async function getBaseRate(productType: string, coverageAmount: number): Promise
     return parseFloat(result.rows[0].baseRate);
   }
   
-  console.warn(`No rate found for ${productType} with coverage ${coverageAmount}, using default`);
   return 0.03;
 }
 
@@ -76,8 +216,7 @@ async function getVatRate(): Promise<number> {
       return isNaN(rate) ? 0.15 : rate;
     }
     return 0.15;
-  } catch (error) {
-    console.error('Error fetching VAT rate:', error);
+  } catch {
     return 0.15;
   }
 }
@@ -92,135 +231,25 @@ async function getDrrRate(): Promise<number> {
       return isNaN(rate) ? 0.01 : rate;
     }
     return 0.01;
-  } catch (error) {
-    console.error('Error fetching DRR rate:', error);
+  } catch {
     return 0.01;
   }
 }
 
-// ==================== PDF GENERATION ====================
-
-async function generatePolicyDocument(policyId: string) {
-  try {
-    console.log(`Starting PDF generation for policy: ${policyId}`);
-    
-    const policyResult = await pool.query(`
-      SELECT p.*, u."firstName", u."lastName", u.email, u.phone, u.address,
-             pr.name as productName
-      FROM policies p
-      JOIN users u ON u.id = p."userId"
-      JOIN products pr ON pr.code = p.type
-      WHERE p.id = $1
-    `, [policyId]);
-    
-    if (policyResult.rows.length === 0) {
-      console.log(`Policy ${policyId} not found for PDF generation`);
-      return;
-    }
-    
-    const policy = policyResult.rows[0];
-    
-    const perilsResult = await pool.query(`
-      SELECT pe."perilName", pe.description, pp."perilPremium"
-      FROM policy_perils pp
-      JOIN perils pe ON pe.id = pp."perilId"
-      WHERE pp."policyId" = $1
-    `, [policyId]);
-    
-    const ridersResult = await pool.query(`
-      SELECT r."riderName", r.description, pr."riderPremium", r."maxLimit"
-      FROM policy_riders pr
-      JOIN riders r ON r.id = pr."riderId"
-      WHERE pr."policyId" = $1
-    `, [policyId]);
-    
-    let vehicles = [];
-    try {
-      if (policy.productDetails) {
-        vehicles = typeof policy.productDetails === 'string' 
-          ? JSON.parse(policy.productDetails).vehicles || [] 
-          : policy.productDetails.vehicles || [];
-      }
-    } catch (e) {
-      vehicles = [];
-    }
-    
-    const policyData = {
-      policyNumber: policy.policyNumber,
-      customerName: `${policy.firstName} ${policy.lastName}`,
-      customerEmail: policy.email,
-      customerPhone: policy.phone || 'N/A',
-      customerAddress: policy.address || 'N/A',
-      productName: policy.productName || policy.type,
-      productType: policy.type,
-      coverageAmount: parseFloat(policy.coverageAmount || 0),
-      premium: parseFloat(policy.premium || 0),
-      totalPremium: parseFloat(policy.totalPremium || policy.premium || 0),
-      premiumFrequency: policy.premiumFrequency || 'YEARLY',
-      effectiveDate: policy.effectiveDate ? new Date(policy.effectiveDate) : new Date(),
-      expirationDate: policy.expirationDate ? new Date(policy.expirationDate) : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-      selectedPerils: perilsResult.rows.map(p => ({
-        perilName: p.perilName,
-        description: p.description,
-        premium: parseFloat(p.perilPremium || 0)
-      })),
-      selectedRiders: ridersResult.rows.map(r => ({
-        riderName: r.riderName,
-        description: r.description,
-        premium: parseFloat(r.riderPremium || 0),
-        maxLimit: r.maxLimit ? parseFloat(r.maxLimit) : null
-      })),
-      vehicles: vehicles
-    };
-    
-    const uploadsDir = path.join(process.cwd(), 'uploads', 'policies');
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
-    }
-    
-    const pdfPath = await generatePolicySchedule(policyData);
-    
-    if (fs.existsSync(pdfPath)) {
-      await pool.query(`
-        UPDATE policies 
-        SET "policyDocumentPath" = $1, "updatedAt" = NOW() 
-        WHERE id = $2
-      `, [pdfPath, policyId]);
-      
-      const documentTitle = `Policy Schedule - ${policy.policyNumber}`;
-      const documentType = 'POLICY_SCHEDULE';
-      
-      const existingDoc = await pool.query(`
-        SELECT id FROM policy_documents WHERE policy_id = $1 AND document_type = $2
-      `, [policyId, documentType]);
-      
-      if (existingDoc.rows.length > 0) {
-        await pool.query(`
-          UPDATE policy_documents 
-          SET file_url = $1, generated_at = NOW(), created_at = NOW(), title = $2
-          WHERE policy_id = $3 AND document_type = $4
-        `, [pdfPath, documentTitle, policyId, documentType]);
-      } else {
-        await pool.query(`
-          INSERT INTO policy_documents (id, policy_id, document_type, title, file_url, generated_at, created_at)
-          VALUES (gen_random_uuid()::text, $1, $2, $3, $4, NOW(), NOW())
-        `, [policyId, documentType, documentTitle, pdfPath]);
-      }
-    }
-  } catch (error) {
-    console.error('Failed to generate policy document:', error);
-  }
-}
-
 // ========================================================================
-// ROUTES – ORDER MATTERS! Exact matches first, parameterized routes last
+// ROUTES
 // ========================================================================
 
-// ==================== GET ALL POLICIES ====================
+// GET all policies
 router.get('/', async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT * FROM policies ORDER BY "createdAt" DESC LIMIT 100
+      SELECT 
+        p.*,
+        pr.name as "productName"
+      FROM policies p
+      LEFT JOIN products pr ON pr.code = p.type
+      ORDER BY p."createdAt" DESC LIMIT 100
     `);
     res.json(result.rows);
   } catch (error: any) {
@@ -229,7 +258,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// ==================== GET POLICY STATS ====================
+// GET policy stats
 router.get('/stats', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -249,62 +278,41 @@ router.get('/stats', async (req, res) => {
   }
 });
 
-router.get('/my-policies', async (req, res) => {
+// GET my policies
+router.get('/my-policies', async (req: AuthRequest, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user!.id;
     const result = await pool.query(`
       SELECT 
-        id,
-        "policyNumber",
-        type,
-        "coverageAmount",
-        premium,
-        status,
-        COALESCE("createdAt", NOW()) as "createdAt",
-        COALESCE("updatedAt", NOW()) as "updatedAt",
-        COALESCE("effectiveDate", NOW()) as "effectiveDate",
-        COALESCE("expirationDate", NOW() + INTERVAL '1 year') as "expirationDate",
-        "policyDocumentPath",
-        "adjustedPremium",
-        "totalPremium",
-        "underwriterNotes",
-        "premiumFrequency",
-        "productDetails",
-        "approvalType",
-        "userId"
-      FROM policies
-      WHERE "userId" = $1
-      ORDER BY "createdAt" DESC
+        p.id, p."policyNumber", p.type, p."coverageAmount", p.premium,
+        p.status, p."createdAt", p."effectiveDate", p."expirationDate",
+        p."policyDocumentPath", p."adjustedPremium", p."totalPremium",
+        pr.name as "productName"
+      FROM policies p
+      LEFT JOIN products pr ON pr.code = p.type
+      WHERE p."userId" = $1
+      ORDER BY p."createdAt" DESC
     `, [userId]);
-    
-    // Ensure all date fields are valid strings
-    const safeRows = result.rows.map(row => ({
-      ...row,
-      createdAt: row.createdAt || new Date().toISOString(),
-      updatedAt: row.updatedAt || new Date().toISOString(),
-      effectiveDate: row.effectiveDate || new Date().toISOString(),
-      expirationDate: row.expirationDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-    }));
-    
-    res.json(safeRows);
+    res.json(result.rows);
   } catch (error: any) {
     console.error('[Policies] My-policies error:', error.message);
     res.status(500).json({ error: 'Failed to fetch policies', detail: error.message });
   }
 });
 
-// ==================== PENDING DECISION ====================
-router.get('/pending-decision', async (req, res) => {
+// GET pending decision (for customer)
+router.get('/pending-decision', async (req: AuthRequest, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user!.id;
     const result = await pool.query(`
       SELECT 
         p.id, p."policyNumber", p.type, p."coverageAmount",
         p.premium as "originalPremium", p."adjustedPremium",
-        p."underwriterNotes", p.status, p."updatedAt"
+        p."underwriterNotes", p.status, p."updatedAt",
+        pr.name as "productName"
       FROM policies p
-      WHERE p."userId" = $1
-        AND p.status IN ('AWAITING_CUSTOMER_APPROVAL', 'PENDING')
+      LEFT JOIN products pr ON pr.code = p.type
+      WHERE p."userId" = $1 AND p.status = 'AWAITING_CUSTOMER_APPROVAL'
       ORDER BY p."updatedAt" DESC
     `, [userId]);
     res.json(result.rows);
@@ -314,7 +322,53 @@ router.get('/pending-decision', async (req, res) => {
   }
 });
 
-// ==================== PREMIUM CALCULATION ====================
+// GET perils for product
+router.get('/perils/:productCode', async (req, res) => {
+  try {
+    const { productCode } = req.params;
+    const result = await pool.query(`
+      SELECT p.* FROM perils p
+      JOIN products pr ON pr.id = p."productId"
+      WHERE pr.code = $1 AND p."isActive" = true
+      ORDER BY p."displayOrder" ASC
+    `, [productCode.toUpperCase()]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Failed to fetch perils:', error);
+    res.json([]);
+  }
+});
+
+// GET riders for product
+router.get('/riders/:productCode', async (req, res) => {
+  try {
+    const { productCode } = req.params;
+    const result = await pool.query(`
+      SELECT r.* FROM riders r
+      JOIN products pr ON pr.id = r."productId"
+      WHERE pr.code = $1 AND r."isActive" = true
+      ORDER BY r."displayOrder" ASC
+    `, [productCode.toUpperCase()]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Failed to fetch riders:', error);
+    res.json([]);
+  }
+});
+
+// GET product custom fields (for dynamic forms)
+router.get('/product-fields/:productCode', async (req, res) => {
+  try {
+    const { productCode } = req.params;
+    const fields = await getProductCustomFields(productCode);
+    res.json(fields);
+  } catch (error: any) {
+    console.error('Failed to fetch product fields:', error.message);
+    res.status(500).json({ error: 'Failed to fetch product fields' });
+  }
+});
+
+// POST calculate premium
 router.post('/calculate-premium', async (req, res) => {
   try {
     const { productType, coverageAmount, termMonths = 12, vehicles = [], selectedPerils = [], selectedRiders = [] } = req.body;
@@ -348,11 +402,11 @@ router.post('/calculate-premium', async (req, res) => {
         `, [perilId]);
         if (perilResult.rows.length > 0) {
           const peril = perilResult.rows[0];
-          let premium = peril.calculationType === 'PERCENTAGE' ? actualCoverage * parseFloat(peril.premiumRate) : parseFloat(peril.premiumRate);
+          const premium = peril.calculationType === 'PERCENTAGE' ? actualCoverage * parseFloat(peril.premiumRate) : parseFloat(peril.premiumRate);
           perilPremium += premium;
           perilBreakdown.push({ id: perilId, name: peril.perilName || 'Unknown', premium });
         }
-      } catch (err) { console.error(`Error fetching peril ${perilId}:`, err); }
+      } catch { /* ignore */ }
     }
     annualPremium += perilPremium;
     
@@ -365,11 +419,11 @@ router.post('/calculate-premium', async (req, res) => {
         `, [riderId]);
         if (riderResult.rows.length > 0) {
           const rider = riderResult.rows[0];
-          let premium = rider.calculationType === 'PERCENTAGE' ? actualCoverage * parseFloat(rider.premiumRate) : parseFloat(rider.premiumRate);
+          const premium = rider.calculationType === 'PERCENTAGE' ? actualCoverage * parseFloat(rider.premiumRate) : parseFloat(rider.premiumRate);
           riderPremium += premium;
           riderBreakdown.push({ id: riderId, name: rider.riderName || 'Unknown', premium });
         }
-      } catch (err) { console.error(`Error fetching rider ${riderId}:`, err); }
+      } catch { /* ignore */ }
     }
     annualPremium += riderPremium;
     
@@ -399,18 +453,23 @@ router.post('/calculate-premium', async (req, res) => {
       baseRate: Math.round(baseRate * 100) / 100
     });
   } catch (error: any) {
-    console.error('Premium calculation failed:', error);
+    console.error('Premium calculation failed:', error.message);
     res.status(500).json({ error: 'Failed to calculate premium', detail: error.message });
   }
 });
 
-// ==================== CREATE POLICY ====================
-router.post('/', async (req, res) => {
+// POST create policy
+router.post('/', async (req: AuthRequest, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user!.id;
     const { type, coverageAmount, premiumFrequency, effectiveDate, expirationDate, productDetails, vehicles = [], selectedPerils = [], selectedRiders = [] } = req.body;
     
-    if (!type || !coverageAmount) return res.status(400).json({ error: 'Missing required fields' });
+    if (!type || !coverageAmount) {
+      return res.status(400).json({ error: 'Missing required fields: type and coverageAmount' });
+    }
+
+    // Get product from database
+    const product = await getProductByCode(type);
     
     const baseRate = await getBaseRate(type, coverageAmount);
     let totalVehicleValue = 0;
@@ -445,13 +504,29 @@ router.post('/', async (req, res) => {
     const drrAmount = basicPremium * drrRate;
     const totalPremium = basicPremium + vatAmount + drrAmount;
     const policyNumber = await generatePolicyNumber(type);
-    
-    const enhancedProductDetails = { ...productDetails, vehicles: vehicles || [], vehicleCount: vehicles?.length || 0, selectedPerils: perilDetails, selectedRiders: riderDetails };
+
+    // Build risk objects
+    const riskObjects = buildRiskObjects(type, productDetails, vehicles);
+
+    // Enhanced product details with risk objects and product name
+    const enhancedProductDetails = {
+      ...productDetails,
+      riskObjects,
+      productName: product?.name || type,
+      productCode: product?.code || type,
+      selectedPerils: perilDetails,
+      selectedRiders: riderDetails,
+    };
     
     const result = await pool.query(`
-      INSERT INTO policies (id, "policyNumber", "userId", type, status, "coverageAmount", premium, "premiumFrequency", "effectiveDate", "expirationDate", "productDetails", "approvalType", "createdAt", "updatedAt")
-      VALUES (gen_random_uuid()::uuid, $1, $2, $3, 'PENDING_UNDERWRITING', $4, $5, $6, $7::date, $8::date, $9::jsonb, 'REVIEW_NEEDED', NOW(), NOW())
-      RETURNING id, "policyNumber", status
+      INSERT INTO policies (
+        id, "policyNumber", "userId", type, status, "coverageAmount", premium,
+        "premiumFrequency", "effectiveDate", "expirationDate", "productDetails",
+        "approvalType", "createdAt", "updatedAt"
+      ) VALUES (
+        gen_random_uuid(), $1, $2, $3, 'PENDING_UNDERWRITING', $4, $5, $6, 
+        $7::date, $8::date, $9::jsonb, 'REVIEW_NEEDED', NOW(), NOW()
+      ) RETURNING id, "policyNumber", status
     `, [policyNumber, userId, type, actualCoverage, basicPremium, premiumFrequency, effectiveDate, expirationDate, JSON.stringify(enhancedProductDetails)]);
     
     const policyId = result.rows[0].id;
@@ -468,125 +543,117 @@ router.post('/', async (req, res) => {
       policyId, policyNumber, status: result.rows[0].status,
       premiumBreakdown: { basePremium: basicPremium, perilPremium, riderPremium, totalPremium, vatAmount, drrAmount, monthlyPremium: totalPremium / termMonths }
     });
-    
-    setTimeout(() => { generatePolicyDocument(policyId).catch(err => console.error(`Background PDF generation failed for policy ${policyId}:`, err)); }, 1000);
   } catch (error: any) {
-    console.error('Failed to create policy:', error);
+    console.error('Failed to create policy:', error.message);
     res.status(500).json({ error: 'Failed to submit policy application', detail: error.message });
   }
 });
 
-// ==================== RESPOND TO OFFER ====================
-router.post('/:id/respond', async (req, res) => {
+// GET policy details with risk objects
+router.get('/:id/details', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const id = String(req.params.id);
+    
+    const result = await pool.query(`
+      SELECT p.*, u."firstName", u."lastName", u.email, u.phone,
+             pr.name as "productName", pr."customFields"
+      FROM policies p
+      JOIN users u ON u.id = p."userId"
+      LEFT JOIN products pr ON pr.code = p.type
+      WHERE p.id = $1 AND p."userId" = $2
+    `, [id, userId]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Policy not found' });
+    }
+    
+    const policy = result.rows[0];
+    
+    // Parse productDetails
+    let productDetails = {};
+    try {
+      productDetails = typeof policy.productDetails === 'string' ? JSON.parse(policy.productDetails) : policy.productDetails;
+    } catch {}
+    
+    // Parse custom fields
+    let customFields = [];
+    try {
+      customFields = typeof policy.customFields === 'string' ? JSON.parse(policy.customFields) : policy.customFields;
+    } catch {}
+    
+    // Get perils
+    let selectedPerils = [];
+    try {
+      const perilsResult = await pool.query(`
+        SELECT pe.id, pe."perilName", pe.description, pp."perilPremium" as premium
+        FROM policy_perils pp
+        JOIN perils pe ON pe.id = pp."perilId"
+        WHERE pp."policyId" = $1
+      `, [id]);
+      selectedPerils = perilsResult.rows;
+    } catch {}
+    
+    // Get riders
+    let selectedRiders = [];
+    try {
+      const ridersResult = await pool.query(`
+        SELECT r.id, r."riderName", r.description, pr."riderPremium" as premium
+        FROM policy_riders pr
+        JOIN riders r ON r.id = pr."riderId"
+        WHERE pr."policyId" = $1
+      `, [id]);
+      selectedRiders = ridersResult.rows;
+    } catch {}
+    
+    // Extract risk objects
+    const riskObjects = (productDetails as any).riskObjects || [];
+    
+    res.json({
+      ...policy,
+      productDetails,
+      selectedPerils,
+      selectedRiders,
+      riskObjects,
+      customFields,
+    });
+  } catch (error: any) {
+    console.error('Failed to fetch policy details:', error.message);
+    res.status(500).json({ error: 'Failed to fetch policy details', detail: error.message });
+  }
+});
+
+// POST respond to offer
+router.post('/:id/respond', async (req: AuthRequest, res: Response) => {
   try {
     const { decision, notes } = req.body;
     const policyId = req.params.id;
-    const userId = req.user?.id;
-
-    const currentPolicy = await pool.query(
-      `SELECT * FROM policies
-       WHERE id = $1 AND "userId" = $2
-         AND status IN ('AWAITING_CUSTOMER_APPROVAL', 'PENDING')`,
-      [policyId, userId]
-    );
+    const userId = req.user!.id;
+    
+    const currentPolicy = await pool.query('SELECT * FROM policies WHERE id = $1 AND "userId" = $2', [policyId, userId]);
     if (currentPolicy.rows.length === 0) return res.status(404).json({ error: 'Policy not found' });
-
+    
     const policy = currentPolicy.rows[0];
     const finalTotalPremium = policy.totalPremium || policy.premium;
     const finalBasePremium = policy.adjustedPremium || policy.premium;
     
     let history = [];
-    try { history = policy.negotiationHistory || []; if (typeof history === 'string') history = JSON.parse(history); } catch (e) { history = []; }
-    history.push({ timestamp: new Date(), action: `CUSTOMER_${decision}`, notes, customer: userId, acceptedPremium: finalBasePremium, acceptedTotalPremium: finalTotalPremium });
+    try { history = policy.negotiationHistory || []; if (typeof history === 'string') history = JSON.parse(history); } catch { history = []; }
+    history.push({ timestamp: new Date(), action: `CUSTOMER_${decision}`, notes, customer: userId });
     
     const newStatus = decision === 'ACCEPT' ? 'PENDING_FINAL_APPROVAL' : 'REJECTED_BY_CUSTOMER';
     
     await pool.query(`
-      UPDATE policies SET "customerDecision"=$1, "customerDecisionDate"=NOW(), "customerDecisionNotes"=$2, status=$3, premium=$4, "totalPremium"=$5, "negotiationHistory"=$6, "updatedAt"=NOW()
+      UPDATE policies SET "customerDecision"=$1, "customerDecisionDate"=NOW(), "customerDecisionNotes"=$2, 
+      status=$3, premium=$4, "totalPremium"=$5, "negotiationHistory"=$6, "updatedAt"=NOW()
       WHERE id=$7
     `, [decision, notes || null, newStatus, finalBasePremium, finalTotalPremium, JSON.stringify(history), policyId]);
     
-    res.json({ message: decision === 'ACCEPT' ? 'Offer accepted, pending final approval' : 'Offer rejected', status: newStatus });
+    res.json({ message: decision === 'ACCEPT' ? 'Offer accepted' : 'Offer rejected', status: newStatus });
   } catch (error) {
     console.error('Failed to process decision:', error);
     res.status(500).json({ error: 'Failed to process decision' });
   }
-});
-
-// ==================== PERILS & RIDERS ====================
-router.get('/perils/:productCode', async (req, res) => {
-  try {
-    const { productCode } = req.params;
-    const result = await pool.query(`SELECT p.* FROM perils p JOIN products pr ON pr.id = p."productId" WHERE pr.code = $1 AND p."isActive" = true ORDER BY p."displayOrder" ASC`, [productCode.toUpperCase()]);
-    res.json(result.rows);
-  } catch (error) { console.error('Failed to fetch perils:', error); res.json([]); }
-});
-
-router.get('/riders/:productCode', async (req, res) => {
-  try {
-    const { productCode } = req.params;
-    const result = await pool.query(`SELECT r.* FROM riders r JOIN products pr ON pr.id = r."productId" WHERE pr.code = $1 AND r."isActive" = true ORDER BY r."displayOrder" ASC`, [productCode.toUpperCase()]);
-    res.json(result.rows);
-  } catch (error) { console.error('Failed to fetch riders:', error); res.json([]); }
-});
-
-// ==================== DOCUMENT DOWNLOAD ====================
-router.get('/documents/:documentId/download', async (req, res) => {
-  try {
-    const { documentId } = req.params;
-    const userId = req.user?.id;
-    const docResult = await pool.query(`SELECT pd.*, p."userId" as policy_owner_id FROM policy_documents pd JOIN policies p ON p.id = pd.policy_id WHERE pd.id = $1`, [documentId]);
-    if (docResult.rows.length === 0) return res.status(404).json({ error: 'Document not found' });
-    const document = docResult.rows[0];
-    if (document.policy_owner_id !== userId && req.user?.role !== 'MASTER_ADMIN') return res.status(403).json({ error: 'Access denied' });
-    if (!fs.existsSync(document.file_url)) return res.status(404).json({ error: 'Document file not found' });
-    const ext = path.extname(document.file_url).toLowerCase();
-    if (!['.pdf', '.xls', '.xlsx'].includes(ext)) return res.status(403).json({ error: 'Only PDF and Excel files can be downloaded.' });
-    res.download(document.file_url, `${document.title}${ext}`);
-  } catch (error) { console.error('Failed to download document:', error); res.status(500).json({ error: 'Failed to download document' }); }
-});
-
-// ==================== PARAMETERIZED ROUTES (must be last) ====================
-router.get('/:policyId/documents', async (req, res) => {
-  try {
-    const { policyId } = req.params;
-    const result = await pool.query(`SELECT * FROM policy_documents WHERE policy_id = $1`, [policyId]);
-    res.json(result.rows);
-  } catch (error: any) { res.status(500).json({ error: 'Failed to fetch documents', detail: error.message }); }
-});
-
-router.get('/:policyId/download', async (req, res) => {
-  try {
-    const userId = req.user?.id;
-    const { policyId } = req.params;
-    const result = await pool.query(`SELECT "policyDocumentPath" FROM policies WHERE id = $1 AND "userId" = $2`, [policyId, userId]);
-    if (result.rows.length === 0 || !result.rows[0].policyDocumentPath) return res.status(404).json({ error: 'Policy document not found' });
-    const filePath = result.rows[0].policyDocumentPath;
-    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Policy document file not found' });
-    const ext = path.extname(filePath).toLowerCase();
-    if (!['.pdf', '.xls', '.xlsx'].includes(ext)) return res.status(403).json({ error: 'Only PDF and Excel files can be downloaded.' });
-    res.download(filePath, `policy_${policyId}${ext}`);
-  } catch (error) { console.error('Failed to download policy document:', error); res.status(500).json({ error: 'Failed to download policy document' }); }
-});
-
-router.get('/:id/details', async (req, res) => {
-  try {
-    const userId = req.user?.id;
-    const id = String(req.params.id);
-    const result = await pool.query(`SELECT p.*, u."firstName", u."lastName", u.email, u.phone, pr.name as productName FROM policies p JOIN users u ON u.id = p."userId" LEFT JOIN products pr ON pr.code = p.type WHERE p.id = $1 AND p."userId" = $2`, [id, userId]);
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Policy not found' });
-    res.json(result.rows[0]);
-  } catch (error) { console.error('Failed to fetch policy details:', error); res.status(500).json({ error: 'Failed to fetch policy details' }); }
-});
-
-router.get('/:id/document-status', async (req, res) => {
-  try {
-    const userId = req.user?.id;
-    const id = String(req.params.id);
-    const result = await pool.query(`SELECT "policyDocumentPath", status FROM policies WHERE id = $1 AND "userId" = $2`, [id, userId]);
-    const hasDocument = result.rows.length > 0 && result.rows[0].policyDocumentPath && result.rows[0].status === 'ACTIVE';
-    res.json({ hasDocument, status: result.rows[0]?.status });
-  } catch (error) { console.error('Failed to check document status:', error); res.json({ hasDocument: false }); }
 });
 
 export default router;
