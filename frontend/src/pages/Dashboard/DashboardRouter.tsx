@@ -1,173 +1,147 @@
-﻿import { useEffect, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
+import { AlertCircle } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
-
-// Dashboards
+import { Card, CardContent } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
 import MasterAdminDashboard from './MasterAdminDashboard';
 import CustomerDashboard from './CustomerDashboard';
 import CustomerAdminDashboard from './CustomerAdminDashboard';
-import UnifiedUnderwritingDashboard from '../Underwriting/UnifiedUnderwritingDashboard';
-import CustomerPolicyDecisions from '../Underwriting/CustomerPolicyDecisions';
+import UnderwritingAdminDashboard from './UnderwritingAdminDashboard';
+import UnderwritingOfficersDashboard from './UnderwritingOfficersDashboard';
+import UnderwritingManagerDashboard from './UnderwritingManagerDashboard';
+import UnderwritingHeadDashboard from './UnderwritingHeadDashboard';
 import UnifiedClaimsDashboard from '../Claims/UnifiedClaimsDashboard';
-import ClaimQueuePage from '../Claims/ClaimQueuePage';
+import CustomerPolicyDecisions from '../Underwriting/CustomerPolicyDecisions';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
 type DashboardType =
   | 'loading'
   | 'customer'
   | 'customer_admin'
-  | 'claims'
-  | 'underwriting'
-  | 'master_admin';
+  | 'claims_officer'
+  | 'claims_supervisor'
+  | 'claims_manager'
+  | 'claims_head'
+  | 'claims_admin'
+  | 'underwriting_officer'
+  | 'underwriting_manager'
+  | 'underwriting_head'
+  | 'underwriting_admin'
+  | 'master_admin'
+  | 'executive'
+  | 'unsupported';
 
-// ---------------------------------------------------------------------------
-// Role → Dashboard mapping
-// ---------------------------------------------------------------------------
-const CLAIMS_ROLES = [
-  'CLAIM_OFFICER',
-  'CLAIM_OFFICER_I',
-  'CLAIM_OFFICER_II',
-  'SENIOR_CLAIM_OFFICER',
-  'SUPERVISOR_CLAIMS',
-  'MANAGER_CLAIMS',
-  'HEAD_CLAIMS',
-  'CLAIMS_ADMIN',
-];
+const CLAIM_OFFICER_ROLES = new Set(['CLAIM_OFFICER', 'CLAIM_OFFICER_I', 'CLAIM_OFFICER_II', 'SENIOR_CLAIM_OFFICER']);
+const CLAIM_SUPERVISOR_ROLES = new Set(['SUPERVISOR_CLAIMS']);
+const CLAIM_MANAGER_ROLES = new Set(['MANAGER_CLAIMS']);
+const CLAIM_HEAD_ROLES = new Set(['HEAD_CLAIMS']);
+const CLAIM_ADMIN_ROLES = new Set(['CLAIMS_ADMIN']);
 
-const MASTER_ADMIN_ROLES = [
-  'MASTER_ADMIN',
-  'SYSTEM_ADMIN',
-  'SUPER_ADMIN',
-  'CEO',
-  'COO',
-  'CFO',
-  'ADMIN',
-];
+const UNDERWRITING_OFFICER_ROLES = new Set([
+  'UNDERWRITING_OFFICER',
+  'UNDERWRITING_OFFICER_I',
+  'UNDERWRITING_OFFICER_II',
+  'SENIOR_UNDERWRITING_OFFICER',
+  'SUPERVISOR_UNDERWRITING',
+]);
+const UNDERWRITING_MANAGER_ROLES = new Set(['MANAGER_UNDERWRITING']);
+const UNDERWRITING_HEAD_ROLES = new Set(['HEAD_UNDERWRITING']);
+const UNDERWRITING_ADMIN_ROLES = new Set(['UNDERWRITING_ADMIN']);
+const EXECUTIVE_ROLES = new Set(['CEO', 'COO', 'CFO']);
+const CUSTOMER_ADMIN_ROLES = new Set(['CUSTOMER_ADMIN', 'CUSTOMER_SUPPORT', 'CUSTOMER_RELATION_OFFICER']);
 
-const CUSTOMER_ADMIN_ROLES = [
-  'CUSTOMER_ADMIN',
-  'CUSTOMER_SUPPORT',
-  'CUSTOMER_RELATION_OFFICER',
-];
-
-const getUserRole = (role: string | undefined): DashboardType => {
+const resolveDashboardType = (role: string | undefined): DashboardType => {
   const normalizedRole = (role || '').toUpperCase().trim();
 
-  console.log('[DashboardRouter] Raw role:', role);
-  console.log('[DashboardRouter] Normalized role:', normalizedRole);
+  if (!normalizedRole) return 'unsupported';
+  if (normalizedRole === 'MASTER_ADMIN' || normalizedRole === 'SYSTEM_ADMIN' || normalizedRole === 'SUPER_ADMIN') return 'master_admin';
+  if (EXECUTIVE_ROLES.has(normalizedRole)) return 'executive';
 
-  // 1. Master admin / executives
-  if (MASTER_ADMIN_ROLES.includes(normalizedRole)) {
-    return 'master_admin';
-  }
+  if (CLAIM_ADMIN_ROLES.has(normalizedRole)) return 'claims_admin';
+  if (CLAIM_HEAD_ROLES.has(normalizedRole)) return 'claims_head';
+  if (CLAIM_MANAGER_ROLES.has(normalizedRole)) return 'claims_manager';
+  if (CLAIM_SUPERVISOR_ROLES.has(normalizedRole)) return 'claims_supervisor';
+  if (CLAIM_OFFICER_ROLES.has(normalizedRole)) return 'claims_officer';
 
-  // 2. Claims roles
-  if (CLAIMS_ROLES.includes(normalizedRole)) {
-    return 'claims';
-  }
+  if (UNDERWRITING_ADMIN_ROLES.has(normalizedRole)) return 'underwriting_admin';
+  if (UNDERWRITING_HEAD_ROLES.has(normalizedRole)) return 'underwriting_head';
+  if (UNDERWRITING_MANAGER_ROLES.has(normalizedRole)) return 'underwriting_manager';
+  if (UNDERWRITING_OFFICER_ROLES.has(normalizedRole)) return 'underwriting_officer';
 
-  // 3. Underwriting roles
-  if (normalizedRole.includes('UNDERWRITING') || normalizedRole.includes('UNDERWRITER')) {
-    return 'underwriting';
-  }
+  if (CUSTOMER_ADMIN_ROLES.has(normalizedRole)) return 'customer_admin';
+  if (normalizedRole === 'CUSTOMER') return 'customer';
 
-  // 4. Customer admin / support
-  if (CUSTOMER_ADMIN_ROLES.includes(normalizedRole)) {
-    return 'customer_admin';
-  }
-
-  // 5. Customer
-  if (normalizedRole === 'CUSTOMER') {
-    return 'customer';
-  }
-
-  // 6. Fallback for unknown roles – log a warning and show customer dashboard
-  console.warn(
-    `[DashboardRouter] Unknown role "${normalizedRole}" – falling back to customer dashboard.`
-  );
-  return 'customer';
+  return 'unsupported';
 };
 
-// ---------------------------------------------------------------------------
-// Props
-// ---------------------------------------------------------------------------
 interface DashboardRouterProps {
-  subPage?: string; // e.g. 'queue', 'policy-offers'
+  subPage?: string;
 }
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
+const UnsupportedDashboard = ({ role }: { role?: string }) => (
+  <Card>
+    <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
+      <AlertCircle className="h-12 w-12 text-amber-500" />
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900">No dashboard is configured for this role</h2>
+        <p className="text-sm text-gray-500">Role: {role || 'Unknown'}</p>
+      </div>
+      <Button variant="outline" onClick={() => window.location.assign('/profile')}>Go to profile</Button>
+    </CardContent>
+  </Card>
+);
+
 const DashboardRouter = ({ subPage }: DashboardRouterProps = {}) => {
   const { user, isLoading } = useAuthStore();
   const [dashboardType, setDashboardType] = useState<DashboardType>('loading');
+  const userRole = user?.role;
 
   useEffect(() => {
-    if (!isLoading && user) {
-      const role = getUserRole(user.role);
-      console.log('[DashboardRouter] Resolved dashboard type:', role);
-      setDashboardType(role);
+    if (!isLoading) {
+      setDashboardType(resolveDashboardType(userRole));
     }
-  }, [user, isLoading]);
+  }, [userRole, isLoading]);
 
-  // -----------------------------------------------------------------------
-  // Loading
-  // -----------------------------------------------------------------------
+  const dashboard = useMemo(() => {
+    switch (dashboardType) {
+      case 'master_admin':
+        return <MasterAdminDashboard />;
+      case 'executive':
+        return <MasterAdminDashboard />;
+      case 'claims_admin':
+      case 'claims_head':
+      case 'claims_manager':
+      case 'claims_supervisor':
+      case 'claims_officer':
+        return <UnifiedClaimsDashboard />;
+      case 'underwriting_admin':
+        return <UnderwritingAdminDashboard />;
+      case 'underwriting_head':
+        return <UnderwritingHeadDashboard />;
+      case 'underwriting_manager':
+        return <UnderwritingManagerDashboard />;
+      case 'underwriting_officer':
+        return <UnderwritingOfficersDashboard />;
+      case 'customer_admin':
+        return <CustomerAdminDashboard />;
+      case 'customer':
+        return subPage === 'policy-offers' ? <CustomerPolicyDecisions /> : <CustomerDashboard />;
+      case 'unsupported':
+        return <UnsupportedDashboard role={userRole} />;
+      case 'loading':
+      default:
+        return null;
+    }
+  }, [dashboardType, subPage, userRole]);
+
   if (isLoading || dashboardType === 'loading') {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+      <div className="flex h-64 items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600" />
       </div>
     );
   }
 
-  // -----------------------------------------------------------------------
-  // Master Admin
-  // -----------------------------------------------------------------------
-  if (dashboardType === 'master_admin') {
-    return <MasterAdminDashboard />;
-  }
-
-  // -----------------------------------------------------------------------
-  // Claims
-  // -----------------------------------------------------------------------
-  if (dashboardType === 'claims') {
-    if (subPage === 'queue') {
-      return <ClaimQueuePage />;
-    }
-    return <UnifiedClaimsDashboard />;
-  }
-
-  // -----------------------------------------------------------------------
-  // Underwriting
-  // -----------------------------------------------------------------------
-  if (dashboardType === 'underwriting') {
-    return <UnifiedUnderwritingDashboard />;
-  }
-
-  // -----------------------------------------------------------------------
-  // Customer Admin / Support
-  // -----------------------------------------------------------------------
-  if (dashboardType === 'customer_admin') {
-    return <CustomerAdminDashboard />;
-  }
-
-  // -----------------------------------------------------------------------
-  // Customer
-  // -----------------------------------------------------------------------
-  if (dashboardType === 'customer') {
-    if (subPage === 'policy-offers') {
-      return <CustomerPolicyDecisions />;
-    }
-    return <CustomerDashboard />;
-  }
-
-  // -----------------------------------------------------------------------
-  // Ultimate fallback (should never reach here, but just in case)
-  // -----------------------------------------------------------------------
-  console.error('[DashboardRouter] Unhandled dashboard type:', dashboardType);
-  return <CustomerDashboard />;
+  return dashboard;
 };
 
 export default DashboardRouter;

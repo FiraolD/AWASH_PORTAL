@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+﻿import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   FileText, Clock, CheckCircle, XCircle, AlertCircle, RefreshCw, Loader2,
   Search, Eye, ClipboardList, Activity, DollarSign, User
@@ -103,21 +103,28 @@ const getRoleDisplayName = (role: string): string => {
 // ----------------------------------------------------------------------------
 const useClaimsPermissions = (userRole: string) => {
   return useMemo(() => {
-    const isReviewer = ['CLAIM_OFFICER', 'CLAIM_OFFICER_I', 'CLAIM_OFFICER_II', 'SENIOR_CLAIM_OFFICER'].includes(userRole);
-    const isApprover = ['MANAGER_CLAIMS', 'SUPERVISOR_CLAIMS', 'HEAD_CLAIMS'].includes(userRole);
+    const isOfficer = ['CLAIM_OFFICER', 'CLAIM_OFFICER_I', 'CLAIM_OFFICER_II', 'SENIOR_CLAIM_OFFICER'].includes(userRole);
+    const isSupervisor = userRole === 'SUPERVISOR_CLAIMS';
+    const isManager = userRole === 'MANAGER_CLAIMS';
+    const isHead = userRole === 'HEAD_CLAIMS';
     const isAdmin = userRole === 'CLAIMS_ADMIN' || userRole === 'MASTER_ADMIN';
+    const isApprover = isSupervisor || isManager || isHead;
+
     return {
-      isReviewer,
-      isApprover,
+      isOfficer,
+      isSupervisor,
+      isManager,
+      isHead,
       isAdmin,
-      canReview: isReviewer && !isApprover,
-      canApprove: isApprover || isAdmin,
-      canViewAll: isApprover || isAdmin,
+      canReview: isOfficer || isSupervisor,
+      canApprove: isApprover,
+      canViewAll: isSupervisor || isManager || isHead || isAdmin,
+      canConfigure: isAdmin,
+      queueTitle: isApprover ? 'Pending Claim Approvals' : isAdmin ? 'Claims Administration Queue' : 'My Assigned Claim Queue',
       roleDisplayName: getRoleDisplayName(userRole)
     };
   }, [userRole]);
 };
-
 // ----------------------------------------------------------------------------
 // Debounce utility
 // ----------------------------------------------------------------------------
@@ -159,7 +166,7 @@ export default function UnifiedClaimsDashboard() {
   // Queue filter
   const [queueSearchTerm, setQueueSearchTerm] = useState('');
 
-  // Debounced search function (with internal min‑length guard)
+  // Debounced search function (with internal minâ€‘length guard)
   const debouncedSearch = useRef(
     debounce(async (query: string) => {
       if (query.length < 3) return; // safety net
@@ -217,13 +224,15 @@ export default function UnifiedClaimsDashboard() {
           const res = await axiosInstance.get('/claims/queue?status=REVIEWED');
           queueData = res.data || [];
         }
-      } else {
+      } else if (permissions.canViewAll) {
         try {
           const res = await axiosInstance.get('/claims');
           queueData = res.data || [];
         } catch {
           queueData = [];
         }
+      } else {
+        queueData = [];
       }
       setQueueClaims(queueData.map((c: any) => ({
         ...c,
@@ -378,7 +387,7 @@ export default function UnifiedClaimsDashboard() {
                 <div key={i} className="flex items-center justify-between border-b pb-2 last:border-0">
                   <div>
                     <p className="text-sm font-medium">{act.action}</p>
-                    <p className="text-xs text-gray-500">{act.user} • {formatDate(act.timestamp)}</p>
+                    <p className="text-xs text-gray-500">{act.user} â€¢ {formatDate(act.timestamp)}</p>
                   </div>
                   <Badge className={act.status === 'APPROVED' ? 'bg-green-100 text-green-800' : act.status === 'REJECTED' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}>
                     {act.status}
@@ -457,6 +466,7 @@ export default function UnifiedClaimsDashboard() {
       {renderStatsCards()}
 
       {/* Global Search Claim (read-only results) */}
+      {permissions.canViewAll && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -494,7 +504,7 @@ export default function UnifiedClaimsDashboard() {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="font-medium">{claim.claimNumber}</p>
-                          <p className="text-sm text-gray-500">{claim.customerName} • {claim.natureOfLoss}</p>
+                          <p className="text-sm text-gray-500">{claim.customerName} â€¢ {claim.natureOfLoss}</p>
                         </div>
                         <Badge className={getStatusBadge(claim.status).color}>
                           {getStatusBadge(claim.status).label}
@@ -508,6 +518,7 @@ export default function UnifiedClaimsDashboard() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* My Queue */}
       <Card>
@@ -515,7 +526,7 @@ export default function UnifiedClaimsDashboard() {
           <div className="flex justify-between items-center flex-wrap gap-4">
             <CardTitle className="flex items-center gap-2">
               <ClipboardList className="h-5 w-5" />
-              {permissions.canApprove ? 'Pending Approvals' : 'My Claim Queue'}
+              {permissions.queueTitle}
             </CardTitle>
             <div className="flex-1 max-w-xs">
               <Input
@@ -618,3 +629,4 @@ export default function UnifiedClaimsDashboard() {
     </div>
   );
 }
+

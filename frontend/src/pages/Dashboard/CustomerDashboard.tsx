@@ -449,7 +449,7 @@ export default function CustomerDashboard() {
               <FileCheck className="h-12 w-12 text-gray-300 mx-auto mb-3" />
               <p className="text-gray-500">No claims filed</p>
               <Link to="/customer/claims/new">
-                <Button variant="outline" className="mt-3">File a Claim</Button>
+                <Button className="mt-3 bg-[#1A3E6F]">File a Claim</Button>
               </Link>
             </div>
           ) : (
@@ -496,7 +496,7 @@ export default function CustomerDashboard() {
               <Headphones className="h-12 w-12 text-gray-300 mx-auto mb-3" />
               <p className="text-gray-500">No support tickets</p>
               <Link to="/customer/support/new">
-                <Button variant="outline" className="mt-3">Contact Support</Button>
+                <Button className="mt-3 bg-[#1A3E6F]">Contact Support</Button>
               </Link>
             </div>
           ) : (

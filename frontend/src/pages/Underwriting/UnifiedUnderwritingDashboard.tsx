@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+﻿import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FileText, Clock, CheckCircle, XCircle, AlertCircle, RefreshCw, Loader2,
@@ -98,25 +98,25 @@ const getRoleDisplayName = (role: string): string => {
 
 const usePermissions = (userRole: string) => {
   return useMemo(() => {
-    const isOfficer = ['UNDERWRITING_OFFICER_I', 'UNDERWRITING_OFFICER_II', 'SENIOR_UNDERWRITING_OFFICER'].includes(userRole);
+    const isJuniorOfficer = ['UNDERWRITING_OFFICER', 'UNDERWRITING_OFFICER_I'].includes(userRole);
+    const isOfficer = ['UNDERWRITING_OFFICER_II', 'SENIOR_UNDERWRITING_OFFICER'].includes(userRole);
     const isSupervisor = userRole === 'SUPERVISOR_UNDERWRITING';
     const isManager = userRole === 'MANAGER_UNDERWRITING';
     const isHead = userRole === 'HEAD_UNDERWRITING';
     const isAdmin = userRole === 'UNDERWRITING_ADMIN' || userRole === 'MASTER_ADMIN';
 
     return {
-      isOfficer, isSupervisor, isManager, isHead, isAdmin,
-      canReview: true,
+      isJuniorOfficer, isOfficer, isSupervisor, isManager, isHead, isAdmin,
+      canReview: isJuniorOfficer || isOfficer || isSupervisor || isManager || isHead || isAdmin,
       canAdjustPremium: isOfficer || isSupervisor || isManager || isHead || isAdmin,
-      canFinalApprove: isSupervisor || isManager || isHead || isAdmin,
+      canFinalApprove: isManager || isHead || isAdmin,
       canReject: isSupervisor || isManager || isHead || isAdmin,
-      canDirectApprove: isSupervisor || isManager || isHead || isAdmin,
-      canViewAll: isManager || isHead || isAdmin,
+      canDirectApprove: isManager || isHead || isAdmin,
+      canViewAll: isSupervisor || isManager || isHead || isAdmin,
       roleDisplayName: getRoleDisplayName(userRole),
     };
   }, [userRole]);
 };
-
 // ---------------------------------------------------------------------------
 // Main Component
 // ---------------------------------------------------------------------------
@@ -762,3 +762,4 @@ export default function UnifiedUnderwritingDashboard() {
     </div>
   );
 }
+

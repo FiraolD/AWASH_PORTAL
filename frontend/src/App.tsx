@@ -1,8 +1,8 @@
-import * as React from 'react';
+﻿import * as React from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { useAuthStore } from './stores/authStore';
-import { UserRole } from './types';
+import { UserRole } from './lib/utils/rolePermissions';
 import MainLayout from './components/layout/MainLayout';
 import { RoleGuard } from './components/layout/RoleGuard';
 import DashboardRouter from './pages/Dashboard/DashboardRouter';
@@ -410,7 +410,7 @@ export default function App() {
             }
           />
 
-          {/* Dynamic claim details – MUST BE LAST */}
+          {/* Dynamic claim details â€“ MUST BE LAST */}
           <Route
             path="claims/:id"
             element={
@@ -600,14 +600,14 @@ export default function App() {
             }
           />
 
-          {/* Profile – accessible to all authenticated users */}
+          {/* Profile â€“ accessible to all authenticated users */}
           <Route path="profile" element={<ProfilePage />} />
 
-          {/* Catch‑all inside main layout */}
+          {/* Catchâ€‘all inside main layout */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>
 
-        {/* Catch‑all outside main layout */}
+        {/* Catchâ€‘all outside main layout */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </React.Suspense>
