@@ -2,23 +2,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
-  ArrowLeft, 
-  ShieldCheck, 
-  Calendar, 
-  DollarSign, 
-  FileText, 
-  Download, 
-  CheckCircle2,
-  AlertCircle,
-  Clock,
-  CreditCard,
-  Home,
-  Car,
-  Heart,
-  Briefcase,
-  FileCheck,
-  Loader2,
-  ChevronRight
+  ArrowLeft, ShieldCheck, Calendar, DollarSign, FileText, Download,
+  CheckCircle2, AlertCircle, Clock, CreditCard, Home, Car, Heart,
+  Briefcase, FileCheck, Loader2, ChevronRight, User, Plane, Package,
+  Ship, MapPin, Phone, Mail
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -31,6 +18,23 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+interface RiskObjectField {
+  key: string;
+  label: string;
+  type?: 'text' | 'currency' | 'date';
+}
+
+interface RiskObjectConfig {
+  type: string;
+  label: string;
+  icon: React.ReactNode;
+  dataKey: string; // Key in productDetails that holds the array
+  fields: RiskObjectField[];
+}
+
 interface PolicyDetail {
   id: string;
   policyNumber: string;
@@ -42,24 +46,233 @@ interface PolicyDetail {
   effectiveDate: string;
   expirationDate: string;
   policyDocumentPath?: string;
-  productDetails?: {
-    vehicles?: Array<{
-      make: string;
-      model: string;
-      year: number;
-      registrationNumber: string;
-      vehicleValue: number;
-      engineNumber?: string;
-      chassisNumber?: string;
-    }>;
-  };
+  productDetails?: any;
   firstName?: string;
   lastName?: string;
   email?: string;
   phone?: string;
   productName?: string;
+  selectedPerils?: any[];
+  selectedRiders?: any[];
+  adjustedPremium?: number;
+  totalPremium?: number;
 }
 
+// ---------------------------------------------------------------------------
+// Risk Object Configurations by Product Type
+// ---------------------------------------------------------------------------
+const RISK_OBJECT_CONFIGS: Record<string, RiskObjectConfig> = {
+  MOTOR: {
+    type: 'MOTOR',
+    label: 'Vehicles',
+    icon: <Car className="h-5 w-5" />,
+    dataKey: 'vehicles',
+    fields: [
+      { key: 'make', label: 'Make' },
+      { key: 'model', label: 'Model' },
+      { key: 'yearOfMake', label: 'Year' },
+      { key: 'plateNumber', label: 'Plate Number' },
+      { key: 'engineNumber', label: 'Engine Number' },
+      { key: 'chassisNumber', label: 'Chassis Number' },
+      { key: 'vehicleType', label: 'Vehicle Type' },
+      { key: 'usage', label: 'Usage' },
+      { key: 'vehicleValue', label: 'Vehicle Value', type: 'currency' },
+    ],
+  },
+  MTCM: {
+    type: 'MTCM',
+    label: 'Vehicles',
+    icon: <Car className="h-5 w-5" />,
+    dataKey: 'vehicles',
+    fields: [
+      { key: 'make', label: 'Make' },
+      { key: 'model', label: 'Model' },
+      { key: 'yearOfMake', label: 'Year' },
+      { key: 'plateNumber', label: 'Plate Number' },
+      { key: 'vehicleValue', label: 'Vehicle Value', type: 'currency' },
+    ],
+  },
+  AUTO: {
+    type: 'AUTO',
+    label: 'Vehicles',
+    icon: <Car className="h-5 w-5" />,
+    dataKey: 'vehicles',
+    fields: [
+      { key: 'make', label: 'Make' },
+      { key: 'model', label: 'Model' },
+      { key: 'year', label: 'Year' },
+      { key: 'registrationNumber', label: 'Registration Number' },
+      { key: 'vehicleValue', label: 'Vehicle Value', type: 'currency' },
+    ],
+  },
+  HEALTH: {
+    type: 'HEALTH',
+    label: 'Insured Persons',
+    icon: <User className="h-5 w-5" />,
+    dataKey: 'insuredPersons',
+    fields: [
+      { key: 'fullName', label: 'Full Name' },
+      { key: 'dateOfBirth', label: 'Date of Birth', type: 'date' },
+      { key: 'gender', label: 'Gender' },
+      { key: 'age', label: 'Age' },
+      { key: 'relationship', label: 'Relationship to Policy Holder' },
+      { key: 'medicalConditions', label: 'Pre-existing Conditions' },
+    ],
+  },
+  LIFE: {
+    type: 'LIFE',
+    label: 'Insured Person',
+    icon: <Heart className="h-5 w-5" />,
+    dataKey: 'insuredPersons',
+    fields: [
+      { key: 'fullName', label: 'Full Name' },
+      { key: 'dateOfBirth', label: 'Date of Birth', type: 'date' },
+      { key: 'gender', label: 'Gender' },
+      { key: 'beneficiaryName', label: 'Beneficiary Name' },
+      { key: 'beneficiaryRelationship', label: 'Beneficiary Relationship' },
+      { key: 'beneficiaryPhone', label: 'Beneficiary Phone' },
+    ],
+  },
+  FIRE: {
+    type: 'FIRE',
+    label: 'Property Details',
+    icon: <Home className="h-5 w-5" />,
+    dataKey: 'properties',
+    fields: [
+      { key: 'propertyAddress', label: 'Property Address' },
+      { key: 'propertyType', label: 'Property Type' },
+      { key: 'constructionType', label: 'Construction Type' },
+      { key: 'yearBuilt', label: 'Year Built' },
+      { key: 'numberOfFloors', label: 'Number of Floors' },
+      { key: 'propertyValue', label: 'Property Value', type: 'currency' },
+    ],
+  },
+  PROPERTY: {
+    type: 'PROPERTY',
+    label: 'Property Details',
+    icon: <Home className="h-5 w-5" />,
+    dataKey: 'properties',
+    fields: [
+      { key: 'propertyAddress', label: 'Property Address' },
+      { key: 'propertyType', label: 'Property Type' },
+      { key: 'propertyValue', label: 'Property Value', type: 'currency' },
+    ],
+  },
+  HOME: {
+    type: 'HOME',
+    label: 'Property Details',
+    icon: <Home className="h-5 w-5" />,
+    dataKey: 'properties',
+    fields: [
+      { key: 'propertyAddress', label: 'Property Address' },
+      { key: 'propertyType', label: 'Property Type' },
+      { key: 'propertyValue', label: 'Property Value', type: 'currency' },
+    ],
+  },
+  TRAVEL: {
+    type: 'TRAVEL',
+    label: 'Travel Details',
+    icon: <Plane className="h-5 w-5" />,
+    dataKey: 'trips',
+    fields: [
+      { key: 'destination', label: 'Destination' },
+      { key: 'departureDate', label: 'Departure Date', type: 'date' },
+      { key: 'returnDate', label: 'Return Date', type: 'date' },
+      { key: 'tripDuration', label: 'Trip Duration (Days)' },
+      { key: 'numberOfTravelers', label: 'Number of Travelers' },
+      { key: 'travelPurpose', label: 'Travel Purpose' },
+    ],
+  },
+  MARINE: {
+    type: 'MARINE',
+    label: 'Cargo Details',
+    icon: <Ship className="h-5 w-5" />,
+    dataKey: 'cargo',
+    fields: [
+      { key: 'cargoType', label: 'Cargo Type' },
+      { key: 'cargoDescription', label: 'Description' },
+      { key: 'cargoValue', label: 'Cargo Value', type: 'currency' },
+      { key: 'origin', label: 'Origin' },
+      { key: 'destination', label: 'Destination' },
+      { key: 'vesselName', label: 'Vessel Name' },
+    ],
+  },
+  GENERIC: {
+    type: 'GENERIC',
+    label: 'Covered Risks',
+    icon: <ShieldCheck className="h-5 w-5" />,
+    dataKey: 'riskObjects',
+    fields: [],
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Helper: Get risk config for a product type
+// ---------------------------------------------------------------------------
+const getRiskConfig = (type: string): RiskObjectConfig => {
+  const upperType = type?.toUpperCase() || '';
+  return RISK_OBJECT_CONFIGS[upperType] || RISK_OBJECT_CONFIGS.GENERIC;
+};
+
+// ---------------------------------------------------------------------------
+// Helper: Extract risk objects from productDetails
+// ---------------------------------------------------------------------------
+const extractRiskObjects = (type: string, productDetails: any): any[] => {
+  if (!productDetails) return [];
+  
+  const config = getRiskConfig(type);
+  
+  // Direct key lookup
+  if (config.dataKey && productDetails[config.dataKey]) {
+    return Array.isArray(productDetails[config.dataKey]) 
+      ? productDetails[config.dataKey] 
+      : [productDetails[config.dataKey]];
+  }
+  
+  // Fallback: check common keys
+  const commonKeys = ['vehicles', 'insuredPersons', 'properties', 'trips', 'cargo', 'riskObjects', 'persons'];
+  for (const key of commonKeys) {
+    if (productDetails[key]) {
+      return Array.isArray(productDetails[key]) ? productDetails[key] : [productDetails[key]];
+    }
+  }
+  
+  // If productDetails itself has risk object fields (not nested)
+  const directKeys = ['make', 'model', 'fullName', 'propertyAddress', 'destination', 'cargoType'];
+  if (directKeys.some(key => productDetails[key])) {
+    return [productDetails];
+  }
+  
+  return [];
+};
+
+// ---------------------------------------------------------------------------
+// Helper: Format value
+// ---------------------------------------------------------------------------
+const formatRiskValue = (value: any, type?: string): string => {
+  if (value === undefined || value === null || value === '') return 'N/A';
+  if (type === 'currency') return `ETB ${Number(value).toLocaleString()}`;
+  if (type === 'date') return new Date(value).toLocaleDateString();
+  return String(value);
+};
+
+// ---------------------------------------------------------------------------
+// Helper: Get product type icon
+// ---------------------------------------------------------------------------
+const getPolicyTypeIcon = (type: string) => {
+  const typeUpper = type?.toUpperCase() || '';
+  if (['AUTO', 'MTCM', 'MOTOR'].includes(typeUpper)) return <Car className="h-6 w-6 text-blue-500" />;
+  if (['HOME', 'PROPERTY', 'FIRE'].includes(typeUpper)) return <Home className="h-6 w-6 text-green-500" />;
+  if (['HEALTH'].includes(typeUpper)) return <Heart className="h-6 w-6 text-red-500" />;
+  if (['LIFE'].includes(typeUpper)) return <Heart className="h-6 w-6 text-purple-500" />;
+  if (['TRAVEL'].includes(typeUpper)) return <Plane className="h-6 w-6 text-cyan-500" />;
+  if (['MARINE'].includes(typeUpper)) return <Ship className="h-6 w-6 text-blue-600" />;
+  return <ShieldCheck className="h-6 w-6 text-gray-500" />;
+};
+
+// ---------------------------------------------------------------------------
+// Main Component
+// ---------------------------------------------------------------------------
 export default function PolicyDetailsPage() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -86,7 +299,19 @@ export default function PolicyDetailsPage() {
       const response = await axios.get(`${API_URL}/policies/${id}/details`, {
         headers: getAuthHeaders()
       });
-      setPolicy(response.data);
+      
+      const data = response.data;
+      
+      // Parse productDetails JSON if it's a string
+      let productDetails = data.productDetails;
+      if (typeof productDetails === 'string') {
+        try { productDetails = JSON.parse(productDetails); } catch { productDetails = {}; }
+      }
+      
+      setPolicy({
+        ...data,
+        productDetails,
+      });
     } catch (error) {
       console.error('Failed to fetch policy details:', error);
       toast.error('Failed to load policy details');
@@ -134,39 +359,14 @@ export default function PolicyDetailsPage() {
 
   const getStatusBadge = (status: string) => {
     const statusUpper = status?.toUpperCase() || '';
-    if (statusUpper === 'ACTIVE') {
-      return <Badge className="bg-green-100 text-green-800 text-sm px-3 py-1">Active</Badge>;
-    }
-    if (statusUpper === 'PENDING_UNDERWRITING') {
-      return <Badge className="bg-yellow-100 text-yellow-800 text-sm px-3 py-1">Pending Underwriting</Badge>;
-    }
-    if (statusUpper === 'AWAITING_CUSTOMER_APPROVAL') {
-      return <Badge className="bg-purple-100 text-purple-800 text-sm px-3 py-1">Awaiting Your Approval</Badge>;
-    }
-    if (statusUpper === 'PENDING_FINAL_APPROVAL') {
-      return <Badge className="bg-indigo-100 text-indigo-800 text-sm px-3 py-1">Pending Final Approval</Badge>;
-    }
-    if (statusUpper === 'REJECTED_BY_CUSTOMER' || statusUpper === 'REJECTED_BY_UNDERWRITER') {
-      return <Badge className="bg-red-100 text-red-800 text-sm px-3 py-1">Rejected</Badge>;
-    }
-    return <Badge className="bg-gray-100 text-gray-800 text-sm px-3 py-1">{status}</Badge>;
-  };
-
-  const getPolicyTypeIcon = (type: string) => {
-    const typeUpper = type?.toUpperCase() || '';
-    if (typeUpper === 'AUTO' || typeUpper === 'MTCM' || typeUpper === 'MOTOR') {
-      return <Car className="h-6 w-6 text-blue-500" />;
-    }
-    if (typeUpper === 'HOME' || typeUpper === 'PROPERTY') {
-      return <Home className="h-6 w-6 text-green-500" />;
-    }
-    if (typeUpper === 'LIFE') {
-      return <Heart className="h-6 w-6 text-purple-500" />;
-    }
-    if (typeUpper === 'HEALTH') {
-      return <Heart className="h-6 w-6 text-red-500" />;
-    }
-    return <ShieldCheck className="h-6 w-6 text-gray-500" />;
+    const badges: Record<string, React.ReactNode> = {
+      'ACTIVE': <Badge className="bg-green-100 text-green-800 text-sm px-3 py-1">Active</Badge>,
+      'PENDING_UNDERWRITING': <Badge className="bg-yellow-100 text-yellow-800 text-sm px-3 py-1">Pending Underwriting</Badge>,
+      'AWAITING_CUSTOMER_APPROVAL': <Badge className="bg-purple-100 text-purple-800 text-sm px-3 py-1">Awaiting Your Approval</Badge>,
+      'PENDING_FINAL_APPROVAL': <Badge className="bg-indigo-100 text-indigo-800 text-sm px-3 py-1">Pending Final Approval</Badge>,
+      'REJECTED': <Badge className="bg-red-100 text-red-800 text-sm px-3 py-1">Rejected</Badge>,
+    };
+    return badges[statusUpper] || <Badge className="bg-gray-100 text-gray-800 text-sm px-3 py-1">{status}</Badge>;
   };
 
   if (loading) {
@@ -193,6 +393,9 @@ export default function PolicyDetailsPage() {
     );
   }
 
+  const riskConfig = getRiskConfig(policy.type);
+  const riskObjects = extractRiskObjects(policy.type, policy.productDetails);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -201,16 +404,8 @@ export default function PolicyDetailsPage() {
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Policies
         </Button>
         {policy.policyDocumentPath && (
-          <Button 
-            variant="outline" 
-            onClick={handleDownloadPolicy}
-            disabled={downloading}
-          >
-            {downloading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Download className="mr-2 h-4 w-4" />
-            )}
+          <Button variant="outline" onClick={handleDownloadPolicy} disabled={downloading}>
+            {downloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
             Download Policy
           </Button>
         )}
@@ -240,7 +435,11 @@ export default function PolicyDetailsPage() {
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="coverage">Coverage Details</TabsTrigger>
-          <TabsTrigger value="vehicles">Vehicles</TabsTrigger>
+          {/* Dynamic 3rd tab based on product type */}
+          <TabsTrigger value="risks">
+            {riskConfig.icon}
+            <span className="ml-2">{riskConfig.label}</span>
+          </TabsTrigger>
         </TabsList>
 
         {/* Tab 1: Overview */}
@@ -254,19 +453,19 @@ export default function PolicyDetailsPage() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
+                <div>
                   <p className="text-xs text-gray-500">Policy Number</p>
                   <p className="font-medium">{policy.policyNumber}</p>
                 </div>
-                <div className="space-y-1">
+                <div>
                   <p className="text-xs text-gray-500">Policy Type</p>
                   <p className="font-medium capitalize">{policy.type}</p>
                 </div>
-                <div className="space-y-1">
+                <div>
                   <p className="text-xs text-gray-500">Status</p>
                   <p className="font-medium">{getStatusBadge(policy.status)}</p>
                 </div>
-                <div className="space-y-1">
+                <div>
                   <p className="text-xs text-gray-500">Product Name</p>
                   <p className="font-medium">{policy.productName || policy.type}</p>
                 </div>
@@ -283,11 +482,11 @@ export default function PolicyDetailsPage() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
+                <div>
                   <p className="text-xs text-gray-500">Coverage Amount</p>
                   <p className="text-2xl font-bold text-[#1A3E6F]">ETB {policy.coverageAmount?.toLocaleString()}</p>
                 </div>
-                <div className="space-y-1">
+                <div>
                   <p className="text-xs text-gray-500">Annual Premium</p>
                   <p className="text-2xl font-bold text-green-600">ETB {policy.premium?.toLocaleString()}</p>
                 </div>
@@ -304,11 +503,11 @@ export default function PolicyDetailsPage() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
+                <div>
                   <p className="text-xs text-gray-500">Effective Date</p>
                   <p className="font-medium">{policy.effectiveDate ? new Date(policy.effectiveDate).toLocaleDateString() : 'N/A'}</p>
                 </div>
-                <div className="space-y-1">
+                <div>
                   <p className="text-xs text-gray-500">Expiration Date</p>
                   <p className="font-medium">{policy.expirationDate ? new Date(policy.expirationDate).toLocaleDateString() : 'N/A'}</p>
                 </div>
@@ -319,21 +518,21 @@ export default function PolicyDetailsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
-                <FileCheck className="h-5 w-5" />
+                <User className="h-5 w-5" />
                 Policyholder Information
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
+                <div>
                   <p className="text-xs text-gray-500">Policyholder Name</p>
                   <p className="font-medium">{policy.firstName} {policy.lastName}</p>
                 </div>
-                <div className="space-y-1">
+                <div>
                   <p className="text-xs text-gray-500">Email</p>
                   <p className="font-medium">{policy.email}</p>
                 </div>
-                <div className="space-y-1">
+                <div>
                   <p className="text-xs text-gray-500">Phone</p>
                   <p className="font-medium">{policy.phone || 'N/A'}</p>
                 </div>
@@ -367,59 +566,94 @@ export default function PolicyDetailsPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Perils */}
+          {policy.selectedPerils && policy.selectedPerils.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5 text-orange-600" />
+                  Covered Perils
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {policy.selectedPerils.map((peril: any, idx: number) => (
+                    <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div>
+                        <p className="font-medium">{peril.perilName || peril.name}</p>
+                        {peril.description && <p className="text-xs text-gray-500">{peril.description}</p>}
+                      </div>
+                      <Badge variant="outline">ETB {Number(peril.premium || 0).toLocaleString()}</Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Riders */}
+          {policy.selectedRiders && policy.selectedRiders.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 text-purple-600" />
+                  Optional Riders
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {policy.selectedRiders.map((rider: any, idx: number) => (
+                    <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div>
+                        <p className="font-medium">{rider.riderName || rider.name}</p>
+                        {rider.description && <p className="text-xs text-gray-500">{rider.description}</p>}
+                      </div>
+                      <Badge variant="outline">ETB {Number(rider.premium || 0).toLocaleString()}</Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
-        {/* Tab 3: Vehicles */}
-        <TabsContent value="vehicles" className="space-y-4">
-          {policy.productDetails?.vehicles && policy.productDetails.vehicles.length > 0 ? (
-            policy.productDetails.vehicles.map((vehicle, idx) => (
+        {/* Tab 3: Dynamic Risk Objects */}
+        <TabsContent value="risks" className="space-y-4">
+          {riskObjects.length > 0 ? (
+            riskObjects.map((riskObj: any, idx: number) => (
               <Card key={idx}>
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
-                    <Car className="h-5 w-5" />
-                    Vehicle {idx + 1}: {vehicle.make} {vehicle.model}
+                    {riskConfig.icon}
+                    {riskConfig.label} {riskObjects.length > 1 ? `#${idx + 1}` : ''}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <p className="text-xs text-gray-500">Make</p>
-                      <p className="font-medium">{vehicle.make}</p>
+                  {riskConfig.fields.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {riskConfig.fields.map((field) => (
+                        <div key={field.key}>
+                          <p className="text-xs text-gray-500">{field.label}</p>
+                          <p className="font-medium">{formatRiskValue(riskObj[field.key], field.type)}</p>
+                        </div>
+                      ))}
                     </div>
-                    <div className="space-y-1">
-                      <p className="text-xs text-gray-500">Model</p>
-                      <p className="font-medium">{vehicle.model}</p>
+                  ) : (
+                    <div className="text-sm text-gray-500">
+                      No specific risk details available for this policy type.
                     </div>
-                    <div className="space-y-1">
-                      <p className="text-xs text-gray-500">Year</p>
-                      <p className="font-medium">{vehicle.year}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs text-gray-500">Registration Number</p>
-                      <p className="font-medium">{vehicle.registrationNumber}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs text-gray-500">Engine Number</p>
-                      <p className="font-medium">{vehicle.engineNumber || 'N/A'}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs text-gray-500">Chassis Number</p>
-                      <p className="font-medium">{vehicle.chassisNumber || 'N/A'}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs text-gray-500">Vehicle Value</p>
-                      <p className="font-medium">ETB {vehicle.vehicleValue?.toLocaleString()}</p>
-                    </div>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
             ))
           ) : (
             <Card>
               <CardContent className="text-center py-12">
-                <Car className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">No vehicle information available</p>
-                <p className="text-sm text-gray-400 mt-1">This policy may not be a motor policy.</p>
+                <div className="h-12 w-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  {riskConfig.icon}
+                </div>
+                <p className="text-gray-500">No {riskConfig.label.toLowerCase()} information available.</p>
               </CardContent>
             </Card>
           )}
