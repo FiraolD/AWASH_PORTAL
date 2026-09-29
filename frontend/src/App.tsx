@@ -33,7 +33,7 @@ const SystemSettingsPage = React.lazy(() => import('./pages/Admin/SystemSettings
 const ClaimsAssignmentConfigPage = React.lazy(() => import('./pages/Admin/ClaimsAssignmentConfigPage'));
 const RatesManagementPage = React.lazy(() => import('./pages/Admin/PremiumRateConfigPage'));
 const ProductManagementPage = React.lazy(() => import('./pages/Admin/ProductManagementPage'));
-const WorkflowConfigPage = React.lazy(() => import('./pages/Admin/WorkflowConfigPage'));
+//const WorkflowConfigPage = React.lazy(() => import('./pages/Admin/WorkflowConfigPage'));
 const AuditLogsPage = React.lazy(() => import('./pages/Admin/AuditLogsPage'));
 const ApprovalRulesConfigPage = React.lazy(() => import('./pages/Admin/ApprovalRulesConfigPage'));
 
@@ -258,14 +258,14 @@ export default function App() {
                 </RoleGuard>
               }
             />
-            <Route
+            {/*<Route
               path="workflow"
               element={
                 <RoleGuard allowedRoles={[UserRole.MASTER_ADMIN]}>
                   <WorkflowConfigPage />
                 </RoleGuard>
               }
-            />
+            />*/}
             <Route
               path="approval-rules"
               element={
