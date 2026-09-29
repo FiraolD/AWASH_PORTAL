@@ -1,6 +1,7 @@
 ﻿import * as React from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'sonner';
+import { SpeedInsights } from "@vercel/speed-insights/next"
 import { useAuthStore } from './stores/authStore';
 import { UserRole } from './lib/utils/rolePermissions';
 import MainLayout from './components/layout/MainLayout';
