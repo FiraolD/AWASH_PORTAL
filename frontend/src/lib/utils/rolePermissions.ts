@@ -73,7 +73,7 @@ export const navigationConfig = {
     { title: 'Product Management', href: '/admin/products', icon: 'Package', roles: [UserRole.MASTER_ADMIN] },
     { title: 'Rates Management', href: '/admin/rates', icon: 'DollarSign', roles: [UserRole.MASTER_ADMIN] },
     { title: 'Approval Rules', href: '/admin/approval-rules', icon: 'CheckSquare', roles: [UserRole.MASTER_ADMIN] },
-    { title: 'Workflow Rules', href: '/admin/workflow', icon: 'GitBranch', roles: [UserRole.MASTER_ADMIN] },
+    //{ title: 'Workflow Rules', href: '/admin/workflow', icon: 'GitBranch', roles: [UserRole.MASTER_ADMIN] },
     { title: 'Audit Logs', href: '/admin/audit-logs', icon: 'FileSearch', roles: [UserRole.MASTER_ADMIN, UserRole.CEO] },
     { title: 'System Settings', href: '/admin/settings', icon: 'Settings', roles: [UserRole.MASTER_ADMIN] },
 
