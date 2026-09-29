@@ -1,7 +1,7 @@
 ﻿import * as React from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'sonner';
-import { SpeedInsights } from "@vercel/speed-insights/next"
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { useAuthStore } from './stores/authStore';
 import { UserRole } from './lib/utils/rolePermissions';
 import MainLayout from './components/layout/MainLayout';
@@ -116,6 +116,7 @@ export default function App() {
   return (
     <React.Suspense fallback={<LoadingFallback />}>
       <Toaster position="top-right" richColors closeButton />
+      <SpeedInsights />
       <Routes>
         {/* Auth Routes */}
         <Route path="/login" element={<LoginPage />} />
