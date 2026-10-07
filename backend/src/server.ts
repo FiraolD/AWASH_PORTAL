@@ -6,7 +6,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import apiV1Routes from './api/v1/index.js';
 import pool from './lib/db.js';
-import { getAllowedOrigins, getJwtSecret } from './lib/security.js';
+import { getAllowedOrigins, getJwtSecret, isOriginAllowed } from './lib/security.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
