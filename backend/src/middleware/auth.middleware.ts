@@ -21,17 +21,19 @@ export interface TokenPayload {
   emailVerified?: boolean;
 }
 
-const JWT_SECRET = getJwtSecret();
+function getConfiguredJwtSecret(): string {
+  return getJwtSecret();
+}
 
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 const AUTH_COOKIE_NAME = 'awash_access_token';
 
 export function generateToken(payload: TokenPayload): string {
-  return jwt.sign(payload as object, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  return jwt.sign(payload as object, getConfiguredJwtSecret(), { expiresIn: JWT_EXPIRES_IN });
 }
 
 export function verifyToken(token: string): TokenPayload {
-  return jwt.verify(token, JWT_SECRET) as TokenPayload;
+  return jwt.verify(token, getConfiguredJwtSecret()) as TokenPayload;
 }
 
 export function setAuthCookie(res: Response, token: string): void {
