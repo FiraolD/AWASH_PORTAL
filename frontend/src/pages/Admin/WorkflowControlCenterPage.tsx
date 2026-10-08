@@ -22,7 +22,7 @@ export default function WorkflowControlCenterPage(){
   const [newDef,setNewDef]=useState({code:'',name:'',entityType:'POLICY',description:''});
   const [authority,setAuthority]=useState({roleLevelId:'',entityType:'POLICY',productCode:'',maxAmount:''});
   const defs=useQuery<Definition[]>({queryKey:['workflow-definitions'],queryFn:async()=> (await apiClient.get('/workflow/definitions')).data});
-  const detail=useQuery({queryKey:['workflow-definition',selected?.id],enabled:!!selected?.id,queryFn:async()=> (await apiClient.get(`/workflow/definitions/${selected!.id}`)).data});
+  const detail=useQuery<any>({queryKey:['workflow-definition',selected?.id],enabled:!!selected?.id,queryFn:async()=> (await apiClient.get(`/workflow/definitions/${selected!.id}`)).data});
   const authorities=useQuery<any[]>({queryKey:['workflow-authorities'],queryFn:async()=> (await apiClient.get('/workflow/authorities')).data});
   const roleLevels=useQuery<any[]>({queryKey:['workflow-role-levels'],queryFn:async()=> (await apiClient.get('/workflow/role-levels')).data});
   const saveAuthority=useMutation({mutationFn:async()=> (await apiClient.post('/workflow/authorities',{...authority,maxAmount:authority.maxAmount?Number(authority.maxAmount):null})).data,onSuccess:()=>{toast.success('Approval authority saved');setAuthority({...authority,maxAmount:''});qc.invalidateQueries({queryKey:['workflow-authorities']})},onError:(e:any)=>toast.error(e?.response?.data?.error||'Unable to save authority')});
