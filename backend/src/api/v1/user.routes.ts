@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import pool from '../../lib/db.js';
 import { authenticate, authorize } from '../../middleware/auth.middleware.js';
+import { canAccessOwnedResource } from '../../middleware/authorization.policy.js';
 import bcrypt from 'bcryptjs';
 
 const router = Router();
@@ -49,7 +50,7 @@ router.get('/:id', authenticate, async (req, res) => {
     const isSelf = requesterId === targetId;
     const isAdmin = requesterRole === 'CUSTOMER_ADMIN' || requesterRole === 'MASTER_ADMIN';
 
-    if (!isSelf && !isAdmin) {
+    if (!canAccessOwnedResource(req.user, targetId, ['CUSTOMER_ADMIN', 'MASTER_ADMIN'])) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
