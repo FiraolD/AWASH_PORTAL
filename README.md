@@ -280,16 +280,16 @@ The API returns JSON and uses standard HTTP status codes for validation, authent
 
 ## Quality & CI
 
-GitHub Actions validates each backend and frontend workspace on pushes and pull requests.
+GitHub Actions validates the backend and frontend workspaces on pushes and pull requests.
 
 Current quality gates:
 
 1. Clean checkout.
 2. `npm ci` from committed lockfiles.
 3. Frontend linting.
-4. Frontend and backend builds.
+4. Frontend and backend TypeScript builds.
 
-Future quality gates will add automated unit/integration tests, dependency auditing, secret scanning, and API contract checks.
+Automated authorization regression tests are still planned; CI should not be described as a security-test suite until those tests are added.
 
 ## Engineering Roadmap
 
@@ -301,10 +301,11 @@ Future quality gates will add automated unit/integration tests, dependency audit
 
 ### Phase 2 — Backend hardening
 - [ ] Centralize request validation with Zod.
-- [ ] Add authentication rate limiting and abuse protection.
+- [x] Add authentication rate limiting and abuse protection.
 - [ ] Add structured request IDs and production logging.
 - [ ] Add transactional service boundaries for critical workflows.
-- [ ] Audit all privileged endpoints for object-level authorization.
+- [x] Audit the currently reviewed claims, policies, policy documents, user lookup, and sensitive file exposure paths for object-level authorization.
+- [ ] Complete the remaining payment, approval, assignment, support, and administrative authorization audit.
 
 ### Phase 3 — Frontend quality
 - [ ] Standardize loading, empty, error, and optimistic states.
@@ -336,3 +337,16 @@ This project demonstrates more than a CRUD application. It is intended to show:
 ## License
 
 See repository licensing information before reuse or redistribution.
+
+## Vercel Frontend Deployment
+
+The Vercel project should deploy the `frontend/` workspace as a Vite static application rather than executing the repository-level backend build. Recommended project settings:
+
+- **Root Directory:** `frontend`
+- **Framework Preset:** Vite
+- **Install Command:** `npm ci`
+- **Build Command:** `npm run build`
+- **Output Directory:** `dist`
+- **Node.js:** 22.x
+
+The backend is an independently deployable Node/Express service and should not be bundled into the Vercel frontend deployment.
