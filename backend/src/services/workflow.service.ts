@@ -23,7 +23,11 @@ export class WorkflowService {
     const versions = await pool.query(`
       SELECT * FROM workflow_versions WHERE workflow_definition_id = $1 ORDER BY version_no DESC
     `, [id]);
-    return { ...def.rows[0], versions: versions.rows };
+    const versionRows = await Promise.all(versions.rows.map(async (version: any) => {
+      const steps = await pool.query('SELECT * FROM workflow_steps WHERE workflow_version_id=$1 ORDER BY step_order', [version.id]);
+      return { ...version, steps: steps.rows };
+    }));
+    return { ...def.rows[0], versions: versionRows };
   }
 
   async createDefinition(input: { code: string; name: string; description?: string; entityType: WorkflowEntityType; createdBy: string }) {
