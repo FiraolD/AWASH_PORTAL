@@ -47,6 +47,16 @@ export class WorkflowService {
     } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
   }
 
+  async createVersion(definitionId: string, actorId: string) {
+    const current = await pool.query('SELECT COALESCE(MAX(version_no),0)::int AS version_no FROM workflow_versions WHERE workflow_definition_id=$1', [definitionId]);
+    const next = current.rows[0].version_no + 1;
+    const result = await pool.query(`
+      INSERT INTO workflow_versions(workflow_definition_id,version_no,status,created_by)
+      VALUES($1,$2,'DRAFT',$3) RETURNING *
+    `, [definitionId,next,actorId]);
+    return { ...result.rows[0], steps: [] };
+  }
+
   async saveVersion(versionId: string, steps: any[], actorId: string) {
     const client = await pool.connect();
     try {
