@@ -37,7 +37,7 @@ export default function PolicyDocuments({ policyId, policyNumber, open = true }:
             const parsed = JSON.parse(stored);
             authToken = parsed.state?.token;
         }
-        return { Authorization: `Bearer ${authToken}` };
+        return authToken ? { Authorization: `Bearer ${authToken}` } : {};
     };
 
     useEffect(() => {
