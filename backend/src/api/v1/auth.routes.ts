@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import pool from '../../lib/db.js';
 import { generateToken, authenticate, setAuthCookie, clearAuthCookie } from '../../middleware/auth.middleware.js';
 import { authRateLimit } from '../../middleware/auth-rate-limit.middleware.js';
-import { sendVerificationEmail } from '../../services/email.service.js';
+import { sendVerificationEmail, sendPasswordResetEmail } from '../../services/email.service.js';
 
 const router = Router();
 
@@ -310,7 +310,7 @@ router.post('/forgot-password', authRateLimit, async (req, res: Response) => {
     );
 
     try {
-      await (await import('../../services/email.service.js')).sendPasswordResetEmail(user.email, resetToken);
+      await sendPasswordResetEmail(user.email, resetToken);
     } catch (emailError) {
       console.error('[Auth] Password reset email failed:', emailError);
     }
