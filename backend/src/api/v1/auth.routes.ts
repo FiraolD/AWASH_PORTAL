@@ -362,22 +362,23 @@ router.post('/reset-password', authRateLimit, async (req, res: Response) => {
     }
 
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-    const userResult = await pool.query(
-      `SELECT id FROM users
-       WHERE "resetToken" = $1 AND "resetTokenExpiresAt" > NOW()`,
-      [tokenHash]
-    );
-
-    if (userResult.rows.length === 0) return res.status(400).json({ error: 'Invalid or expired reset token' });
-
     const passwordHash = await bcrypt.hash(password, 12);
-    await pool.query(
+
+    // Consume the reset token atomically so concurrent requests cannot reuse it.
+    const resetResult = await pool.query(
       `UPDATE users
        SET "passwordHash" = $1, "resetToken" = NULL, "resetTokenExpiresAt" = NULL,
            "updatedAt" = NOW()
-       WHERE id = $2`,
-      [passwordHash, userResult.rows[0].id]
+       WHERE "resetToken" = $2
+         AND "resetTokenExpiresAt" > NOW()
+         AND status = 'ACTIVE'
+       RETURNING id`,
+      [passwordHash, tokenHash]
     );
+
+    if (resetResult.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid or expired reset token' });
+    }
 
     res.json({ message: 'Password reset successfully' });
   } catch (error: any) {
