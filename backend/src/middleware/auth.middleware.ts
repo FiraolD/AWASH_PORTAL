@@ -26,12 +26,17 @@ export interface TokenPayload {
 // ---------------------------------------------------------------------------
 // JWT Configuration
 // ---------------------------------------------------------------------------
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET || JWT_SECRET.length < 32) {
+  throw new Error('JWT_SECRET must be configured and at least 32 characters long');
+}
+
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 export function generateToken(payload: TokenPayload): string {
-  return jwt.sign(payload as object, JWT_SECRET, { expiresIn: 604800 }); // 7 days in seconds
+  return jwt.sign(payload as object, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 }
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 
 // ---------------------------------------------------------------------------
@@ -159,7 +164,9 @@ export const authenticate = async (
       lastName: user.lastName,
     };
 
-    console.log(`[AUTH] User authenticated: ${user.email} (${user.role})`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[AUTH] User authenticated: ${user.email} (${user.role})`);
+    }
     next();
   } catch (error: any) {
     if (error.name === 'JsonWebTokenError') {
@@ -183,18 +190,17 @@ export const authorize = (...allowedRoles: string[]) => {
     const userRole = req.user?.role;
 
     if (!userRole) {
-      console.log('[AUTHORIZE] No user role found – access denied');
+      
       res.status(401).json({ error: 'Authentication required.' });
       return;
     }
 
-    console.log(`[AUTHORIZE] User role: ${userRole}`);
-    console.log(`[AUTHORIZE] Allowed roles: [${allowedRoles.join(', ')}]`);
+    
 
     const isAllowed = allowedRoles.includes(userRole);
 
     if (!isAllowed) {
-      console.log(`[AUTHORIZE] ACCESS DENIED – ${userRole} not in allowed list`);
+      
       res.status(403).json({
         error: 'Insufficient permissions',
         userRole,
@@ -203,7 +209,7 @@ export const authorize = (...allowedRoles: string[]) => {
       return;
     }
 
-    console.log(`[AUTHORIZE] ACCESS GRANTED – ${userRole}`);
+    
     next();
   };
 };
