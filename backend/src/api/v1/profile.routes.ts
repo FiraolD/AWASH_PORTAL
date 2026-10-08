@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import pool from '../../lib/db.js';
 import { uploadAvatar } from '../middleware/upload.middleware.js';
-import { authenticate } from '../middleware/auth.middleware.js';
+import { authenticate } from '../../middleware/auth.middleware.js';
 import bcrypt from 'bcryptjs';
 
 const router = Router();
