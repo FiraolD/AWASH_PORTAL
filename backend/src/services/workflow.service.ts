@@ -304,6 +304,15 @@ export class WorkflowService {
     } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
   }
 
+
+  private async taskCount(client: any, instanceId: string, stepId: string): Promise<number> {
+    const result = await client.query(
+      'SELECT COUNT(*)::int AS count FROM workflow_tasks WHERE workflow_instance_id=$1 AND workflow_step_id=$2',
+      [instanceId, stepId]
+    );
+    return result.rows[0].count;
+  }
+
   async getInstance(id: string) {
     const instance = await pool.query(`SELECT wi.*, wd.code AS workflow_code, wd.name AS workflow_name, wv.version_no
       FROM workflow_instances wi JOIN workflow_versions wv ON wv.id=wi.workflow_version_id
