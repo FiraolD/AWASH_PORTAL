@@ -24,8 +24,21 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.disable('x-powered-by');
+
+app.use((_req: Request, res: Response, next: NextFunction) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  if (process.env.NODE_ENV === 'production') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  next();
+});
+
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: false, limit: '2mb' }));
 
 // Request logging (development only)
 if (process.env.NODE_ENV !== 'production') {
@@ -77,7 +90,7 @@ if (process.env.NODE_ENV === 'production') {
 app.use((req: Request, res: Response) => {
   res.status(404).json({
     error: 'Not Found',
-    message: `Route ${req.method} ${req.path} not found`,
+    message: 'The requested resource was not found',
     timestamp: new Date().toISOString(),
   });
 });
@@ -98,6 +111,7 @@ app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
   res.status(err.status || 500).json({
     error: isProduction ? 'Internal Server Error' : err.message,
     timestamp: new Date().toISOString(),
+    requestId: req.headers['x-request-id'] || undefined,
     ...(isProduction ? {} : { stack: err.stack }),
   });
 });

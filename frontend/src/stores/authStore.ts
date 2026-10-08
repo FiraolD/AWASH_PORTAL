@@ -48,11 +48,7 @@ export const useAuthStore = create<AuthState>()(
       const response = await axiosInstance.post('/auth/login', { email, password });
       const { user, token } = response.data;
       
-      // Store token in multiple places for redundancy
       set({ user, token, isAuthenticated: true, isLoading: false });
-      localStorage.setItem('awash-auth-storage', JSON.stringify({ state: { token, user } }));
-      localStorage.setItem('token', token);
-      sessionStorage.setItem('token', token);
       
     } catch (error: any) {
       set({ isLoading: false });
@@ -63,12 +59,11 @@ export const useAuthStore = create<AuthState>()(
   register: async (data: RegisterData) => {
     set({ isLoading: true });
     try {
-      const response = await axiosInstance.post('/auth/register', data);
-      const { user, token } = response.data;
-      
-      set({ user, token, isAuthenticated: true, isLoading: false });
-      localStorage.setItem('awash-auth-storage', JSON.stringify({ state: { token, user } }));
-      localStorage.setItem('token', token);
+      const response = await axiosInstance.post('/auth/signup', data);
+      const { user } = response.data;
+
+      // Accounts require email verification before authentication.
+      set({ user, token: null, isAuthenticated: false, isLoading: false });
       
     } catch (error: any) {
       set({ isLoading: false });
@@ -81,21 +76,18 @@ export const useAuthStore = create<AuthState>()(
     if (!current) return;
     const user = { ...current, ...updates };
     set({ user });
-    const token = get().token;
-    localStorage.setItem('awash-auth-storage', JSON.stringify({ state: { token, user } }));
+
   },
 
   logout: () => {
     set({ user: null, token: null, isAuthenticated: false, isLoading: false });
-    localStorage.removeItem('awash-auth-storage');
-    localStorage.removeItem('token');
-    sessionStorage.removeItem('token');
+
   },
 
   fetchUser: async () => {
     set({ isLoading: true });
     try {
-      const response = await axiosInstance.get('/auth/me');
+      const response = await axiosInstance.get('/auth/profile');
       const user = response.data;
       set({ user, isAuthenticated: true, isLoading: false });
     } catch (error) {
