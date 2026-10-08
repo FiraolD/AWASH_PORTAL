@@ -1,6 +1,6 @@
 ﻿import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import axiosInstance from '../lib/axios';
+import { apiClient as axiosInstance } from '../api/client';
 
 interface User {
   id: string;
