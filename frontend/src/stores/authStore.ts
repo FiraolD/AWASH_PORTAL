@@ -16,7 +16,6 @@ interface User {
 
 interface AuthState {
   user: User | null;
-  token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -38,7 +37,6 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
   user: null,
-  token: null,
   isAuthenticated: false,
   isLoading: false,
 
@@ -46,9 +44,9 @@ export const useAuthStore = create<AuthState>()(
     set({ isLoading: true });
     try {
       const response = await axiosInstance.post('/auth/login', { email, password });
-      const { user, token } = response.data;
+      const { user } = response.data;
       
-      set({ user, token, isAuthenticated: true, isLoading: false });
+      set({ user, isAuthenticated: true, isLoading: false });
       
     } catch (error: any) {
       set({ isLoading: false });
@@ -63,7 +61,7 @@ export const useAuthStore = create<AuthState>()(
       const { user } = response.data;
 
       // Accounts require email verification before authentication.
-      set({ user, token: null, isAuthenticated: false, isLoading: false });
+      set({ user, isAuthenticated: false, isLoading: false });
       
     } catch (error: any) {
       set({ isLoading: false });
@@ -80,7 +78,7 @@ export const useAuthStore = create<AuthState>()(
   },
 
   logout: () => {
-    set({ user: null, token: null, isAuthenticated: false, isLoading: false });
+    set({ user: null, isAuthenticated: false, isLoading: false });
 
   },
 
@@ -98,6 +96,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'awash-auth-storage',
+      partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated }),
     }
   )
 );
