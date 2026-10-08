@@ -56,3 +56,27 @@ Fix: the claim owner or an authorized claims-access role must pass the ownership
 ## Deployment rule
 
 These authorization changes are on the schema-reconciliation branch and should be validated before merging. No production database migration is part of this work.
+
+## Automated regression coverage
+
+A backend authorization regression suite now covers the core policy primitives used by the protected endpoints:
+
+- unauthenticated/invalid authorization context fails closed
+- explicit role allowlists
+- exact resource ownership
+- customer access to own policy/profile
+- customer denial for another customer's policy/profile
+- privileged staff access to customer-owned resources
+- claims-staff access to claim resources
+- customer denial for another customer's claim/document resource
+- policy statistics restricted to privileged roles
+- missing owner identity fails closed
+
+The suite is located at `backend/src/__tests__/authorization.policy.test.ts` and runs with Node's built-in test runner through `npm test`.
+
+CI workflow:
+`.github/workflows/backend-authorization-tests.yml`
+
+Latest branch run: **PASS** — dependency installation, TypeScript build, and all authorization regression tests completed successfully.
+
+These are authorization-policy regression tests, not production-database integration tests. HTTP/database integration coverage should be added after the test environment is made deterministic and isolated from production.
