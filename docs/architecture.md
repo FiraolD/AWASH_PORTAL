@@ -6,7 +6,7 @@ AWASH_PORTAL is organized as a two-tier web application:
 - **Frontend:** React + TypeScript + Vite
 - **Backend:** Node.js + Express + TypeScript
 - **Data layer:** PostgreSQL
-- **Authentication:** JWT + bcrypt
+- **Authentication:** JWT + bcrypt with HttpOnly web sessions and bearer-token compatibility
 - **Email:** SMTP via Nodemailer
 - **Document generation:** PDFKit
 
@@ -24,7 +24,8 @@ The browser communicates with the backend through versioned REST endpoints. Busi
       v
     Express API
       |
-      +--> Authentication / RBAC
+      +--> Authentication / RBAC / rate limiting
+      +--> HttpOnly session cookies
       +--> Business workflows
       +--> Audit logging
       +--> Email / PDF services
@@ -49,7 +50,7 @@ The browser communicates with the backend through versioned REST endpoints. Busi
 - `routes/` — route and access configuration.
 
 ## Security Model
-Authentication establishes the user identity. Authorization then evaluates the authenticated user's role against the operation being requested. Server-side authorization is authoritative; frontend route guards are only a user-experience layer.
+Authentication establishes the user identity through a signed JWT. Browser sessions use an HttpOnly cookie; non-browser clients may use the Authorization bearer scheme. Authorization then evaluates the authenticated user's role against the operation being requested. Server-side authorization is authoritative; frontend route guards are only a user-experience layer.
 
 Database queries must remain parameterized. Production database connections must verify TLS certificates unless an explicitly documented managed-database exception exists.
 
@@ -76,3 +77,7 @@ A change is considered portfolio-ready when:
 5. API behavior and error handling are documented.
 6. The README reflects the actual implementation.
 7. A clean environment can reproduce the application from documented steps.
+
+## Authentication Recovery
+
+Password recovery is implemented as a one-hour, single-use token flow. Reset tokens are stored as SHA-256 hashes in PostgreSQL and the reset endpoint clears the token after a successful password change. The required database columns are provisioned by `backend/prisma/migrations/20261008_auth_hardening.sql`.
