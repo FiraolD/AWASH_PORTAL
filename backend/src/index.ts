@@ -85,7 +85,8 @@ if (process.env.NODE_ENV === 'production') {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
 
-  app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+  // Do not expose claims/policies/payment files through a public static directory.
+  app.use('/uploads/avatars', express.static(path.join(__dirname, '../uploads/avatars')));
 }
 
 // ========================

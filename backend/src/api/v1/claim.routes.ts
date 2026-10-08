@@ -649,6 +649,18 @@ router.post('/:id/documents', authenticate, upload.array('documents', 10), async
       return res.status(400).json({ error: 'No files uploaded' });
     }
     
+    // Object-level authorization: only the claim owner or authorized claims staff may upload.
+    const claimResult = await pool.query('SELECT "userId" FROM claims WHERE id = $1', [id]);
+    if (claimResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Claim not found' });
+    }
+
+    const claimOwnerId = claimResult.rows[0].userId;
+    const isClaimsStaff = CLAIM_ROLES.includes(req.user?.role) || req.user?.role === 'MASTER_ADMIN';
+    if (!isClaimsStaff && claimOwnerId !== userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
     const documents = [];
     for (const file of files) {
       const result = await pool.query(

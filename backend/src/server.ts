@@ -75,7 +75,9 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(csrfOriginGuard);
 
 // Serve static files
-app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
+// Only profile avatars are publicly cacheable. Claims/policies/payment documents
+// must be served through authenticated, object-authorized endpoints.
+app.use('/uploads/avatars', express.static(path.join(__dirname, '../uploads/avatars'), {
   maxAge: '1y',
   etag: true,
   lastModified: true,
