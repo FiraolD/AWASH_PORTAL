@@ -659,7 +659,6 @@ router.post('/:id/documents', authenticate, upload.array('documents', 10), async
     }
 
     const claimOwnerId = claimResult.rows[0].userId;
-    const isStaff = ALL_CLAIMS_ACCESS.includes(req.user?.role);
     if (!canAccessOwnedResource(req.user, claimOwnerId, ALL_CLAIMS_ACCESS)) {
       return res.status(403).json({ error: 'Access denied' });
     }
@@ -726,7 +725,7 @@ router.get('/:id/documents/:documentId/download', authenticate, async (req: any,
     
     const claim = claimResult.rows[0];
     const isAdmin = CLAIM_ROLES.includes(userRole) || userRole === 'MASTER_ADMIN';
-    if (!isAdmin && claim.userId !== userId) return res.status(403).json({ error: 'Access denied' });
+    if (!canAccessOwnedResource(req.user, claim.userId, [...CLAIM_ROLES, 'MASTER_ADMIN'])) return res.status(403).json({ error: 'Access denied' });
     
     const documentResult = await pool.query(
       'SELECT * FROM claim_documents WHERE id = $1 AND "claimId" = $2',
@@ -763,7 +762,7 @@ router.get('/:id', authenticate, async (req: any, res: any) => {
     if (claimCheck.rows.length === 0) return res.status(404).json({ error: 'Claim not found' });
 
     const claim = claimCheck.rows[0];
-    if (!isAdmin && claim.userId !== userId) return res.status(403).json({ error: 'Access denied' });
+    if (!canAccessOwnedResource(req.user, claim.userId, [...CLAIM_ROLES, 'MASTER_ADMIN'])) return res.status(403).json({ error: 'Access denied' });
 
     const result = await pool.query(
       `SELECT 
