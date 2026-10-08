@@ -41,6 +41,31 @@ router.get('/versions/:id', ...requireWorkflowAdmin, async (req,res) => {
   catch (e:any) { res.status(404).json({ error:e.message }); }
 });
 
+
+router.get('/role-levels', ...requireWorkflowAdmin, async (_req,res) => {
+  try {
+    const { rows } = await (await import('../../lib/db.js')).default.query(
+      'SELECT id, level_code, level_name, department, level_order FROM role_levels WHERE is_active=true ORDER BY department, level_order'
+    );
+    res.json(rows);
+  } catch (e:any) { res.status(500).json({ error:'Failed to load role levels', detail:e.message }); }
+});
+
+router.post('/authorities', ...requireWorkflowAdmin, async (req: AuthRequest,res:Response) => {
+  try {
+    const { roleLevelId, entityType, productCode, maxAmount, canApprove=true, canReject=true, canModify=true } = req.body;
+    if (!roleLevelId || !entityType) return res.status(400).json({ error:'roleLevelId and entityType are required' });
+    const { rows } = await (await import('../../lib/db.js')).default.query(`
+      INSERT INTO workflow_authorities(role_level_id,entity_type,product_code,max_amount,can_approve,can_reject,can_modify,created_by)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8)
+      ON CONFLICT(role_level_id,entity_type,product_code)
+      DO UPDATE SET max_amount=EXCLUDED.max_amount,can_approve=EXCLUDED.can_approve,can_reject=EXCLUDED.can_reject,can_modify=EXCLUDED.can_modify,is_active=true
+      RETURNING *
+    `, [roleLevelId,entityType,productCode||null,maxAmount??null,canApprove,canReject,canModify,req.user!.id]);
+    res.status(201).json(rows[0]);
+  } catch (e:any) { res.status(400).json({ error:e.message }); }
+});
+
 router.get('/authorities', ...requireWorkflowAdmin, async (_req,res) => {
   try { res.json(await workflowService.listAuthorities()); }
   catch (e:any) { res.status(500).json({ error:'Failed to load authorities', detail:e.message }); }
