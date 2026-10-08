@@ -58,7 +58,7 @@ The legacy `/approval` API remains mounted temporarily for compatibility, but ne
 
 ## Insurance control principles
 
-The design follows a maker-checker model: the requester cannot approve their own request, approval is bounded by authority, and the system retains the workflow version and decision history used for the outcome. Authority thresholds are a first-class routing control rather than a hard-coded role check. citeturn0search0turn0search13
+The design follows a maker-checker model: the requester cannot approve their own request, approval is bounded by authority, and the system retains the workflow version and decision history used for the outcome. Authority thresholds are a first-class routing control rather than a hard-coded role check.
 
 ## Deployment safety
 
