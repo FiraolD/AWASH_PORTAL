@@ -557,7 +557,13 @@ router.get('/documents/:documentId/download', async (req, res) => {
     const docResult = await pool.query(`SELECT pd.*, p."userId" as policy_owner_id FROM policy_documents pd JOIN policies p ON p.id = pd.policy_id WHERE pd.id = $1`, [documentId]);
     if (docResult.rows.length === 0) return res.status(404).json({ error: 'Document not found' });
     const document = docResult.rows[0];
-    if (document.policy_owner_id !== userId && req.user?.role !== 'MASTER_ADMIN') return res.status(403).json({ error: 'Access denied' });
+    const policyStaffRoles = [
+      'CUSTOMER_ADMIN', 'MASTER_ADMIN', 'UNDERWRITING_ADMIN',
+      'SUPERVISOR_UNDERWRITING', 'MANAGER_UNDERWRITING', 'HEAD_UNDERWRITING'
+    ];
+    if (document.policy_owner_id !== userId && !policyStaffRoles.includes(req.user?.role || '')) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
     if (!fs.existsSync(document.file_url)) return res.status(404).json({ error: 'Document file not found' });
     const ext = path.extname(document.file_url).toLowerCase();
     if (!['.pdf', '.xls', '.xlsx'].includes(ext)) return res.status(403).json({ error: 'Only PDF and Excel files can be downloaded.' });
@@ -569,6 +575,24 @@ router.get('/documents/:documentId/download', async (req, res) => {
 router.get('/:policyId/documents', async (req, res) => {
   try {
     const { policyId } = req.params;
+    const userId = req.user?.id;
+    const staffRoles = [
+      'CUSTOMER_ADMIN', 'MASTER_ADMIN', 'UNDERWRITING_ADMIN',
+      'SUPERVISOR_UNDERWRITING', 'MANAGER_UNDERWRITING', 'HEAD_UNDERWRITING'
+    ];
+    const isStaff = staffRoles.includes(req.user?.role || '');
+
+    const policyResult = await pool.query(
+      'SELECT "userId" FROM policies WHERE id = $1',
+      [policyId]
+    );
+    if (policyResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Policy not found' });
+    }
+    if (!isStaff && policyResult.rows[0].userId !== userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
     const result = await pool.query(`SELECT * FROM policy_documents WHERE policy_id = $1`, [policyId]);
     res.json(result.rows);
   } catch (error: any) { res.status(500).json({ error: 'Failed to fetch documents', detail: error.message }); }
