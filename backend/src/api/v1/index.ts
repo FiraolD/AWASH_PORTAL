@@ -28,6 +28,7 @@ import paymentsRoutes from './payment.routes.js';
 
 // Approval / Workflow
 import approvalRoutes from './approval.routes.js';
+import workflowRoutes from './workflow.routes.js';
 
 // Underwriting
 import underwritingRoutes from './underwriting.routes.js';
@@ -98,7 +99,8 @@ router.use('/payments', paymentsRoutes);
 // ============================================================================
 // APPROVAL / WORKFLOW
 // ============================================================================
-router.use('/approval', approvalRoutes);
+router.use('/approval', approvalRoutes); // legacy compatibility; new work uses /workflow
+router.use('/workflow', workflowRoutes);
 
 // ============================================================================
 // UNDERWRITING
