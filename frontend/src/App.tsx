@@ -11,6 +11,7 @@ import BuyNewPolicyPage from './pages/Customer/BuyNewPolicyPage';
 import ClaimsPage from './pages/Customer/ClaimsPage';
 import NewClaimPage from './pages/Claims/NewClaimPage';
 import FinalApprovalQueue from './pages/Underwriting/FinalApprovalQueue';
+import ApprovalWorkbenchPage from './pages/Approvals/ApprovalWorkbenchPage';
 
 
 
@@ -36,7 +37,7 @@ const RatesManagementPage = React.lazy(() => import('./pages/Admin/PremiumRateCo
 const ProductManagementPage = React.lazy(() => import('./pages/Admin/ProductManagementPage'));
 //const WorkflowConfigPage = React.lazy(() => import('./pages/Admin/WorkflowConfigPage'));
 const AuditLogsPage = React.lazy(() => import('./pages/Admin/AuditLogsPage'));
-const ApprovalRulesConfigPage = React.lazy(() => import('./pages/Admin/ApprovalRulesConfigPage'));
+const WorkflowControlCenterPage = React.lazy(() => import('./pages/Admin/WorkflowControlCenterPage'));
 
 // ============================================
 // CUSTOMER ADMIN PAGES
@@ -226,6 +227,15 @@ export default function App() {
             />
           </Route>
 
+          <Route
+            path="approvals/workbench"
+            element={
+              <RoleGuard allowedRoles={[UserRole.MASTER_ADMIN, UserRole.MANAGER_UNDERWRITING, UserRole.HEAD_UNDERWRITING, UserRole.MANAGER_CLAIMS, UserRole.HEAD_CLAIMS, UserRole.SUPERVISOR_CLAIMS, UserRole.SENIOR_CLAIM_OFFICER, UserRole.SUPERVISOR_UNDERWRITING]}>
+                <ApprovalWorkbenchPage />
+              </RoleGuard>
+            }
+          />
+
           {/* ==================== MASTER ADMIN ==================== */}
           <Route path="admin">
             <Route
@@ -260,19 +270,11 @@ export default function App() {
                 </RoleGuard>
               }
             />
-            {/*<Route
-              path="workflow"
-              element={
-                <RoleGuard allowedRoles={[UserRole.MASTER_ADMIN]}>
-                  <WorkflowConfigPage />
-                </RoleGuard>
-              }
-            />*/}
             <Route
-              path="approval-rules"
+              path="workflows"
               element={
                 <RoleGuard allowedRoles={[UserRole.MASTER_ADMIN]}>
-                  <ApprovalRulesConfigPage />
+                  <WorkflowControlCenterPage />
                 </RoleGuard>
               }
             />
