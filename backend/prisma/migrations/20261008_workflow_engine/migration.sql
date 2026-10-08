@@ -135,3 +135,11 @@ CREATE INDEX IF NOT EXISTS idx_workflow_tasks_queue ON workflow_tasks(status, au
 CREATE INDEX IF NOT EXISTS idx_workflow_tasks_instance ON workflow_tasks(workflow_instance_id);
 CREATE INDEX IF NOT EXISTS idx_workflow_decisions_instance ON workflow_decisions(workflow_instance_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_workflow_history_instance ON workflow_history(workflow_instance_id, created_at);
+
+-- Initial workflow catalog. Versions remain DRAFT until an administrator configures and activates them.
+INSERT INTO workflow_definitions(code,name,description,entity_type)
+VALUES
+ ('POLICY_UNDERWRITING','Policy Underwriting Approval','Governed approval for policy underwriting and final issuance.','POLICY'),
+ ('CLAIM_SETTLEMENT','Claim Settlement Approval','Governed approval for claim settlement decisions.','CLAIM'),
+ ('ENDORSEMENT_SERVICING','Endorsement Servicing Approval','Governed approval for policy endorsement changes.','ENDORSEMENT')
+ON CONFLICT (code) DO NOTHING;
