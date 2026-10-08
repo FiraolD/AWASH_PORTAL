@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import pool from '../../lib/db.js';
-import { authenticate } from '../middleware/auth.middleware.js';
+import { authenticate } from '../../middleware/auth.middleware.js';
 import { generatePolicyNumber } from '../../lib/numbering.js';
 import { generatePolicySchedule } from '../../services/PDFGenerator.service.js';
 import fs from 'fs';

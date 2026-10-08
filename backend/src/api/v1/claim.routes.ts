@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import pool from '../../lib/db.js';
-import { authenticate, authorize, AuthRequest } from '../middleware/auth.middleware.js';
+import { authenticate, authorize, AuthRequest } from '../../middleware/auth.middleware.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';

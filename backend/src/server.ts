@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 import apiV1Routes from './api/v1/index.js';
 import pool from './lib/db.js';
 import { getAllowedOrigins, getJwtSecret, isOriginAllowed } from './lib/security.js';
+import { csrfOriginGuard } from './middleware/csrf-origin.middleware.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -69,6 +70,9 @@ app.use(express.json({
 }));
 
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
+// Protect cookie-authenticated state-changing requests against CSRF.
+app.use(csrfOriginGuard);
 
 // Serve static files
 app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {

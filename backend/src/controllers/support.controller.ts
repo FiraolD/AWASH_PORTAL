@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import pool from '../lib/db.js';
-import { AuthRequest } from '../api/middleware/auth.middleware.js';
+import { AuthRequest } from '../middleware/auth.middleware.js';
 import { generateTicketNumber } from '../lib/numbering.js';
 import { EmailService, sendVerificationEmail } from '../services/email.service.js';
 

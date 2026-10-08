@@ -1,6 +1,6 @@
 ﻿import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import axiosInstance from '../lib/axios';
+import { apiClient as axiosInstance } from '../api/client';
 
 interface User {
   id: string;
@@ -80,8 +80,8 @@ export const useAuthStore = create<AuthState>()(
   },
 
   logout: () => {
+    void axiosInstance.post('/auth/logout').catch(() => undefined);
     set({ user: null, token: null, isAuthenticated: false, isLoading: false });
-
   },
 
   fetchUser: async () => {
@@ -98,6 +98,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'awash-auth-storage',
+      partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated }),
     }
   )
 );

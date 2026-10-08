@@ -6,20 +6,7 @@ export const apiClient = axios.create({
   baseURL: API_URL,
   headers: { 'Content-Type': 'application/json' },
   timeout: 30000,
-});
-
-apiClient.interceptors.request.use((config) => {
-  const stored = localStorage.getItem('awash-auth-storage');
-  if (stored) {
-    try {
-      const parsed = JSON.parse(stored);
-      const token = parsed.state?.token;
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-    } catch (e) {}
-  }
-  return config;
+  withCredentials: true,
 });
 
 apiClient.interceptors.response.use(

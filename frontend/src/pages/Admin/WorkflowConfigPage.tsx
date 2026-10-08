@@ -153,7 +153,7 @@ export default function WorkflowConfigPage() {
       const parsed = JSON.parse(stored);
       authToken = parsed.state?.token;
     }
-    return { Authorization: `Bearer ${authToken}` };
+    return authToken ? { Authorization: `Bearer ${authToken}` } : {};
   };
 
   const fetchAllData = async () => {

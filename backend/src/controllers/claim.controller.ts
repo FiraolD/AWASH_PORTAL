@@ -1,7 +1,7 @@
 // backend/src/controllers/claim.controller.ts
 import { Response } from 'express';
 import pool from '../lib/db.js';
-import { AuthRequest } from '../api/middleware/auth.middleware.js';
+import { AuthRequest } from '../middleware/auth.middleware.js';
 import { generateClaimNumber } from '../lib/numbering.js';
 import { EmailService, sendVerificationEmail } from '../services/email.service.js';
 import { findMatchingRule, assignClaimToOfficer } from '../services/claimAssignment.service.js';

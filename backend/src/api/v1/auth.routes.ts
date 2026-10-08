@@ -2,15 +2,16 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import pool from '../../lib/db.js';
-import { generateToken, authenticate } from '../../middleware/auth.middleware.js';
-import { sendVerificationEmail } from '../../services/email.service.js';
+import { generateToken, authenticate, setAuthCookie, clearAuthCookie } from '../../../middleware/auth.middleware.js';
+import { authRateLimit } from '../../middleware/auth-rate-limit.middleware.js';
+import { sendVerificationEmail, sendPasswordResetEmail } from '../../services/email.service.js';
 
 const router = Router();
 
 // ---------------------------------------------------------------------------
 // SIGNUP – Create customer account
 // ---------------------------------------------------------------------------
-router.post('/signup', async (req, res: Response) => {
+router.post('/signup', authRateLimit, async (req, res: Response) => {
   try {
     const { firstName, lastName, email, phone, password, address } = req.body;
 
@@ -167,7 +168,7 @@ router.get('/verify-email', async (req, res: Response) => {
 // ---------------------------------------------------------------------------
 // RESEND VERIFICATION EMAIL
 // ---------------------------------------------------------------------------
-router.post('/resend-verification', async (req, res: Response) => {
+router.post('/resend-verification', authRateLimit, async (req, res: Response) => {
   try {
     const { email } = req.body;
 
@@ -213,7 +214,7 @@ router.post('/resend-verification', async (req, res: Response) => {
 // ---------------------------------------------------------------------------
 // LOGIN
 // ---------------------------------------------------------------------------
-router.post('/login', async (req, res: Response) => {
+router.post('/login', authRateLimit, async (req, res: Response) => {
   try {
     const { email, password } = req.body;
 
@@ -251,6 +252,8 @@ router.post('/login', async (req, res: Response) => {
       role: user.role,
     });
 
+    setAuthCookie(res, token);
+
     res.json({
       message: 'Login successful',
       user: {
@@ -265,6 +268,122 @@ router.post('/login', async (req, res: Response) => {
   } catch (error: any) {
     console.error('[Auth] Login error:', error.message);
     res.status(500).json({ error: 'Failed to log in' });
+  }
+});
+
+
+// ---------------------------------------------------------------------------
+// LOGOUT – Clear the HttpOnly authentication session
+// ---------------------------------------------------------------------------
+router.post('/logout', (_req, res: Response) => {
+  clearAuthCookie(res);
+  res.status(204).send();
+});
+
+// ---------------------------------------------------------------------------
+// FORGOT PASSWORD – Issue a short-lived reset token
+// ---------------------------------------------------------------------------
+router.post('/forgot-password', authRateLimit, async (req, res: Response) => {
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    if (!email) return res.status(400).json({ error: 'Email is required' });
+
+    const result = await pool.query(
+      `SELECT id, email, "firstName" FROM users WHERE email = $1 AND status = 'ACTIVE'`,
+      [email]
+    );
+
+    // Always return the same response to avoid account enumeration.
+    if (result.rows.length === 0) {
+      return res.json({ message: 'If an eligible account exists, a reset link has been sent.' });
+    }
+
+    const user = result.rows[0];
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+    const resetTokenExpiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+    await pool.query(
+      `UPDATE users
+       SET "resetToken" = $1, "resetTokenExpiresAt" = $2, "updatedAt" = NOW()
+       WHERE id = $3`,
+      [resetTokenHash, resetTokenExpiresAt, user.id]
+    );
+
+    try {
+      await sendPasswordResetEmail(user.email, resetToken);
+    } catch (emailError) {
+      console.error('[Auth] Password reset email failed:', emailError);
+    }
+
+    res.json({ message: 'If an eligible account exists, a reset link has been sent.' });
+  } catch (error: any) {
+    console.error('[Auth] Forgot password error:', error.message);
+    res.status(500).json({ error: 'Unable to process password reset request' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// VERIFY RESET TOKEN
+// ---------------------------------------------------------------------------
+router.post('/verify-reset-token', authRateLimit, async (req, res: Response) => {
+  try {
+    const token = String(req.body?.token || '');
+    if (!token) return res.status(400).json({ error: 'Reset token is required' });
+
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const result = await pool.query(
+      `SELECT id FROM users
+       WHERE "resetToken" = $1 AND "resetTokenExpiresAt" > NOW()`,
+      [tokenHash]
+    );
+
+    if (result.rows.length === 0) return res.status(400).json({ error: 'Invalid or expired reset token' });
+    res.json({ valid: true });
+  } catch (error: any) {
+    console.error('[Auth] Reset token verification error:', error.message);
+    res.status(500).json({ error: 'Unable to verify reset token' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// RESET PASSWORD
+// ---------------------------------------------------------------------------
+router.post('/reset-password', authRateLimit, async (req, res: Response) => {
+  try {
+    const token = String(req.body?.token || '');
+    const password = String(req.body?.password || '');
+
+    if (!token || !password) return res.status(400).json({ error: 'Reset token and password are required' });
+    if (password.length < 8 || !/[A-Z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+      return res.status(400).json({
+        error: 'Password must be at least 8 characters and contain uppercase, number, and special character',
+      });
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    // Consume the reset token atomically so concurrent requests cannot reuse it.
+    const resetResult = await pool.query(
+      `UPDATE users
+       SET "passwordHash" = $1, "resetToken" = NULL, "resetTokenExpiresAt" = NULL,
+           "updatedAt" = NOW()
+       WHERE "resetToken" = $2
+         AND "resetTokenExpiresAt" > NOW()
+         AND status = 'ACTIVE'
+       RETURNING id`,
+      [passwordHash, tokenHash]
+    );
+
+    if (resetResult.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid or expired reset token' });
+    }
+
+    res.json({ message: 'Password reset successfully' });
+  } catch (error: any) {
+    console.error('[Auth] Reset password error:', error.message);
+    res.status(500).json({ error: 'Unable to reset password' });
   }
 });
 

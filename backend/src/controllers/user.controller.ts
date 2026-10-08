@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import bcrypt from 'bcryptjs';
 import pool from '../lib/db.js';
-import { AuthRequest } from '../api/middleware/auth.middleware.js';
+import { AuthRequest } from '../middleware/auth.middleware.js';
 
 export const UserController = {
   // Get all users

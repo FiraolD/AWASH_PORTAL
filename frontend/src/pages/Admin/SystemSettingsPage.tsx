@@ -91,7 +91,7 @@ export default function SystemSettingsPage() {
         authToken = parsed.state?.token;
       } catch (e) {}
     }
-    return { Authorization: `Bearer ${authToken}` };
+    return authToken ? { Authorization: `Bearer ${authToken}` } : {};
   };
 
   useEffect(() => {

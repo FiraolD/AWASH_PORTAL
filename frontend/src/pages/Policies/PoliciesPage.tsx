@@ -40,7 +40,7 @@ export default function PoliciesPage() {
       const parsed = JSON.parse(stored);
       authToken = parsed.state?.token;
     }
-    return { Authorization: `Bearer ${authToken}` };
+    return authToken ? { Authorization: `Bearer ${authToken}` } : {};
   };
 
   const filteredPolicies = policies.filter((p) => {
