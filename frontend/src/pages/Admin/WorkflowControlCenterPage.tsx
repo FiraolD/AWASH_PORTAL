@@ -1,0 +1,46 @@
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Plus, Save, PlayCircle, ShieldCheck, Workflow } from 'lucide-react';
+import { toast } from 'sonner';
+import { apiClient } from '../../api/client';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
+import { Label } from '../../components/ui/Label';
+import { Badge } from '../../components/ui/Badge';
+import { LoadingSpinner } from '../../components/common/LoadingSpinner';
+
+type Definition = { id:string; code:string; name:string; description?:string; entity_type:string; latest_version:number; versions?: any[] };
+type Step = { stepKey:string; name:string; department:string; authorityLevelCode:string; approvalMode:'ANY'|'ALL'|'QUORUM'; requiredApprovals:number; maxAmount:string; slaHours:string; conditionsText:string };
+
+const emptyStep=():Step=>({stepKey:'STEP_1',name:'Approval step',department:'UNDERWRITING',authorityLevelCode:'',approvalMode:'ANY',requiredApprovals:1,maxAmount:'',slaHours:'24',conditionsText:'{}'});
+
+export default function WorkflowControlCenterPage(){
+  const qc=useQueryClient();
+  const [selected,setSelected]=useState<Definition|null>(null);
+  const [steps,setSteps]=useState<Step[]>([emptyStep()]);
+  const [newDef,setNewDef]=useState({code:'',name:'',entityType:'POLICY',description:''});
+  const defs=useQuery<Definition[]>({queryKey:['workflow-definitions'],queryFn:async()=> (await apiClient.get('/workflow/definitions')).data});
+  const detail=useQuery({queryKey:['workflow-definition',selected?.id],enabled:!!selected?.id,queryFn:async()=> (await apiClient.get(`/workflow/definitions/${selected!.id}`)).data});
+  const authorities=useQuery<any[]>({queryKey:['workflow-authorities'],queryFn:async()=> (await apiClient.get('/workflow/authorities')).data});
+  const create=useMutation({mutationFn:async()=> (await apiClient.post('/workflow/definitions',newDef)).data,onSuccess:(d)=>{toast.success('Workflow definition created');setNewDef({code:'',name:'',entityType:'POLICY',description:''});qc.invalidateQueries({queryKey:['workflow-definitions']});setSelected(d)}}});
+  const save=useMutation({mutationFn:async()=> (await apiClient.put(`/workflow/versions/${detail.data.versions[0].id}/steps`,{steps:steps.map((s,i)=>({...s,stepKey:s.stepKey||`STEP_${i+1}`,requiredApprovals:Number(s.requiredApprovals)||1,maxAmount:s.maxAmount?Number(s.maxAmount):null,slaHours:s.slaHours?Number(s.slaHours):null,conditions:s.conditionsText?JSON.parse(s.conditionsText):{}}))})).data,onSuccess:()=>{toast.success('Workflow steps saved');qc.invalidateQueries({queryKey:['workflow-definition',selected?.id]})},onError:(e:any)=>toast.error(e?.response?.data?.error||'Invalid workflow configuration')});
+  const activate=useMutation({mutationFn:async()=> (await apiClient.post(`/workflow/versions/${detail.data.versions[0].id}/activate`)).data,onSuccess:()=>{toast.success('Workflow version activated');qc.invalidateQueries({queryKey:['workflow-definition',selected?.id]);qc.invalidateQueries({queryKey:['workflow-definitions']})}});
+  useMemo(()=>{ if(detail.data?.versions?.[0]?.steps?.length) setSteps(detail.data.versions[0].steps.map((s:any)=>({stepKey:s.step_key,name:s.name,department:s.department||'',authorityLevelCode:s.authority_level_code||'',approvalMode:s.approval_mode||'ANY',requiredApprovals:s.required_approvals||1,maxAmount:s.max_amount||'',slaHours:s.sla_hours||'',conditionsText:JSON.stringify(s.conditions||{},null,2)}))); },[detail.data]);
+  if(defs.isLoading) return <LoadingSpinner/>;
+  return <div className="space-y-6 p-6">
+    <div><h1 className="text-2xl font-bold">Workflow Control Center</h1><p className="text-sm text-slate-500">Configure authority-driven, versioned approval workflows. Assignment remains separate from approval authority.</p></div>
+    <div className="grid gap-6 lg:grid-cols-3">
+      <Card className="lg:col-span-1"><CardHeader><CardTitle className="flex items-center gap-2"><Workflow className="h-5 w-5"/>Workflow Definitions</CardTitle></CardHeader><CardContent className="space-y-3">
+        {(defs.data||[]).map(d=><button key={d.id} onClick={()=>setSelected(d)} className={`w-full rounded-lg border p-3 text-left ${selected?.id===d.id?'border-slate-900 bg-slate-50':''}`}><div className="font-semibold">{d.name}</div><div className="text-xs text-slate-500">{d.code} · {d.entity_type}</div><div className="mt-1 text-xs">Latest v{d.latest_version}</div></button>)}
+        <div className="border-t pt-4 space-y-3"><Label>New workflow</Label><Input placeholder="Code e.g. POLICY_UNDERWRITING" value={newDef.code} onChange={e=>setNewDef({...newDef,code:e.target.value.toUpperCase()})}/><Input placeholder="Name" value={newDef.name} onChange={e=>setNewDef({...newDef,name:e.target.value})}/><select className="w-full rounded-md border p-2" value={newDef.entityType} onChange={e=>setNewDef({...newDef,entityType:e.target.value})}><option>POLICY</option><option>CLAIM</option><option>ENDORSEMENT</option><option>CANCELLATION</option></select><Input placeholder="Description" value={newDef.description} onChange={e=>setNewDef({...newDef,description:e.target.value})}/><Button disabled={create.isPending||!newDef.code||!newDef.name} onClick={()=>create.mutate()}><Plus className="mr-2 h-4 w-4"/>Create workflow</Button></div>
+      </CardContent></Card>
+      <Card className="lg:col-span-2"><CardHeader><CardTitle>{selected?.name||'Select a workflow'}</CardTitle><CardDescription>Draft versions are editable; active versions are immutable for auditability.</CardDescription></CardHeader><CardContent>{selected&&detail.data?<div className="space-y-4">
+        <div className="flex flex-wrap gap-2"><Badge>{detail.data.entity_type}</Badge>{detail.data.versions?.map((v:any)=><Badge key={v.id}>{`v${v.version_no} ${v.status}`}</Badge>)}</div>
+        {steps.map((s,i)=><div key={i} className="rounded-xl border p-4 space-y-3"><div className="flex items-center justify-between"><b>Step {i+1}</b>{steps.length>1&&<Button variant="outline" onClick={()=>setSteps(steps.filter((_,j)=>j!==i))}>Remove</Button>}</div><div className="grid gap-3 md:grid-cols-2"><Input placeholder="Step key" value={s.stepKey} onChange={e=>{const x=[...steps];x[i]={...s,stepKey:e.target.value};setSteps(x)}}/><Input placeholder="Name" value={s.name} onChange={e=>{const x=[...steps];x[i]={...s,name:e.target.value};setSteps(x)}}/><Input placeholder="Department" value={s.department} onChange={e=>{const x=[...steps];x[i]={...s,department:e.target.value};setSteps(x)}}/><Input placeholder="Authority level code" value={s.authorityLevelCode} onChange={e=>{const x=[...steps];x[i]={...s,authorityLevelCode:e.target.value};setSteps(x)}}/><Input type="number" placeholder="Max amount" value={s.maxAmount} onChange={e=>{const x=[...steps];x[i]={...s,maxAmount:e.target.value};setSteps(x)}}/><Input type="number" placeholder="SLA hours" value={s.slaHours} onChange={e=>{const x=[...steps];x[i]={...s,slaHours:e.target.value};setSteps(x)}}/></div><div className="grid gap-3 md:grid-cols-2"><select className="rounded-md border p-2" value={s.approvalMode} onChange={e=>{const x=[...steps];x[i]={...s,approvalMode:e.target.value as Step['approvalMode']};setSteps(x)}}><option>ANY</option><option>ALL</option><option>QUORUM</option></select><Input type="number" min="1" placeholder="Required approvals" value={s.requiredApprovals} onChange={e=>{const x=[...steps];x[i]={...s,requiredApprovals:Number(e.target.value)||1};setSteps(x)}}/></div><textarea className="min-h-20 w-full rounded-md border p-2 font-mono text-xs" value={s.conditionsText} onChange={e=>{const x=[...steps];x[i]={...s,conditionsText:e.target.value};setSteps(x)}}/></div>)}
+        <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={()=>setSteps([...steps,emptyStep()])}><Plus className="mr-2 h-4 w-4"/>Add step</Button><Button disabled={save.isPending} onClick={()=>save.mutate()}><Save className="mr-2 h-4 w-4"/>Save draft</Button><Button disabled={activate.isPending} onClick={()=>activate.mutate()}><PlayCircle className="mr-2 h-4 w-4"/>Activate version</Button></div>
+      </div>:<div className="p-10 text-center text-slate-500">Choose a workflow definition.</div>}</CardContent></Card>
+    </div>
+    <Card><CardHeader><CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5"/>Approval Authority Matrix</CardTitle></CardHeader><CardContent><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b text-left"><th className="p-2">Role level</th><th className="p-2">Department</th><th className="p-2">Entity</th><th className="p-2">Product</th><th className="p-2">Max amount</th></tr></thead><tbody>{(authorities.data||[]).map((a:any)=><tr key={a.id} className="border-b"><td className="p-2">{a.level_name}</td><td className="p-2">{a.department}</td><td className="p-2">{a.entity_type}</td><td className="p-2">{a.product_code||'ALL'}</td><td className="p-2">{a.max_amount??'Unlimited'}</td></tr>)}</tbody></table></div></CardContent></Card>
+  </div>;
+}
