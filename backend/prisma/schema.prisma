@@ -19,6 +19,9 @@ model ApprovalHistory {
   approvedAt DateTime?
   createdAt DateTime?
 
+  @@index([approvedBy], name: "idx_approval_history_approver")
+  @@index([decision], name: "idx_approval_history_decision")
+  @@index([requestId], name: "idx_approval_history_request")
   @@map("approval_history")
 }
 
@@ -38,6 +41,9 @@ model ApprovalRequest {
 
   @@unique([requestNumber])
 
+  @@index([entityType, entityId], name: "idx_approval_requests_entity")
+  @@index([requestedBy], name: "idx_approval_requests_requester")
+  @@index([status], name: "idx_approval_requests_status")
   @@map("approval_requests")
 }
 
@@ -55,6 +61,9 @@ model ApprovalRule {
   createdAt DateTime?
   updatedAt DateTime?
 
+  @@index([isActive], name: "idx_approval_rules_active")
+  @@index([createdBy], name: "idx_approval_rules_creator")
+  @@index([productType], name: "idx_approval_rules_product")
   @@map("approval_rules")
 }
 
@@ -84,6 +93,7 @@ model ClaimDocument {
   uploadedAt DateTime?
   createdAt DateTime?
 
+  @@index([claimId], name: "idx_claim_documents_claim")
   @@map("claim_documents")
 }
 
@@ -95,6 +105,8 @@ model ClaimTimeline {
   changedBy String?
   createdAt DateTime?
 
+  @@index([claimId], name: "idx_claim_timeline_claim")
+  @@index([status], name: "idx_claim_timeline_status")
   @@map("claim_timeline")
 }
 
@@ -139,6 +151,10 @@ model Claim {
 
   @@unique([claimNumber])
 
+  @@index([claimNumber], name: "idx_claims_number")
+  @@index([policyId], name: "idx_claims_policy")
+  @@index([status], name: "idx_claims_status")
+  @@index([userId], name: "idx_claims_user")
   @@map("claims")
 }
 
@@ -154,6 +170,9 @@ model ClaimsAssignmentRule {
   createdAt DateTime?
   updatedAt DateTime?
 
+  @@index([isActive], name: "idx_claim_assignment_active")
+  @@index([priorityLevel], name: "idx_claim_assignment_priority")
+  @@index([productType], name: "idx_claim_assignment_product")
   @@map("claims_assignment_rules")
 }
 
@@ -584,6 +603,9 @@ model RoleLevel {
 
   @@unique([levelCode])
 
+  @@index([isActive], name: "idx_role_levels_active")
+  @@index([levelCode], name: "idx_role_levels_code")
+  @@index([levelOrder], name: "idx_role_levels_order")
   @@map("role_levels")
 }
 
@@ -650,6 +672,7 @@ model User {
 
   @@unique([email])
 
+  @@index([email], name: "idx_users_email")
   @@map("users")
 }
 
