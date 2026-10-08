@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import pool from '../../lib/db.js';
+import { workflowService } from '../../services/workflow.service.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
 import { hasAnyRole, canAccessOwnedResource } from '../../middleware/authorization.policy.js';
 import { generatePolicyNumber } from '../../lib/numbering.js';
@@ -520,13 +521,29 @@ router.post('/:id/respond', async (req, res) => {
     history.push({ timestamp: new Date(), action: `CUSTOMER_${decision}`, notes, customer: userId, acceptedPremium: finalBasePremium, acceptedTotalPremium: finalTotalPremium });
     
     const newStatus = decision === 'ACCEPT' ? 'PENDING_FINAL_APPROVAL' : 'REJECTED_BY_CUSTOMER';
+
+    let workflowInstance: any = null;
+    if (decision === 'ACCEPT') {
+      workflowInstance = await workflowService.startInstance({
+        entityType: 'POLICY',
+        entityId: policyId,
+        requestedBy: policy.underwriterId || userId,
+        context: {
+          referenceNumber: policy.policyNumber,
+          amount: Number(finalTotalPremium || 0),
+          riskScore: policy.riskScore ?? null,
+          productCode: policy.type,
+          operationalOwnerId: policy.underwriterId || null,
+        },
+      });
+    }
     
     await pool.query(`
       UPDATE policies SET "customerDecision"=$1, "customerDecisionDate"=NOW(), "customerDecisionNotes"=$2, status=$3, premium=$4, "totalPremium"=$5, "negotiationHistory"=$6, "updatedAt"=NOW()
       WHERE id=$7
     `, [decision, notes || null, newStatus, finalBasePremium, finalTotalPremium, JSON.stringify(history), policyId]);
     
-    res.json({ message: decision === 'ACCEPT' ? 'Offer accepted, pending final approval' : 'Offer rejected', status: newStatus });
+    res.json({ message: decision === 'ACCEPT' ? 'Offer accepted and routed to the Approval Workbench' : 'Offer rejected', status: newStatus, workflowInstanceId: workflowInstance?.id ?? null });
   } catch (error) {
     console.error('Failed to process decision:', error);
     res.status(500).json({ error: 'Failed to process decision' });
