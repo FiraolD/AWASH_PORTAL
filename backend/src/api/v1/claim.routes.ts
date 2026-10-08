@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import pool from '../../lib/db.js';
 import { authenticate, authorize, AuthRequest } from '../../middleware/auth.middleware.js';
+import { canAccessOwnedResource } from '../../middleware/authorization.policy.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -659,7 +660,7 @@ router.post('/:id/documents', authenticate, upload.array('documents', 10), async
 
     const claimOwnerId = claimResult.rows[0].userId;
     const isStaff = ALL_CLAIMS_ACCESS.includes(req.user?.role);
-    if (!isStaff && claimOwnerId !== userId) {
+    if (!canAccessOwnedResource(req.user, claimOwnerId, ALL_CLAIMS_ACCESS)) {
       return res.status(403).json({ error: 'Access denied' });
     }
     
@@ -699,7 +700,7 @@ router.get('/:id/documents', authenticate, async (req: any, res: any) => {
     
     const claim = claimResult.rows[0];
     const isAdmin = CLAIM_ROLES.includes(userRole) || userRole === 'MASTER_ADMIN';
-    if (!isAdmin && claim.userId !== userId) return res.status(403).json({ error: 'Access denied' });
+    if (!canAccessOwnedResource(req.user, claim.userId, [...CLAIM_ROLES, 'MASTER_ADMIN'])) return res.status(403).json({ error: 'Access denied' });
     
     const result = await pool.query(
       `SELECT id, "documentName", "documentUrl", "documentType", "fileSize", "uploadedAt", "createdAt"
