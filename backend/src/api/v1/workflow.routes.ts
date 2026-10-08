@@ -25,6 +25,11 @@ router.post('/definitions', ...requireWorkflowAdmin, async (req: AuthRequest,res
   } catch (e:any) { res.status(400).json({ error:e.message }); }
 });
 
+router.post('/definitions/:id/versions', ...requireWorkflowAdmin, async (req: AuthRequest,res:Response) => {
+  try { res.status(201).json(await workflowService.createVersion(req.params.id, req.user!.id)); }
+  catch (e:any) { res.status(400).json({ error:e.message }); }
+});
+
 router.put('/versions/:id/steps', ...requireWorkflowAdmin, async (req: AuthRequest,res:Response) => {
   try {
     if (!Array.isArray(req.body.steps)) return res.status(400).json({ error:'steps must be an array' });
