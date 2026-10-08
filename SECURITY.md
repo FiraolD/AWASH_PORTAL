@@ -27,6 +27,18 @@ Use `.env` files locally and configure secrets through the deployment platform i
 
 If a secret is ever committed, rotate it immediately. Removing the file from Git history does not make a leaked credential safe.
 
+## Object-Level Authorization
+
+Sensitive resources are protected at the object level, not only by authentication:
+
+- Customers may access only their own claims, policies, policy documents, payment references, and profile data.
+- Claim document upload/download operations verify that the authenticated user owns the claim or has an authorized claims-staff role.
+- Policy document enumeration verifies policy ownership or an explicitly authorized staff role.
+- Generic user lookup is restricted to the requesting user or authorized customer-management administrators.
+- Sensitive claim/policy/payment files are not exposed through the public `/uploads` static directory; only profile avatars are publicly served.
+
+When adding an endpoint that accepts an object identifier such as `claimId`, `policyId`, `documentId`, or `userId`, the handler must re-query the target object with the authenticated user's authorization context before returning or mutating it.
+
 ## Reporting a Vulnerability
 Do not disclose exploitable vulnerabilities in public issues. Contact the repository owner privately with:
 
