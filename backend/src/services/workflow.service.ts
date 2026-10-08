@@ -228,6 +228,7 @@ export class WorkflowService {
       const task = taskResult.rows[0];
 
       if (task.requested_by === actor.id) throw new Error('Segregation of duties: requester cannot approve their own request');
+      if (task.context?.operationalOwnerId && task.context.operationalOwnerId === actor.id) throw new Error('Segregation of duties: operational owner cannot approve the same transaction');
 
       const role = await client.query('SELECT role FROM users WHERE id=$1 AND status=\'ACTIVE\' AND is_active=true', [actor.id]);
       if (!role.rows.length || (task.authority_level_code && role.rows[0].role !== task.authority_level_code)) {
@@ -257,7 +258,9 @@ export class WorkflowService {
       `, [actor.id, decision, decision, comment, task.id]);
 
       if (decision !== 'APPROVED') {
-        await client.query('UPDATE workflow_instances SET status=$2, completed_at=NOW(), updated_at=NOW() WHERE id=$1', [task.workflow_instance_id, decision === 'REJECTED' ? 'REJECTED' : 'REQUIRES_MODIFICATION']);
+        const outcome = decision === 'REJECTED' ? 'REJECTED' : 'REQUIRES_MODIFICATION';
+        await client.query('UPDATE workflow_instances SET status=$2, completed_at=NOW(), updated_at=NOW() WHERE id=$1', [task.workflow_instance_id, outcome]);
+        await this.applyEntityOutcome(client, task.entity_type, task.entity_id, outcome, actor.id, task.context);
         await client.query(`
           INSERT INTO workflow_history(workflow_instance_id,event_type,actor_user_id,step_order,from_status,to_status,details)
           VALUES($1,'DECISION_RECORDED',$2,$3,'PENDING',$4,$5)
@@ -286,6 +289,7 @@ export class WorkflowService {
 
       if (!next.rows.length) {
         await client.query('UPDATE workflow_instances SET status=\'APPROVED\', completed_at=NOW(), updated_at=NOW() WHERE id=$1', [task.workflow_instance_id]);
+        await this.applyEntityOutcome(client, task.entity_type, task.entity_id, 'APPROVED', actor.id, task.context);
         await client.query(`
           INSERT INTO workflow_history(workflow_instance_id,event_type,actor_user_id,step_order,from_status,to_status,details)
           VALUES($1,'WORKFLOW_COMPLETED',$2,$3,'IN_PROGRESS','APPROVED',$4)
@@ -304,6 +308,28 @@ export class WorkflowService {
     } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
   }
 
+
+
+  private async applyEntityOutcome(client: any, entityType: string, entityId: string, outcome: string, actorId: string, context: any) {
+    if (entityType === 'CLAIM') {
+      const status = outcome === 'APPROVED' ? 'APPROVED' : outcome;
+      await client.query(`
+        UPDATE claims SET status=$1, "approvedBy"=CASE WHEN $1='APPROVED' THEN $2 ELSE "approvedBy" END,
+          "approvedAmount"=CASE WHEN $1='APPROVED' AND $3 IS NOT NULL THEN $3 ELSE "approvedAmount" END,
+          "approvedAt"=CASE WHEN $1='APPROVED' THEN NOW() ELSE "approvedAt" END, "updatedAt"=NOW()
+        WHERE id=$4
+      `, [status, actorId, context?.approvedAmount ?? context?.amount ?? null, entityId]);
+      return;
+    }
+    if (entityType === 'POLICY') {
+      const status = outcome === 'APPROVED' ? 'ACTIVE' : outcome;
+      await client.query(`
+        UPDATE policies SET status=$1, "approvedBy"=CASE WHEN $1='ACTIVE' THEN $2 ELSE "approvedBy" END,
+          "approvedAt"=CASE WHEN $1='ACTIVE' THEN NOW() ELSE "approvedAt" END, "updatedAt"=NOW()
+        WHERE id=$3
+      `, [status, actorId, entityId]);
+    }
+  }
 
   private async taskCount(client: any, instanceId: string, stepId: string): Promise<number> {
     const result = await client.query(
