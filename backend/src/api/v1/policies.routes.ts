@@ -219,9 +219,20 @@ async function generatePolicyDocument(policyId: string) {
 // ==================== GET ALL POLICIES ====================
 router.get('/', async (req, res) => {
   try {
-    const result = await pool.query(`
-      SELECT * FROM policies ORDER BY "createdAt" DESC LIMIT 100
-    `);
+    const userRole = req.user?.role;
+    const userId = req.user?.id;
+    const staffRoles = [
+      'CUSTOMER_ADMIN', 'MASTER_ADMIN', 'UNDERWRITING_ADMIN',
+      'SUPERVISOR_UNDERWRITING', 'MANAGER_UNDERWRITING', 'HEAD_UNDERWRITING'
+    ];
+    const isStaff = staffRoles.includes(userRole || '');
+
+    const result = await pool.query(
+      isStaff
+        ? `SELECT * FROM policies ORDER BY "createdAt" DESC LIMIT 100`
+        : `SELECT * FROM policies WHERE "userId" = $1 ORDER BY "createdAt" DESC LIMIT 100`,
+      isStaff ? [] : [userId]
+    );
     res.json(result.rows);
   } catch (error: any) {
     console.error('[Policies] Fetch all error:', error.message);
@@ -232,6 +243,14 @@ router.get('/', async (req, res) => {
 // ==================== GET POLICY STATS ====================
 router.get('/stats', async (req, res) => {
   try {
+    const staffRoles = [
+      'CUSTOMER_ADMIN', 'MASTER_ADMIN', 'UNDERWRITING_ADMIN',
+      'SUPERVISOR_UNDERWRITING', 'MANAGER_UNDERWRITING', 'HEAD_UNDERWRITING'
+    ];
+    if (!staffRoles.includes(req.user?.role || '')) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+
     const result = await pool.query(`
       SELECT 
         COUNT(*) as total,
