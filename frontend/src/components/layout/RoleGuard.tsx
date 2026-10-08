@@ -6,14 +6,12 @@ import { UserRole, hasPermission } from '../../lib/utils/rolePermissions';
 interface RoleGuardProps {
   children: React.ReactNode;
   allowedRoles?: UserRole[];
-  allowedPermissions?: string[];
   fallbackPath?: string;
 }
 
 export function RoleGuard({ 
   children, 
   allowedRoles = [], 
-  allowedPermissions = [], 
   fallbackPath = '/dashboard' 
 }: RoleGuardProps) {
   const { user, isAuthenticated, isLoading } = useAuthStore();
@@ -40,10 +38,7 @@ export function RoleGuard({
   // Check role-based access
   const hasRoleAccess = allowedRoles.length === 0 || hasPermission(user.role, allowedRoles);
   
-  // Check permission-based access
-  const hasPermissionAccess = allowedPermissions.length === 0;
-
-  if (!hasRoleAccess || !hasPermissionAccess) {
+  if (!hasRoleAccess) {
     return <Navigate to={fallbackPath} replace />;
   }
 
