@@ -72,8 +72,8 @@ export const navigationConfig = {
     { title: 'User Management', href: '/admin/users', icon: 'Users', roles: [UserRole.MASTER_ADMIN] },
     { title: 'Product Management', href: '/admin/products', icon: 'Package', roles: [UserRole.MASTER_ADMIN] },
     { title: 'Rates Management', href: '/admin/rates', icon: 'DollarSign', roles: [UserRole.MASTER_ADMIN] },
-    { title: 'Approval Rules', href: '/admin/approval-rules', icon: 'CheckSquare', roles: [UserRole.MASTER_ADMIN] },
-    //{ title: 'Workflow Rules', href: '/admin/workflow', icon: 'GitBranch', roles: [UserRole.MASTER_ADMIN] },
+    { title: 'Workflow Control Center', href: '/admin/workflows', icon: 'GitBranch', roles: [UserRole.MASTER_ADMIN] },
+    { title: 'Approval Workbench', href: '/approvals/workbench', icon: 'CheckSquare', roles: [UserRole.MASTER_ADMIN, UserRole.MANAGER_UNDERWRITING, UserRole.HEAD_UNDERWRITING, UserRole.MANAGER_CLAIMS, UserRole.HEAD_CLAIMS, UserRole.SUPERVISOR_CLAIMS, UserRole.SENIOR_CLAIM_OFFICER, UserRole.SUPERVISOR_UNDERWRITING] },
     { title: 'Audit Logs', href: '/admin/audit-logs', icon: 'FileSearch', roles: [UserRole.MASTER_ADMIN, UserRole.CEO] },
     { title: 'System Settings', href: '/admin/settings', icon: 'Settings', roles: [UserRole.MASTER_ADMIN] },
 
