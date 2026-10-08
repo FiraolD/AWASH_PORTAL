@@ -43,10 +43,20 @@ router.get('/customers', authenticate, authorize('CUSTOMER_ADMIN', 'MASTER_ADMIN
 // Get user by ID
 router.get('/:id', authenticate, async (req, res) => {
   try {
+    const requestedUserId = String(req.params.id);
+    const currentUserId = String(req.user?.id);
+    const currentRole = req.user?.role;
+    const canViewOtherUsers = ['CUSTOMER_ADMIN', 'MASTER_ADMIN'].includes(currentRole);
+
+    // Object-level authorization: ordinary users may only retrieve their own profile.
+    if (requestedUserId !== currentUserId && !canViewOtherUsers) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
     const result = await pool.query(
       `SELECT id, email, "firstName", "lastName", role, status, phone, "avatarUrl", "createdAt"
        FROM users WHERE id = $1`,
-      [req.params.id]
+      [requestedUserId]
     );
     
     if (result.rows.length === 0) {
