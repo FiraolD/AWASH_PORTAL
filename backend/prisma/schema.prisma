@@ -687,3 +687,139 @@ model WebhookEvent {
 
   @@map("webhook_events")
 }
+
+
+// Canonical Workflow Engine — future migration only; not yet applied to production.
+model WorkflowDefinition {
+  id String @id @default(dbgenerated("gen_random_uuid()"))
+  code String @unique
+  name String
+  description String?
+  entityType String
+  isActive Boolean @default(true)
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  versions WorkflowVersion[]
+  @@map("workflow_definitions")
+}
+model WorkflowVersion {
+  id String @id @default(dbgenerated("gen_random_uuid()"))
+  workflowDefinitionId String
+  versionNo Int
+  status String @default("DRAFT")
+  effectiveFrom DateTime?
+  effectiveTo DateTime?
+  createdBy String?
+  createdAt DateTime @default(now())
+  definition WorkflowDefinition @relation(fields: [workflowDefinitionId], references: [id])
+  steps WorkflowStep[]
+  @@unique([workflowDefinitionId, versionNo])
+  @@map("workflow_versions")
+}
+model WorkflowStep {
+  id String @id @default(dbgenerated("gen_random_uuid()"))
+  workflowVersionId String
+  stepKey String
+  stepOrder Int
+  name String
+  department String?
+  authorityLevelCode String?
+  approvalMode String @default("ANY")
+  requiredApprovals Int @default(1)
+  minAmount Decimal?
+  maxAmount Decimal?
+  slaHours Int?
+  conditions Json
+  isActive Boolean @default(true)
+  version WorkflowVersion @relation(fields: [workflowVersionId], references: [id])
+  @@unique([workflowVersionId, stepKey])
+  @@unique([workflowVersionId, stepOrder])
+  @@map("workflow_steps")
+}
+model WorkflowAuthority {
+  id String @id @default(dbgenerated("gen_random_uuid()"))
+  roleLevelId String
+  entityType String
+  productCode String?
+  maxAmount Decimal?
+  canApprove Boolean @default(true)
+  canReject Boolean @default(true)
+  canModify Boolean @default(true)
+  isActive Boolean @default(true)
+  createdBy String?
+  createdAt DateTime @default(now())
+  @@unique([roleLevelId, entityType, productCode])
+  @@map("workflow_authorities")
+}
+model WorkflowInstance {
+  id String @id @default(dbgenerated("gen_random_uuid()"))
+  workflowVersionId String
+  entityType String
+  entityId String
+  requestedBy String
+  status String @default("PENDING")
+  currentStepOrder Int?
+  context Json
+  startedAt DateTime @default(now())
+  completedAt DateTime?
+  updatedAt DateTime @updatedAt
+  @@index([entityType, entityId])
+  @@index([status, entityType, currentStepOrder])
+  @@map("workflow_instances")
+}
+model WorkflowTask {
+  id String @id @default(dbgenerated("gen_random_uuid()"))
+  workflowInstanceId String
+  workflowStepId String
+  assigneeUserId String?
+  authorityLevelCode String?
+  status String @default("PENDING")
+  dueAt DateTime?
+  decision String?
+  decisionComment String?
+  decidedBy String?
+  decidedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([workflowInstanceId])
+  @@index([status, authorityLevelCode, dueAt])
+  @@map("workflow_tasks")
+}
+model WorkflowDecision {
+  id String @id @default(dbgenerated("gen_random_uuid()"))
+  workflowInstanceId String
+  workflowTaskId String?
+  actorUserId String
+  decision String
+  comment String?
+  metadata Json
+  createdAt DateTime @default(now())
+  @@index([workflowInstanceId, createdAt])
+  @@map("workflow_decisions")
+}
+model WorkflowDelegation {
+  id String @id @default(dbgenerated("gen_random_uuid()"))
+  delegatorUserId String
+  delegateUserId String
+  entityType String?
+  startsAt DateTime
+  endsAt DateTime
+  reason String?
+  isActive Boolean @default(true)
+  createdAt DateTime @default(now())
+  @@map("workflow_delegations")
+}
+model WorkflowHistory {
+  id String @id @default(dbgenerated("gen_random_uuid()"))
+  workflowInstanceId String
+  eventType String
+  actorUserId String?
+  stepOrder Int?
+  fromStatus String?
+  toStatus String?
+  details Json
+  createdAt DateTime @default(now())
+  @@index([workflowInstanceId, createdAt])
+  @@map("workflow_history")
+}
