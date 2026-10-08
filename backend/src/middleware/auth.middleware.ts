@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import pool from '../lib/db.js';
+import { getJwtSecret } from '../lib/security.js';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -20,10 +21,7 @@ export interface TokenPayload {
   emailVerified?: boolean;
 }
 
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET || JWT_SECRET.length < 32) {
-  throw new Error('JWT_SECRET must be configured and at least 32 characters long');
-}
+const JWT_SECRET = getJwtSecret();
 
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 const AUTH_COOKIE_NAME = 'awash_access_token';
