@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import pool from '../../lib/db.js';
 import { authenticate, authorize } from '../../middleware/auth.middleware.js';
+import { canAccessOwnedResource } from '../../middleware/authorization.policy.js';
 import bcrypt from 'bcryptjs';
 
 const router = Router();
@@ -43,10 +44,20 @@ router.get('/customers', authenticate, authorize('CUSTOMER_ADMIN', 'MASTER_ADMIN
 // Get user by ID
 router.get('/:id', authenticate, async (req, res) => {
   try {
+    const requesterId = req.user?.id;
+    const requesterRole = req.user?.role;
+    const targetId = String(req.params.id);
+    const isSelf = requesterId === targetId;
+    const isAdmin = requesterRole === 'CUSTOMER_ADMIN' || requesterRole === 'MASTER_ADMIN';
+
+    if (!canAccessOwnedResource(req.user, targetId, ['CUSTOMER_ADMIN', 'MASTER_ADMIN'])) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
     const result = await pool.query(
       `SELECT id, email, "firstName", "lastName", role, status, phone, "avatarUrl", "createdAt"
        FROM users WHERE id = $1`,
-      [req.params.id]
+      [targetId]
     );
     
     if (result.rows.length === 0) {

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import pool from '../../lib/db.js';
 import { authenticate, authorize, AuthRequest } from '../../middleware/auth.middleware.js';
+import { canAccessOwnedResource } from '../../middleware/authorization.policy.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -648,6 +649,19 @@ router.post('/:id/documents', authenticate, upload.array('documents', 10), async
     if (!files || files.length === 0) {
       return res.status(400).json({ error: 'No files uploaded' });
     }
+
+    const claimResult = await pool.query(
+      'SELECT "userId" FROM claims WHERE id = $1',
+      [id]
+    );
+    if (claimResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Claim not found' });
+    }
+
+    const claimOwnerId = claimResult.rows[0].userId;
+    if (!canAccessOwnedResource(req.user, claimOwnerId, ALL_CLAIMS_ACCESS)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
     
     const documents = [];
     for (const file of files) {
@@ -685,7 +699,7 @@ router.get('/:id/documents', authenticate, async (req: any, res: any) => {
     
     const claim = claimResult.rows[0];
     const isAdmin = CLAIM_ROLES.includes(userRole) || userRole === 'MASTER_ADMIN';
-    if (!isAdmin && claim.userId !== userId) return res.status(403).json({ error: 'Access denied' });
+    if (!canAccessOwnedResource(req.user, claim.userId, [...CLAIM_ROLES, 'MASTER_ADMIN'])) return res.status(403).json({ error: 'Access denied' });
     
     const result = await pool.query(
       `SELECT id, "documentName", "documentUrl", "documentType", "fileSize", "uploadedAt", "createdAt"
@@ -711,7 +725,7 @@ router.get('/:id/documents/:documentId/download', authenticate, async (req: any,
     
     const claim = claimResult.rows[0];
     const isAdmin = CLAIM_ROLES.includes(userRole) || userRole === 'MASTER_ADMIN';
-    if (!isAdmin && claim.userId !== userId) return res.status(403).json({ error: 'Access denied' });
+    if (!canAccessOwnedResource(req.user, claim.userId, [...CLAIM_ROLES, 'MASTER_ADMIN'])) return res.status(403).json({ error: 'Access denied' });
     
     const documentResult = await pool.query(
       'SELECT * FROM claim_documents WHERE id = $1 AND "claimId" = $2',
@@ -748,7 +762,7 @@ router.get('/:id', authenticate, async (req: any, res: any) => {
     if (claimCheck.rows.length === 0) return res.status(404).json({ error: 'Claim not found' });
 
     const claim = claimCheck.rows[0];
-    if (!isAdmin && claim.userId !== userId) return res.status(403).json({ error: 'Access denied' });
+    if (!canAccessOwnedResource(req.user, claim.userId, [...CLAIM_ROLES, 'MASTER_ADMIN'])) return res.status(403).json({ error: 'Access denied' });
 
     const result = await pool.query(
       `SELECT 
