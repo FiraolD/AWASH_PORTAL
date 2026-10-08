@@ -106,8 +106,11 @@ export class WorkflowService {
       JOIN workflow_definitions wd ON wd.id=wv.workflow_definition_id
       WHERE wd.entity_type=$1 AND wd.is_active=true AND wv.status='ACTIVE'
         AND ($2::text IS NULL OR wd.code=$2)
-      ORDER BY wv.version_no DESC LIMIT 1
+      ORDER BY wv.version_no DESC
     `, [entityType, workflowCode ?? null]);
+    if (r.rows.length > 1 && !workflowCode) {
+      throw new Error(`Multiple active workflows exist for ${entityType}; the caller must specify workflowCode`);
+    }
     return r.rows[0] ?? null;
   }
 
