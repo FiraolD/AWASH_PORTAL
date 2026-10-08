@@ -6,8 +6,6 @@ export type WorkflowDecision = 'APPROVED' | 'REJECTED' | 'REQUIRES_MODIFICATION'
 
 type UserContext = { id: string; role?: string | null; department?: string | null };
 
-const table = (name: string) => name;
-
 export class WorkflowService {
   async listDefinitions() {
     const { rows } = await pool.query(`
@@ -143,7 +141,7 @@ export class WorkflowService {
         INSERT INTO workflow_instances(id,workflow_version_id,entity_type,entity_id,requested_by,status,current_step_order,context)
         VALUES($1,$2,$3,$4,$5,'PENDING',$6,$7)
       `, [instanceId, version.id, input.entityType, input.entityId, input.requestedBy, first.step_order, JSON.stringify(input.context ?? {})]);
-      await this.createTasks(client, instanceId, first, input.requestedBy, input.context ?? {});
+      await this.createTasks(client, instanceId, first, input.requestedBy, { ...(input.context ?? {}), entityType: input.entityType });
       await client.query(`
         INSERT INTO workflow_history(workflow_instance_id,event_type,actor_user_id,step_order,to_status,details)
         VALUES($1,'WORKFLOW_STARTED',$2,$3,'PENDING',$4)
@@ -293,8 +291,9 @@ export class WorkflowService {
           VALUES($1,'WORKFLOW_COMPLETED',$2,$3,'IN_PROGRESS','APPROVED',$4)
         `, [task.workflow_instance_id, actor.id, task.step_order, JSON.stringify({ workflow_code: task.workflow_code })]);
       } else {
+        await client.query("UPDATE workflow_tasks SET status='CANCELLED', updated_at=NOW() WHERE workflow_instance_id=$1 AND workflow_step_id=$2 AND status='PENDING'", [task.workflow_instance_id, task.workflow_step_id]);
         await client.query('UPDATE workflow_instances SET status=\'IN_PROGRESS\', current_step_order=$2, updated_at=NOW() WHERE id=$1', [task.workflow_instance_id, next.rows[0].step_order]);
-        await this.createTasks(client, task.workflow_instance_id, next.rows[0], task.requested_by, task.context);
+        await this.createTasks(client, task.workflow_instance_id, next.rows[0], task.requested_by, { ...(task.context ?? {}), entityType: task.entity_type });
         await client.query(`
           INSERT INTO workflow_history(workflow_instance_id,event_type,actor_user_id,step_order,from_status,to_status,details)
           VALUES($1,'STEP_COMPLETED',$2,$3,'PENDING','IN_PROGRESS',$4)
