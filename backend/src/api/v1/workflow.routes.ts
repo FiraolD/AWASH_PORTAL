@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate, authorizeExecutives } from '../../middleware/auth.middleware.js';
 import { workflowService } from '../../services/workflow.service.js';
+import pool from '../../lib/db.js';
 
 const router = Router();
 
@@ -44,7 +45,7 @@ router.get('/versions/:id', ...requireWorkflowAdmin, async (req,res) => {
 
 router.get('/role-levels', ...requireWorkflowAdmin, async (_req,res) => {
   try {
-    const { rows } = await (await import('../../lib/db.js')).default.query(
+    const { rows } = await pool.query(
       'SELECT id, level_code, level_name, department, level_order FROM role_levels WHERE is_active=true ORDER BY department, level_order'
     );
     res.json(rows);
