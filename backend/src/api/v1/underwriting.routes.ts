@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import pool from '../../lib/db.js';
 import { authenticate, authorize } from '../../middleware/auth.middleware.js';
+import { workflowService } from '../../services/workflow.service.js';
 
 const router = Router();
 
@@ -19,6 +20,40 @@ const UNDERWRITING_ROLES = [
 ];
 
 // In backend/src/routes/underwriting.ts
+
+
+// ---------------------------------------------------------------------------
+// Canonical workflow interception.
+// Legacy approval handlers remain below for compatibility but are unreachable
+// for final decision routes; all consequential decisions enter the Workflow Engine.
+// ---------------------------------------------------------------------------
+const startPolicyWorkflow = async (req: any, res: any) => {
+  try {
+    const policyResult = await pool.query('SELECT * FROM policies WHERE id=$1', [String(req.params.id)]);
+    if (!policyResult.rows.length) return res.status(404).json({ error: 'Policy not found' });
+    const policy = policyResult.rows[0];
+    if (['ACTIVE','REJECTED'].includes(policy.status)) return res.status(409).json({ error: `Policy is already ${policy.status.toLowerCase()}` });
+    const instance = await workflowService.startInstance({
+      entityType: 'POLICY',
+      entityId: policy.id,
+      requestedBy: policy.underwriterId || policy.userId || req.user!.id,
+      context: {
+        referenceNumber: policy.policyNumber,
+        amount: Number(policy.totalPremium || policy.premium || 0),
+        riskScore: policy.riskScore ?? null,
+        productCode: policy.type,
+        operationalOwnerId: policy.underwriterId || null,
+      },
+    });
+    return res.status(202).json({ success: true, message: 'Policy decision routed to Approval Workbench', workflowInstanceId: instance.id, status: instance.status });
+  } catch (error: any) {
+    return res.status(409).json({ error: error.message });
+  }
+};
+
+router.post('/policies/:id/direct-approve', authenticate, authorize('SUPERVISOR_UNDERWRITING', 'MANAGER_UNDERWRITING', 'HEAD_UNDERWRITING'), startPolicyWorkflow);
+router.post('/policies/:id/reject', authenticate, authorize('SUPERVISOR_UNDERWRITING', 'MANAGER_UNDERWRITING', 'UNDERWRITING_ADMIN', 'HEAD_UNDERWRITING', 'SENIOR_UNDERWRITING_OFFICER', 'CUSTOMER_ADMIN', 'MASTER_ADMIN'), startPolicyWorkflow);
+router.post('/policies/:id/final-approve', authenticate, authorize(...UNDERWRITING_ROLES), startPolicyWorkflow);
 
 // Direct approve policy (without premium adjustment)
 router.post('/policies/:id/direct-approve', authenticate, authorize('SUPERVISOR_UNDERWRITING', 'MANAGER_UNDERWRITING', 'HEAD_UNDERWRITING'),   async (req, res) => {
@@ -224,6 +259,30 @@ router.post('/policies/:id/reject',
     }
   }
 );
+
+const startEndorsementWorkflow = async (req: any, res: any) => {
+  try {
+    const result = await pool.query('SELECT * FROM endorsements WHERE id=$1', [String(req.params.id)]);
+    if (!result.rows.length) return res.status(404).json({ error: 'Endorsement not found' });
+    const endorsement = result.rows[0];
+    const instance = await workflowService.startInstance({
+      entityType: 'ENDORSEMENT',
+      entityId: endorsement.id,
+      requestedBy: endorsement.requestedBy || req.user!.id,
+      context: {
+        referenceNumber: endorsement.endorsementNumber || endorsement.id,
+        amount: Number(endorsement.amount || 0),
+        operationalOwnerId: endorsement.reviewedBy || null,
+      },
+    });
+    return res.status(202).json({ success: true, message: 'Endorsement decision routed to Approval Workbench', workflowInstanceId: instance.id, status: instance.status });
+  } catch (error: any) {
+    return res.status(409).json({ error: error.message });
+  }
+};
+router.post('/endorsements/:id/approve', authenticate, authorize(...UNDERWRITING_ROLES), startEndorsementWorkflow);
+router.post('/endorsements/:id/reject', authenticate, authorize(...UNDERWRITING_ROLES), startEndorsementWorkflow);
+
 // ==================== POLICY REVIEW & ADJUSTMENT ====================
 
 // Get policies pending underwriting review (PENDING_UNDERWRITING or SUBMITTED)
