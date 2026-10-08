@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import pool from '../lib/db.js';
 import { getJwtSecret } from '../lib/security.js';
+import { hasAnyRole } from './authorization.policy.js';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -179,7 +180,7 @@ export const authorize = (...allowedRoles: string[]) => {
       return;
     }
 
-    if (!allowedRoles.includes(userRole)) {
+    if (!hasAnyRole(req.user, allowedRoles)) {
       res.status(403).json({ error: 'Insufficient permissions' });
       return;
     }
