@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Save, PlayCircle, ShieldCheck, Workflow } from 'lucide-react';
 import { toast } from 'sonner';
@@ -29,7 +29,7 @@ export default function WorkflowControlCenterPage(){
   const create=useMutation({mutationFn:async()=> (await apiClient.post('/workflow/definitions',newDef)).data,onSuccess:(d)=>{toast.success('Workflow definition created');setNewDef({code:'',name:'',entityType:'POLICY',description:''});qc.invalidateQueries({queryKey:['workflow-definitions']});setSelected(d)}}});
   const save=useMutation({mutationFn:async()=> (await apiClient.put(`/workflow/versions/${detail.data.versions[0].id}/steps`,{steps:steps.map((s,i)=>({...s,stepKey:s.stepKey||`STEP_${i+1}`,requiredApprovals:Number(s.requiredApprovals)||1,maxAmount:s.maxAmount?Number(s.maxAmount):null,slaHours:s.slaHours?Number(s.slaHours):null,conditions:s.conditionsText?JSON.parse(s.conditionsText):{}}))})).data,onSuccess:()=>{toast.success('Workflow steps saved');qc.invalidateQueries({queryKey:['workflow-definition',selected?.id]})},onError:(e:any)=>toast.error(e?.response?.data?.error||'Invalid workflow configuration')});
   const activate=useMutation({mutationFn:async()=> (await apiClient.post(`/workflow/versions/${detail.data.versions[0].id}/activate`)).data,onSuccess:()=>{toast.success('Workflow version activated');qc.invalidateQueries({queryKey:['workflow-definition',selected?.id]});qc.invalidateQueries({queryKey:['workflow-definitions']})}});
-  useMemo(()=>{ if(detail.data?.versions?.[0]?.steps?.length) setSteps(detail.data.versions[0].steps.map((s:any)=>({stepKey:s.step_key,name:s.name,department:s.department||'',authorityLevelCode:s.authority_level_code||'',approvalMode:s.approval_mode||'ANY',requiredApprovals:s.required_approvals||1,maxAmount:s.max_amount||'',slaHours:s.sla_hours||'',conditionsText:JSON.stringify(s.conditions||{},null,2)}))); },[detail.data]);
+  useEffect(()=>{ if(detail.data?.versions?.[0]?.steps?.length) setSteps(detail.data.versions[0].steps.map((s:any)=>({stepKey:s.step_key,name:s.name,department:s.department||'',authorityLevelCode:s.authority_level_code||'',approvalMode:s.approval_mode||'ANY',requiredApprovals:s.required_approvals||1,maxAmount:s.max_amount||'',slaHours:s.sla_hours||'',conditionsText:JSON.stringify(s.conditions||{},null,2)}))); },[detail.data]);
   if(defs.isLoading) return <LoadingSpinner/>;
   return <div className="space-y-6 p-6">
     <div><h1 className="text-2xl font-bold">Workflow Control Center</h1><p className="text-sm text-slate-500">Configure authority-driven, versioned approval workflows. Assignment remains separate from approval authority.</p></div>
