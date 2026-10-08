@@ -648,6 +648,20 @@ router.post('/:id/documents', authenticate, upload.array('documents', 10), async
     if (!files || files.length === 0) {
       return res.status(400).json({ error: 'No files uploaded' });
     }
+
+    const claimResult = await pool.query(
+      'SELECT "userId" FROM claims WHERE id = $1',
+      [id]
+    );
+    if (claimResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Claim not found' });
+    }
+
+    const claimOwnerId = claimResult.rows[0].userId;
+    const isStaff = ALL_CLAIMS_ACCESS.includes(req.user?.role);
+    if (!isStaff && claimOwnerId !== userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
     
     const documents = [];
     for (const file of files) {
