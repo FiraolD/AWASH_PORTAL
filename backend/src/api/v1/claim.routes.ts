@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import pool from '../../lib/db.js';
+import { workflowService } from '../../services/workflow.service.js';
 import { authenticate, authorize, AuthRequest } from '../../middleware/auth.middleware.js';
 import { canAccessOwnedResource } from '../../middleware/authorization.policy.js';
 import multer from 'multer';
@@ -527,11 +528,8 @@ router.post('/:id/review', authenticate, authorize(...CLAIM_ROLES), validateBody
       return res.status(400).json({ error: `Invalid decision. Must be one of: ${validDecisions.join(', ')}` });
     }
 
-    // Role-based permissions
-    if (['APPROVE', 'REJECT'].includes(decision) && !APPROVER_ROLES.includes(userRole)) {
-      return res.status(403).json({ error: 'Only approvers can approve or reject claims' });
-    }
-
+    // Final claim approval/rejection is controlled exclusively by the canonical Workflow Engine.
+    // Operational review actions remain on this endpoint; approval decisions belong in the Approval Workbench.
     // Check claim exists
     const claimCheck = await client.query('SELECT * FROM claims WHERE id = $1', [id]);
     if (claimCheck.rows.length === 0) {
@@ -539,6 +537,26 @@ router.post('/:id/review', authenticate, authorize(...CLAIM_ROLES), validateBody
     }
 
     const claim = claimCheck.rows[0];
+
+    if (['APPROVE', 'REJECT'].includes(decision)) {
+      const instance = await workflowService.startInstance({
+        entityType: 'CLAIM',
+        entityId: id,
+        requestedBy: claim.assignedOfficer || claim.userId || userId,
+        context: {
+          referenceNumber: claim.claimNumber,
+          amount: approvedAmount ? Number(approvedAmount) : Number(claim.estimatedAmount || 0),
+          approvedAmount: approvedAmount ? Number(approvedAmount) : null,
+          riskScore: claim.riskScore ?? null,
+          operationalOwnerId: claim.assignedOfficer || null,
+        },
+      });
+      return res.status(202).json({
+        message: 'Claim approval is controlled by the Approval Workbench',
+        status: instance.status,
+        workflowInstanceId: instance.id,
+      });
+    }
 
     // Prevent double processing
     if (['APPROVED', 'REJECTED', 'PAID'].includes(claim.status)) {
@@ -610,7 +628,8 @@ router.patch('/:id/status', authenticate, authorize(...APPROVER_ROLES), async (r
     const id = String(req.params.id);
     const { status, notes } = req.body;
 
-    const validStatuses = ['UNDER_REVIEW', 'REVIEWED', 'APPROVED', 'REJECTED', 'PAID'];
+    const validStatuses = ['UNDER_REVIEW', 'REVIEWED'];
+    if (['APPROVED', 'REJECTED', 'PAID'].includes(status)) return res.status(409).json({ error: 'Final claim status changes must be performed through the Workflow Engine / Approval Workbench' });
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
     }
