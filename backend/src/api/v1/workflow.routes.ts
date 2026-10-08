@@ -56,13 +56,17 @@ router.post('/authorities', ...requireWorkflowAdmin, async (req: AuthRequest,res
   try {
     const { roleLevelId, entityType, productCode, maxAmount, canApprove=true, canReject=true, canModify=true } = req.body;
     if (!roleLevelId || !entityType) return res.status(400).json({ error:'roleLevelId and entityType are required' });
-    const { rows } = await (await import('../../lib/db.js')).default.query(`
-      INSERT INTO workflow_authorities(role_level_id,entity_type,product_code,max_amount,can_approve,can_reject,can_modify,created_by)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8)
-      ON CONFLICT(role_level_id,entity_type,product_code)
-      DO UPDATE SET max_amount=EXCLUDED.max_amount,can_approve=EXCLUDED.can_approve,can_reject=EXCLUDED.can_reject,can_modify=EXCLUDED.can_modify,is_active=true
-      RETURNING *
-    `, [roleLevelId,entityType,productCode||null,maxAmount??null,canApprove,canReject,canModify,req.user!.id]);
+    const existing = await pool.query(
+      'SELECT id FROM workflow_authorities WHERE role_level_id=$1 AND entity_type=$2 AND product_code IS NOT DISTINCT FROM $3 LIMIT 1',
+      [roleLevelId, entityType, productCode || null]
+    );
+    const query = existing.rows.length
+      ? `UPDATE workflow_authorities SET max_amount=$1,can_approve=$2,can_reject=$3,can_modify=$4,is_active=true WHERE id=$5 RETURNING *`
+      : `INSERT INTO workflow_authorities(role_level_id,entity_type,product_code,max_amount,can_approve,can_reject,can_modify,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`;
+    const params = existing.rows.length
+      ? [maxAmount ?? null,canApprove,canReject,canModify,existing.rows[0].id]
+      : [roleLevelId,entityType,productCode||null,maxAmount??null,canApprove,canReject,canModify,req.user!.id];
+    const { rows } = await pool.query(query, params);
     res.status(201).json(rows[0]);
   } catch (e:any) { res.status(400).json({ error:e.message }); }
 });
