@@ -29,7 +29,7 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 const AUTH_COOKIE_NAME = 'awash_access_token';
 
 export function generateToken(payload: TokenPayload): string {
-  return jwt.sign(payload as object, getConfiguredJwtSecret(), { expiresIn: JWT_EXPIRES_IN });
+  return jwt.sign(payload as object, getConfiguredJwtSecret(), { expiresIn: JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'] });
 }
 
 export function verifyToken(token: string): TokenPayload {
