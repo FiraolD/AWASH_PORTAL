@@ -2,7 +2,7 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import pool from '../../lib/db.js';
-import { generateToken, authenticate, setAuthCookie, clearAuthCookie } from '../../../middleware/auth.middleware.js';
+import { generateToken, authenticate, setAuthCookie, clearAuthCookie } from '../../middleware/auth.middleware.js';
 import { authRateLimit } from '../../middleware/auth-rate-limit.middleware.js';
 import { sendVerificationEmail, sendPasswordResetEmail } from '../../services/email.service.js';
 
