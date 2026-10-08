@@ -16,6 +16,7 @@ interface User {
 
 interface AuthState {
   user: User | null;
+  token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -37,6 +38,7 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
   user: null,
+  token: null,
   isAuthenticated: false,
   isLoading: false,
 
@@ -44,9 +46,9 @@ export const useAuthStore = create<AuthState>()(
     set({ isLoading: true });
     try {
       const response = await axiosInstance.post('/auth/login', { email, password });
-      const { user } = response.data;
+      const { user, token } = response.data;
       
-      set({ user, isAuthenticated: true, isLoading: false });
+      set({ user, token, isAuthenticated: true, isLoading: false });
       
     } catch (error: any) {
       set({ isLoading: false });
@@ -61,7 +63,7 @@ export const useAuthStore = create<AuthState>()(
       const { user } = response.data;
 
       // Accounts require email verification before authentication.
-      set({ user, isAuthenticated: false, isLoading: false });
+      set({ user, token: null, isAuthenticated: false, isLoading: false });
       
     } catch (error: any) {
       set({ isLoading: false });
@@ -79,7 +81,7 @@ export const useAuthStore = create<AuthState>()(
 
   logout: () => {
     void axiosInstance.post('/auth/logout').catch(() => undefined);
-    set({ user: null, isAuthenticated: false, isLoading: false });
+    set({ user: null, token: null, isAuthenticated: false, isLoading: false });
   },
 
   fetchUser: async () => {
