@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import pool from '../../lib/db.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
+import { hasAnyRole, canAccessOwnedResource } from '../../middleware/authorization.policy.js';
 import { generatePolicyNumber } from '../../lib/numbering.js';
 import { generatePolicySchedule } from '../../services/PDFGenerator.service.js';
 import fs from 'fs';
@@ -225,7 +226,7 @@ router.get('/', async (req, res) => {
       'CUSTOMER_ADMIN', 'MASTER_ADMIN', 'UNDERWRITING_ADMIN',
       'SUPERVISOR_UNDERWRITING', 'MANAGER_UNDERWRITING', 'HEAD_UNDERWRITING'
     ];
-    const isStaff = staffRoles.includes(userRole || '');
+    const isStaff = hasAnyRole(req.user, staffRoles);
 
     const result = await pool.query(
       isStaff
@@ -247,7 +248,7 @@ router.get('/stats', async (req, res) => {
       'CUSTOMER_ADMIN', 'MASTER_ADMIN', 'UNDERWRITING_ADMIN',
       'SUPERVISOR_UNDERWRITING', 'MANAGER_UNDERWRITING', 'HEAD_UNDERWRITING'
     ];
-    if (!staffRoles.includes(req.user?.role || '')) {
+    if (!hasAnyRole(req.user, staffRoles)) {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
 
