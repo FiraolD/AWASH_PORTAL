@@ -550,9 +550,33 @@ router.get('/documents/:documentId/download', async (req, res) => {
 router.get('/:policyId/documents', async (req, res) => {
   try {
     const { policyId } = req.params;
-    const result = await pool.query(`SELECT * FROM policy_documents WHERE policy_id = $1`, [policyId]);
+    const userId = req.user?.id;
+    const userRole = req.user?.role;
+    const isAuthorizedStaff = ['CUSTOMER_ADMIN', 'MASTER_ADMIN', 'UNDERWRITING_ADMIN', 'SUPERVISOR_UNDERWRITING', 'UNDERWRITING_MANAGER', 'HEAD_UNDERWRITING'].includes(userRole);
+
+    // Object-level authorization: do not allow a user to enumerate another customer's documents.
+    const policyResult = await pool.query(
+      `SELECT "userId" FROM policies WHERE id = $1`,
+      [policyId]
+    );
+    if (policyResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Policy not found' });
+    }
+
+    if (!isAuthorizedStaff && policyResult.rows[0].userId !== userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const result = await pool.query(
+      `SELECT id, policy_id, document_type, title, file_url, generated_at, created_at
+       FROM policy_documents WHERE policy_id = $1 ORDER BY created_at DESC`,
+      [policyId]
+    );
     res.json(result.rows);
-  } catch (error: any) { res.status(500).json({ error: 'Failed to fetch documents', detail: error.message }); }
+  } catch (error: any) {
+    console.error('Failed to fetch policy documents:', error);
+    res.status(500).json({ error: 'Failed to fetch documents' });
+  }
 });
 
 router.get('/:policyId/download', async (req, res) => {
