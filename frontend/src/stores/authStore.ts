@@ -78,8 +78,8 @@ export const useAuthStore = create<AuthState>()(
   },
 
   logout: () => {
+    void axiosInstance.post('/auth/logout').catch(() => undefined);
     set({ user: null, isAuthenticated: false, isLoading: false });
-
   },
 
   fetchUser: async () => {
