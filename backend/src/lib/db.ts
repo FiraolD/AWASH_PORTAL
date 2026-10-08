@@ -10,9 +10,13 @@ if (!connectionString) {
 }
 
 const databaseHost = new URL(connectionString).hostname;
-const ssl = ['localhost', '127.0.0.1', '::1'].includes(databaseHost)
+const isLocalDatabase = ['localhost', '127.0.0.1', '::1'].includes(databaseHost);
+const ssl = isLocalDatabase
   ? false
-  : { rejectUnauthorized: false };
+  : {
+      rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false',
+      ...(process.env.DB_SSL_CA ? { ca: process.env.DB_SSL_CA.replace(/\\n/g, '\n') } : {}),
+    };
 
 const pool = new Pool({
   connectionString,
