@@ -99,14 +99,15 @@ export class WorkflowService {
     } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
   }
 
-  private async getActiveVersion(entityType: WorkflowEntityType) {
+  private async getActiveVersion(entityType: WorkflowEntityType, workflowCode?: string) {
     const r = await pool.query(`
       SELECT wv.*, wd.code, wd.name, wd.entity_type
       FROM workflow_versions wv
       JOIN workflow_definitions wd ON wd.id=wv.workflow_definition_id
       WHERE wd.entity_type=$1 AND wd.is_active=true AND wv.status='ACTIVE'
+        AND ($2::text IS NULL OR wd.code=$2)
       ORDER BY wv.version_no DESC LIMIT 1
-    `, [entityType]);
+    `, [entityType, workflowCode ?? null]);
     return r.rows[0] ?? null;
   }
 
@@ -126,7 +127,7 @@ export class WorkflowService {
     `, [input.entityType, input.entityId]);
     if (existing.rows.length) return existing.rows[0];
 
-    const version = await this.getActiveVersion(input.entityType);
+    const version = await this.getActiveVersion(input.entityType, input.context?.workflowCode);
     if (!version) throw new Error(`No active workflow configured for ${input.entityType}`);
     const steps = await pool.query('SELECT * FROM workflow_steps WHERE workflow_version_id=$1 AND is_active=true ORDER BY step_order', [version.id]);
     const applicable = steps.rows.filter((s: any) => this.conditionMatches(s.conditions, input.context ?? {}));
@@ -319,6 +320,11 @@ export class WorkflowService {
           "approvedAt"=CASE WHEN $1='APPROVED' THEN NOW() ELSE "approvedAt" END, "updatedAt"=NOW()
         WHERE id=$4
       `, [status, actorId, context?.approvedAmount ?? context?.amount ?? null, entityId]);
+      return;
+    }
+    if (entityType === 'ENDORSEMENT') {
+      const status = outcome === 'APPROVED' ? 'APPROVED' : outcome === 'REJECTED' ? 'REJECTED' : 'REQUIRES_MODIFICATION';
+      await client.query(`UPDATE endorsements SET status=$1, "approvedBy"=CASE WHEN $1='APPROVED' THEN $2 ELSE "approvedBy" END, "approvedAt"=CASE WHEN $1='APPROVED' THEN NOW() ELSE "approvedAt" END, "updatedAt"=NOW() WHERE id=$3`, [status, actorId, entityId]);
       return;
     }
     if (entityType === 'POLICY') {
