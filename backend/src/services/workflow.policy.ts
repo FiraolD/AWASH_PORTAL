@@ -49,3 +49,13 @@ export function findNextApplicableStep<T extends { step_order: number; condition
     .sort((a, b) => a.step_order - b.step_order)
     .find(step => conditionMatches(step.conditions, context));
 }
+
+
+export function assertStepAmountAllowed(amount: number, minAmount?: number | string | null, maxAmount?: number | string | null) {
+  if (minAmount != null && amount < Number(minAmount)) {
+    throw new Error('Transaction amount is below the workflow step minimum');
+  }
+  if (maxAmount != null && amount > Number(maxAmount)) {
+    throw new Error('Transaction amount exceeds the workflow step maximum');
+  }
+}
