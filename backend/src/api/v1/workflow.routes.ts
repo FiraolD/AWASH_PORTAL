@@ -51,7 +51,7 @@ router.get('/versions/:id', ...requireWorkflowAdmin, async (req,res) => {
 router.get('/role-levels', ...requireWorkflowAdmin, async (_req,res) => {
   try {
     const { rows } = await pool.query(
-      'SELECT id, level_code, level_name, department, level_order FROM role_levels WHERE "isActive"=true ORDER BY department, level_order'
+      'SELECT id, "levelCode" AS level_code, "levelName" AS level_name, department, "levelOrder" AS level_order FROM role_levels WHERE "isActive"=true ORDER BY department, "levelOrder"
     );
     res.json(rows);
   } catch (e:any) { res.status(500).json({ error:'Failed to load role levels', detail:e.message }); }
@@ -66,7 +66,7 @@ router.post('/authorities', ...requireWorkflowAdmin, async (req: AuthRequest,res
       [roleLevelId, entityType, productCode || null]
     );
     const query = existing.rows.length
-      ? `UPDATE workflow_authorities SET max_amount=$1,can_approve=$2,can_reject=$3,can_modify=$4,"isActive"=true WHERE id=$5 RETURNING *`
+      ? `UPDATE workflow_authorities SET max_amount=$1,can_approve=$2,can_reject=$3,can_modify=$4,is_active=true WHERE id=$5 RETURNING *`
       : `INSERT INTO workflow_authorities(role_level_id,entity_type,product_code,max_amount,can_approve,can_reject,can_modify,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`;
     const params = existing.rows.length
       ? [maxAmount ?? null,canApprove,canReject,canModify,existing.rows[0].id]
