@@ -36,7 +36,7 @@ const startPolicyWorkflow = async (req: any, res: any) => {
     const instance = await workflowService.startInstance({
       entityType: 'POLICY',
       entityId: policy.id,
-      requestedBy: policy.underwriterId || policy.userId || req.user!.id,
+      requestedBy: req.user!.id,
       context: {
         referenceNumber: policy.policyNumber,
         amount: Number(policy.totalPremium || policy.premium || 0),
