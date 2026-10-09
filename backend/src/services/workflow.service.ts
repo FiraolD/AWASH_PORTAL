@@ -1,6 +1,6 @@
 import pool from '../lib/db.js';
 import { randomUUID } from 'crypto';
-import { assertDecisionAllowed, assertDecisionCapability, conditionMatches as matchesConditions, isStepComplete } from './workflow.policy.js';
+import { assertDecisionAllowed, assertDecisionCapability, conditionMatches as matchesConditions, findNextApplicableStep, isStepComplete } from './workflow.policy.js';
 
 export type WorkflowEntityType = 'POLICY' | 'CLAIM' | 'ENDORSEMENT' | 'CANCELLATION';
 export type WorkflowDecision = 'APPROVED' | 'REJECTED' | 'REQUIRES_MODIFICATION';
@@ -297,6 +297,8 @@ export class WorkflowService {
       if (decision !== 'APPROVED') {
         const outcome = decision === 'REJECTED' ? 'REJECTED' : 'REQUIRES_MODIFICATION';
         await client.query('UPDATE workflow_instances SET status=$2, completed_at=NOW(), updated_at=NOW() WHERE id=$1', [task.workflow_instance_id, outcome]);
+        // A terminal decision closes every other task so no stale approvals remain pending.
+        await client.query("UPDATE workflow_tasks SET status='CANCELLED', updated_at=NOW() WHERE workflow_instance_id=$1 AND status='PENDING'", [task.workflow_instance_id]);
         await this.applyEntityOutcome(client, task.entity_type, task.entity_id, outcome, actor.id, task.context);
         await client.query(`
           INSERT INTO workflow_history(workflow_instance_id,event_type,actor_user_id,step_order,from_status,to_status,details)
@@ -311,7 +313,6 @@ export class WorkflowService {
       const pendingCount = pending.rows[0].count;
       const approvedCount = approved.rows[0].count;
       const mode = task.approval_mode;
-      const threshold = mode === 'ALL' ? await this.taskCount(client, task.workflow_instance_id, task.workflow_step_id) : mode === 'QUORUM' ? task.required_approvals : 1;
       const totalTasks = await this.taskCount(client, task.workflow_instance_id, task.workflow_step_id);
       const stepComplete = isStepComplete(mode, Number(task.required_approvals), totalTasks, approvedCount, pendingCount);
 
@@ -322,12 +323,13 @@ export class WorkflowService {
 
       const next = await client.query(`
         SELECT * FROM workflow_steps WHERE workflow_version_id=(SELECT workflow_version_id FROM workflow_instances WHERE id=$1)
-        AND is_active=true AND step_order>$2 ORDER BY step_order LIMIT 1
+        AND is_active=true AND step_order>$2 ORDER BY step_order
       `, [task.workflow_instance_id, task.step_order]);
+      const nextStep = findNextApplicableStep(next.rows, Number(task.step_order), task.context ?? {});
 
       // Once a step reaches its completion rule, outstanding parallel tasks are no longer actionable.
       await client.query("UPDATE workflow_tasks SET status='CANCELLED', updated_at=NOW() WHERE workflow_instance_id=$1 AND workflow_step_id=$2 AND status='PENDING'", [task.workflow_instance_id, task.workflow_step_id]);
-      if (!next.rows.length) {
+      if (!nextStep) {
         await client.query('UPDATE workflow_instances SET status=\'APPROVED\', completed_at=NOW(), updated_at=NOW() WHERE id=$1', [task.workflow_instance_id]);
         await this.applyEntityOutcome(client, task.entity_type, task.entity_id, 'APPROVED', actor.id, task.context);
         await client.query(`
@@ -335,12 +337,12 @@ export class WorkflowService {
           VALUES($1,'WORKFLOW_COMPLETED',$2,$3,'IN_PROGRESS','APPROVED',$4)
         `, [task.workflow_instance_id, actor.id, task.step_order, JSON.stringify({ workflow_code: task.workflow_code })]);
       } else {
-        await client.query('UPDATE workflow_instances SET status=\'IN_PROGRESS\', current_step_order=$2, updated_at=NOW() WHERE id=$1', [task.workflow_instance_id, next.rows[0].step_order]);
-        await this.createTasks(client, task.workflow_instance_id, next.rows[0], task.requested_by, { ...(task.context ?? {}), entityType: task.entity_type });
+        await client.query('UPDATE workflow_instances SET status=\'IN_PROGRESS\', current_step_order=$2, updated_at=NOW() WHERE id=$1', [task.workflow_instance_id, nextStep.step_order]);
+        await this.createTasks(client, task.workflow_instance_id, nextStep, task.requested_by, { ...(task.context ?? {}), entityType: task.entity_type });
         await client.query(`
           INSERT INTO workflow_history(workflow_instance_id,event_type,actor_user_id,step_order,from_status,to_status,details)
           VALUES($1,'STEP_COMPLETED',$2,$3,'PENDING','IN_PROGRESS',$4)
-        `, [task.workflow_instance_id, actor.id, task.step_order, JSON.stringify({ next_step: next.rows[0].step_order })]);
+        `, [task.workflow_instance_id, actor.id, task.step_order, JSON.stringify({ next_step: nextStep.step_order })]);
       }
       await client.query('COMMIT');
       return this.getInstance(task.workflow_instance_id);
