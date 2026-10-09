@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assertDecisionAllowed, assertDecisionCapability, conditionMatches, isStepComplete } from '../services/workflow.policy.js';
+import { assertDecisionAllowed, assertDecisionCapability, conditionMatches, findNextApplicableStep, isStepComplete } from '../services/workflow.policy.js';
 
 test('workflow conditions match only when all configured context values match', () => {
   assert.equal(conditionMatches({ productCode: 'MOTOR', amountBand: 'HIGH' }, { productCode: 'MOTOR', amountBand: 'HIGH' }), true);
@@ -47,4 +47,16 @@ test('authority matrix enforces approve, reject, and modification permissions in
   assert.throws(() => assertDecisionCapability('REJECTED', { can_approve: true, can_reject: false, can_modify: true }), /does not permit the rejected decision/);
   assert.throws(() => assertDecisionCapability('REQUIRES_MODIFICATION', { can_approve: true, can_reject: true, can_modify: false }), /does not permit the requires modification decision/);
   assert.throws(() => assertDecisionCapability('APPROVED', {}), /does not permit the approved decision/);
+});
+
+
+test('conditional workflow steps are skipped when their conditions do not match', () => {
+  const steps = [
+    { step_order: 2, conditions: { productCode: 'MOTOR' } },
+    { step_order: 3, conditions: { productCode: 'PROPERTY' } },
+    { step_order: 4, conditions: {} },
+  ];
+  assert.equal(findNextApplicableStep(steps, 1, { productCode: 'PROPERTY' })?.step_order, 3);
+  assert.equal(findNextApplicableStep(steps, 3, { productCode: 'MOTOR' })?.step_order, 4);
+  assert.equal(findNextApplicableStep(steps, 4, { productCode: 'MOTOR' }), undefined);
 });
