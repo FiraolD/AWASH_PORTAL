@@ -1,5 +1,6 @@
 import pool from '../lib/db.js';
 import { randomUUID } from 'crypto';
+import { assertDecisionAllowed, conditionMatches as matchesConditions, isStepComplete } from './workflow.policy.js';
 
 export type WorkflowEntityType = 'POLICY' | 'CLAIM' | 'ENDORSEMENT' | 'CANCELLATION';
 export type WorkflowDecision = 'APPROVED' | 'REJECTED' | 'REQUIRES_MODIFICATION';
@@ -126,11 +127,7 @@ export class WorkflowService {
   }
 
   private conditionMatches(conditions: any, context: any) {
-    if (!conditions || typeof conditions !== 'object') return true;
-    return Object.entries(conditions).every(([key, expected]) => {
-      if (expected === undefined || expected === null || expected === '') return true;
-      return context?.[key] === expected;
-    });
+    return matchesConditions(conditions, context);
   }
 
   async startInstance(input: { entityType: WorkflowEntityType; entityId: string; requestedBy: string; context?: any }) {
@@ -242,8 +239,7 @@ export class WorkflowService {
       if (!taskResult.rows.length) throw new Error('Approval task is unavailable, already decided, or you are not assigned to it');
       const task = taskResult.rows[0];
 
-      if (task.requested_by === actor.id) throw new Error('Segregation of duties: requester cannot approve their own request');
-      if (task.context?.operationalOwnerId && task.context.operationalOwnerId === actor.id) throw new Error('Segregation of duties: operational owner cannot approve the same transaction');
+      assertDecisionAllowed({ actorId: actor.id, requesterId: task.requested_by, operationalOwnerId: task.context?.operationalOwnerId, amount: Number(task.context?.amount ?? 0) });
 
       const role = await client.query('SELECT role FROM users WHERE id=$1 AND status=\'ACTIVE\' AND is_active=true', [actor.id]);
       if (!role.rows.length || (task.authority_level_code && role.rows[0].role !== task.authority_level_code)) {
@@ -260,7 +256,7 @@ export class WorkflowService {
         ORDER BY wa.max_amount DESC NULLS FIRST LIMIT 1
       `, [task.entity_type, role.rows[0].role, task.context?.productCode ?? null]);
       const maxAmount = authority.rows[0]?.max_amount;
-      if (maxAmount != null && amount > Number(maxAmount)) throw new Error('Approval amount exceeds the actor authority limit');
+      assertDecisionAllowed({ actorId: actor.id, requesterId: task.requested_by, operationalOwnerId: task.context?.operationalOwnerId, amount, maxAmount });
 
       await client.query(`
         INSERT INTO workflow_decisions(workflow_instance_id,workflow_task_id,actor_user_id,decision,comment,metadata)
@@ -290,7 +286,8 @@ export class WorkflowService {
       const approvedCount = approved.rows[0].count;
       const mode = task.approval_mode;
       const threshold = mode === 'ALL' ? await this.taskCount(client, task.workflow_instance_id, task.workflow_step_id) : mode === 'QUORUM' ? task.required_approvals : 1;
-      const stepComplete = mode === 'ALL' ? pendingCount === 0 : approvedCount >= threshold;
+      const totalTasks = await this.taskCount(client, task.workflow_instance_id, task.workflow_step_id);
+      const stepComplete = isStepComplete(mode, Number(task.required_approvals), totalTasks, approvedCount, pendingCount);
 
       if (!stepComplete) {
         await client.query('COMMIT');
