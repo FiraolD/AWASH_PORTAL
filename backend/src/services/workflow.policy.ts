@@ -59,3 +59,13 @@ export function assertStepAmountAllowed(amount: number, minAmount?: number | str
     throw new Error('Transaction amount exceeds the workflow step maximum');
   }
 }
+
+
+export function assertQuorumFeasible(requiredApprovals: number, eligibleApprovers: number) {
+  if (!Number.isInteger(requiredApprovals) || requiredApprovals < 1) {
+    throw new Error('Quorum threshold must be a positive integer');
+  }
+  if (eligibleApprovers < requiredApprovals) {
+    throw new Error(`Quorum requires ${requiredApprovals} approvers, but only ${eligibleApprovers} eligible approver(s) are available`);
+  }
+}
