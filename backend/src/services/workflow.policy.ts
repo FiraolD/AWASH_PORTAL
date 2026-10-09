@@ -26,3 +26,15 @@ export function assertDecisionAllowed(input: {
   if (input.operationalOwnerId && input.actorId === input.operationalOwnerId) throw new Error('Segregation of duties: operational owner cannot approve the same transaction');
   if (input.maxAmount != null && input.amount > Number(input.maxAmount)) throw new Error('Approval amount exceeds the actor authority limit');
 }
+
+export function assertDecisionCapability(
+  decision: DecisionOutcome,
+  authority: { can_approve?: boolean; can_reject?: boolean; can_modify?: boolean }
+) {
+  const allowed = decision === 'APPROVED'
+    ? authority.can_approve
+    : decision === 'REJECTED'
+      ? authority.can_reject
+      : authority.can_modify;
+  if (!allowed) throw new Error(`Authority does not permit the ${decision.toLowerCase().replace('_', ' ')} decision`);
+}
