@@ -38,3 +38,14 @@ export function assertDecisionCapability(
       : authority.can_modify;
   if (!allowed) throw new Error(`Authority does not permit the ${decision.toLowerCase().replace('_', ' ')} decision`);
 }
+
+export function findNextApplicableStep<T extends { step_order: number; conditions?: Record<string, unknown> | null; is_active?: boolean }>(
+  steps: T[],
+  currentOrder: number,
+  context: Record<string, unknown>
+): T | undefined {
+  return steps
+    .filter(step => step.step_order > currentOrder && step.is_active !== false)
+    .sort((a, b) => a.step_order - b.step_order)
+    .find(step => conditionMatches(step.conditions, context));
+}
