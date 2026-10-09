@@ -95,7 +95,7 @@ export class WorkflowService {
       await client.query('BEGIN');
       const version = await client.query('SELECT * FROM workflow_versions WHERE id=$1 FOR UPDATE', [versionId]);
       if (!version.rows.length) throw new Error('Workflow version not found');
-      const steps = await client.query('SELECT * FROM workflow_steps WHERE workflow_version_id=$1 AND is_active=true ORDER BY step_order', [versionId]);
+      const steps = await client.query('SELECT * FROM workflow_steps WHERE workflow_version_id=$1 AND "isActive"=true ORDER BY step_order', [versionId]);
       if (!steps.rows.length) throw new Error('Cannot activate a workflow without steps');
       await client.query(`
         UPDATE workflow_versions SET status='RETIRED', effective_to=NOW()
@@ -116,7 +116,7 @@ export class WorkflowService {
       SELECT wv.*, wd.code, wd.name, wd.entity_type
       FROM workflow_versions wv
       JOIN workflow_definitions wd ON wd.id=wv.workflow_definition_id
-      WHERE wd.entity_type=$1 AND wd.is_active=true AND wv.status='ACTIVE'
+      WHERE wd.entity_type=$1 AND wd."isActive"=true AND wv.status='ACTIVE'
         AND ($2::text IS NULL OR wd.code=$2)
       ORDER BY wv.version_no DESC
     `, [entityType, workflowCode ?? null]);
@@ -140,7 +140,7 @@ export class WorkflowService {
 
     const version = await this.getActiveVersion(input.entityType, input.context?.workflowCode);
     if (!version) throw new Error(`No active workflow configured for ${input.entityType}`);
-    const steps = await pool.query('SELECT * FROM workflow_steps WHERE workflow_version_id=$1 AND is_active=true ORDER BY step_order', [version.id]);
+    const steps = await pool.query('SELECT * FROM workflow_steps WHERE workflow_version_id=$1 AND "isActive"=true ORDER BY step_order', [version.id]);
     const applicable = steps.rows.filter((s: any) => this.conditionMatches(s.conditions, input.context ?? {}));
     if (!applicable.length) throw new Error('No workflow step matched the supplied context');
 
@@ -165,12 +165,12 @@ export class WorkflowService {
 
   private async createTasks(client: any, instanceId: string, step: any, requesterId: string, context: any) {
     const authority = await client.query(`
-      SELECT wa.*, rl.level_code, rl.department
+      SELECT wa.*, rl."levelCode", rl.department
       FROM workflow_authorities wa
       JOIN role_levels rl ON rl.id=wa.role_level_id
-      WHERE wa.is_active=true AND wa.entity_type=$1
+      WHERE wa."isActive"=true AND wa.entity_type=$1
         AND (wa.product_code IS NULL OR wa.product_code=$2)
-        AND rl.is_active=true AND rl.level_code=COALESCE($3, rl.level_code)
+        AND rl."isActive"=true AND rl."levelCode"=COALESCE($3, rl."levelCode")
         AND wa.can_approve=true
       ORDER BY wa.max_amount NULLS LAST
     `, [context.entityType ?? context.entity_type ?? '', context.productCode ?? context.product_code ?? null, step.authority_level_code]);
@@ -180,7 +180,7 @@ export class WorkflowService {
     if (!roles.length) throw new Error(`No approval authority configured for step ${step.step_key}`);
 
     const users = await client.query(`
-      SELECT id, role FROM users WHERE status='ACTIVE' AND is_active=true AND role = ANY($1::text[])
+      SELECT id, role FROM users WHERE status='ACTIVE' AND "isActive"=true AND role::text = ANY($1::text[])
     `, [roles.map((r: any) => r.level_code)]);
     if (!users.rows.length) throw new Error('No active approver is available for this workflow step');
 
@@ -241,7 +241,7 @@ export class WorkflowService {
 
       assertDecisionAllowed({ actorId: actor.id, requesterId: task.requested_by, operationalOwnerId: task.context?.operationalOwnerId, amount: Number(task.context?.amount ?? 0) });
 
-      const role = await client.query('SELECT role FROM users WHERE id=$1 AND status=\'ACTIVE\' AND is_active=true', [actor.id]);
+      const role = await client.query('SELECT role FROM users WHERE id=$1 AND status=\'ACTIVE\' AND "isActive"=true', [actor.id]);
       if (!role.rows.length || (task.authority_level_code && role.rows[0].role !== task.authority_level_code)) {
         throw new Error('Approval authority does not match the configured workflow step');
       }
@@ -250,7 +250,7 @@ export class WorkflowService {
       const authority = await client.query(`
         SELECT wa.max_amount FROM workflow_authorities wa
         JOIN role_levels rl ON rl.id=wa.role_level_id
-        WHERE wa.is_active=true AND wa.entity_type=$1 AND rl.level_code=$2
+        WHERE wa."isActive"=true AND wa.entity_type=$1 AND rl."levelCode"=$2
           AND (wa.product_code IS NULL OR wa.product_code=$3)
           AND wa.can_approve=true
         ORDER BY wa.max_amount DESC NULLS FIRST LIMIT 1
@@ -296,7 +296,7 @@ export class WorkflowService {
 
       const next = await client.query(`
         SELECT * FROM workflow_steps WHERE workflow_version_id=(SELECT workflow_version_id FROM workflow_instances WHERE id=$1)
-        AND is_active=true AND step_order>$2 ORDER BY step_order LIMIT 1
+        AND "isActive"=true AND step_order>$2 ORDER BY step_order LIMIT 1
       `, [task.workflow_instance_id, task.step_order]);
 
       if (!next.rows.length) {
@@ -380,9 +380,9 @@ export class WorkflowService {
 
   async listAuthorities() {
     const { rows } = await pool.query(`
-      SELECT wa.*, rl.level_code, rl.level_name, rl.department
+      SELECT wa.*, rl."levelCode", rl."levelName", rl.department
       FROM workflow_authorities wa JOIN role_levels rl ON rl.id=wa.role_level_id
-      ORDER BY rl.department, rl.level_order, wa.entity_type, wa.product_code NULLS FIRST
+      ORDER BY rl.department, rl."levelOrder", wa.entity_type, wa.product_code NULLS FIRST
     `);
     return rows;
   }
