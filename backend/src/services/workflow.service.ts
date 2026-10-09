@@ -1,6 +1,6 @@
 import pool from '../lib/db.js';
 import { randomUUID } from 'crypto';
-import { assertDecisionAllowed, assertDecisionCapability, conditionMatches as matchesConditions, findNextApplicableStep, isStepComplete } from './workflow.policy.js';
+import { assertDecisionAllowed, assertDecisionCapability, assertStepAmountAllowed, conditionMatches as matchesConditions, findNextApplicableStep, isStepComplete } from './workflow.policy.js';
 
 export type WorkflowEntityType = 'POLICY' | 'CLAIM' | 'ENDORSEMENT' | 'CANCELLATION';
 export type WorkflowDecision = 'APPROVED' | 'REJECTED' | 'REQUIRES_MODIFICATION';
@@ -177,6 +177,7 @@ export class WorkflowService {
   }
 
   private async createTasks(client: any, instanceId: string, step: any, requesterId: string, context: any) {
+    assertStepAmountAllowed(Number(context.amount ?? 0), step.min_amount, step.max_amount);
     const authority = await client.query(`
       SELECT wa.*, rl."levelCode" AS level_code, rl.department
       FROM workflow_authorities wa
@@ -199,8 +200,11 @@ export class WorkflowService {
 
     const filtered = users.rows.filter((u: any) => u.id !== requesterId && u.id !== context.operationalOwnerId);
     if (!filtered.length) throw new Error('Segregation of duties: requester cannot be the only approver');
+    if (step.approval_mode === 'QUORUM' && filtered.length < Number(step.required_approvals)) {
+      throw new Error(`Quorum requires ${step.required_approvals} approvers, but only ${filtered.length} eligible approver(s) are available`);
+    }
 
-    const selected = step.approval_mode === 'ALL' || step.approval_mode === 'QUORUM' ? filtered : filtered;
+    const selected = filtered;
     for (const u of selected) {
       await client.query(`
         INSERT INTO workflow_tasks(workflow_instance_id,workflow_step_id,assignee_user_id,authority_level_code,status,due_at)
@@ -249,7 +253,7 @@ export class WorkflowService {
       if (!instanceLock.rows.length) throw new Error('Approval task is unavailable, already decided, or you are not assigned to it');
 
       const taskResult = await client.query(`
-        SELECT wt.*, wi.*, ws.step_order, ws.approval_mode, ws.required_approvals, ws.authority_level_code,
+        SELECT wt.*, wi.*, ws.step_order, ws.approval_mode, ws.required_approvals, ws.authority_level_code, ws.min_amount, ws.max_amount,
                ws.name AS step_name, wv.version_no, wd.code AS workflow_code
         FROM workflow_tasks wt
         JOIN workflow_instances wi ON wi.id=wt.workflow_instance_id
@@ -270,6 +274,7 @@ export class WorkflowService {
       }
 
       const amount = Number(task.context?.amount ?? 0);
+      assertStepAmountAllowed(amount, task.min_amount, task.max_amount);
       const authority = await client.query(`
         SELECT wa.max_amount, wa.can_approve, wa.can_reject, wa.can_modify
         FROM workflow_authorities wa
