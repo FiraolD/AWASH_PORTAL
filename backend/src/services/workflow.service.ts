@@ -1,6 +1,6 @@
 import pool from '../lib/db.js';
 import { randomUUID } from 'crypto';
-import { assertDecisionAllowed, assertDecisionCapability, assertStepAmountAllowed, conditionMatches as matchesConditions, findNextApplicableStep, isStepComplete } from './workflow.policy.js';
+import { assertDecisionAllowed, assertDecisionCapability, assertQuorumFeasible, assertStepAmountAllowed, conditionMatches as matchesConditions, findNextApplicableStep, isStepComplete } from './workflow.policy.js';
 
 export type WorkflowEntityType = 'POLICY' | 'CLAIM' | 'ENDORSEMENT' | 'CANCELLATION';
 export type WorkflowDecision = 'APPROVED' | 'REJECTED' | 'REQUIRES_MODIFICATION';
@@ -200,9 +200,7 @@ export class WorkflowService {
 
     const filtered = users.rows.filter((u: any) => u.id !== requesterId && u.id !== context.operationalOwnerId);
     if (!filtered.length) throw new Error('Segregation of duties: requester cannot be the only approver');
-    if (step.approval_mode === 'QUORUM' && filtered.length < Number(step.required_approvals)) {
-      throw new Error(`Quorum requires ${step.required_approvals} approvers, but only ${filtered.length} eligible approver(s) are available`);
-    }
+    if (step.approval_mode === 'QUORUM') assertQuorumFeasible(Number(step.required_approvals), filtered.length);
 
     const selected = filtered;
     for (const u of selected) {
