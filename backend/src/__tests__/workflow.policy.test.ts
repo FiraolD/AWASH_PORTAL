@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assertDecisionAllowed, conditionMatches, isStepComplete } from '../services/workflow.policy.js';
+import { assertDecisionAllowed, assertDecisionCapability, conditionMatches, isStepComplete } from '../services/workflow.policy.js';
 
 test('workflow conditions match only when all configured context values match', () => {
   assert.equal(conditionMatches({ productCode: 'MOTOR', amountBand: 'HIGH' }, { productCode: 'MOTOR', amountBand: 'HIGH' }), true);
@@ -39,4 +39,12 @@ test('authority limit blocks amount above the configured maximum', () => {
 
 test('missing authority ceiling does not invent an amount limit', () => {
   assert.doesNotThrow(() => assertDecisionAllowed({ actorId: 'u2', requesterId: 'u1', amount: 100000, maxAmount: null }));
+});
+
+
+test('authority matrix enforces approve, reject, and modification permissions independently', () => {
+  assert.doesNotThrow(() => assertDecisionCapability('APPROVED', { can_approve: true, can_reject: false, can_modify: false }));
+  assert.throws(() => assertDecisionCapability('REJECTED', { can_approve: true, can_reject: false, can_modify: true }), /does not permit the rejected decision/);
+  assert.throws(() => assertDecisionCapability('REQUIRES_MODIFICATION', { can_approve: true, can_reject: true, can_modify: false }), /does not permit the requires modification decision/);
+  assert.throws(() => assertDecisionCapability('APPROVED', {}), /does not permit the approved decision/);
 });
