@@ -19,3 +19,5 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+// Compatibility default for legacy imports; this is the Axios singleton, not apiClient.
+export default axios;
