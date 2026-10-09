@@ -131,6 +131,10 @@ CREATE INDEX IF NOT EXISTS idx_workflow_steps_version_order ON workflow_steps(wo
 CREATE INDEX IF NOT EXISTS idx_workflow_authorities_lookup ON workflow_authorities(entity_type, product_code, is_active);
 CREATE INDEX IF NOT EXISTS idx_workflow_instances_queue ON workflow_instances(status, entity_type, current_step_order);
 CREATE INDEX IF NOT EXISTS idx_workflow_instances_entity ON workflow_instances(entity_type, entity_id);
+-- Prevent duplicate in-flight workflows for the same business entity under concurrent submissions.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_workflow_instances_one_open_per_entity
+  ON workflow_instances(entity_type, entity_id)
+  WHERE status IN ('PENDING','IN_PROGRESS');
 CREATE INDEX IF NOT EXISTS idx_workflow_tasks_queue ON workflow_tasks(status, authority_level_code, due_at);
 CREATE INDEX IF NOT EXISTS idx_workflow_tasks_instance ON workflow_tasks(workflow_instance_id);
 CREATE INDEX IF NOT EXISTS idx_workflow_decisions_instance ON workflow_decisions(workflow_instance_id, created_at);
