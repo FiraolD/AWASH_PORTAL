@@ -527,7 +527,7 @@ router.post('/:id/respond', async (req, res) => {
       workflowInstance = await workflowService.startInstance({
         entityType: 'POLICY',
         entityId: policyId,
-        requestedBy: policy.underwriterId || userId,
+        requestedBy: userId,
         context: {
           referenceNumber: policy.policyNumber,
           amount: Number(finalTotalPremium || 0),
