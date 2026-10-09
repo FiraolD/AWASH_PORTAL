@@ -184,7 +184,7 @@ export class WorkflowService {
     `, [roles.map((r: any) => r.level_code)]);
     if (!users.rows.length) throw new Error('No active approver is available for this workflow step');
 
-    const filtered = users.rows.filter((u: any) => u.id !== requesterId);
+    const filtered = users.rows.filter((u: any) => u.id !== requesterId && u.id !== context.operationalOwnerId);
     if (!filtered.length) throw new Error('Segregation of duties: requester cannot be the only approver');
 
     const selected = step.approval_mode === 'ALL' || step.approval_mode === 'QUORUM' ? filtered : filtered;
@@ -241,7 +241,7 @@ export class WorkflowService {
 
       assertDecisionAllowed({ actorId: actor.id, requesterId: task.requested_by, operationalOwnerId: task.context?.operationalOwnerId, amount: Number(task.context?.amount ?? 0) });
 
-      const role = await client.query('SELECT role FROM users WHERE id=$1 AND status=\'ACTIVE\' AND "isActive"=true', [actor.id]);
+      const role = await client.query('SELECT role::text AS role FROM users WHERE id=$1 AND status=\'ACTIVE\' AND "isActive"=true', [actor.id]);
       if (!role.rows.length || (task.authority_level_code && role.rows[0].role !== task.authority_level_code)) {
         throw new Error('Approval authority does not match the configured workflow step');
       }
@@ -339,7 +339,7 @@ export class WorkflowService {
       return;
     }
     if (entityType === 'POLICY') {
-      const status = outcome === 'APPROVED' ? 'ACTIVE' : outcome;
+      const status = outcome === 'APPROVED' ? 'ACTIVE' : outcome === 'REJECTED' ? 'REJECTED' : 'PENDING_UNDERWRITING';
       await client.query(`
         UPDATE policies SET status=$1, "approvedBy"=CASE WHEN $1='ACTIVE' THEN $2 ELSE "approvedBy" END,
           "approvedAt"=CASE WHEN $1='ACTIVE' THEN NOW() ELSE "approvedAt" END, "updatedAt"=NOW()
