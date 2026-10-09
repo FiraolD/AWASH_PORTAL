@@ -51,7 +51,7 @@ router.get('/versions/:id', ...requireWorkflowAdmin, async (req,res) => {
 router.get('/role-levels', ...requireWorkflowAdmin, async (_req,res) => {
   try {
     const { rows } = await pool.query(
-      'SELECT id, "levelCode" AS level_code, "levelName" AS level_name, department, "levelOrder" AS level_order FROM role_levels WHERE "isActive"=true ORDER BY department, "levelOrder"
+      'SELECT id, "levelCode" AS level_code, "levelName" AS level_name, department, "levelOrder" AS level_order FROM role_levels WHERE "isActive"=true ORDER BY department, "levelOrder"'
     );
     res.json(rows);
   } catch (e:any) { res.status(500).json({ error:'Failed to load role levels', detail:e.message }); }
