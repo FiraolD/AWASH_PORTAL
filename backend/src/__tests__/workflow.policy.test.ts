@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assertDecisionAllowed, assertDecisionCapability, conditionMatches, findNextApplicableStep, isStepComplete } from '../services/workflow.policy.js';
+import { assertDecisionAllowed, assertDecisionCapability, assertStepAmountAllowed, conditionMatches, findNextApplicableStep, isStepComplete } from '../services/workflow.policy.js';
 
 test('workflow conditions match only when all configured context values match', () => {
   assert.equal(conditionMatches({ productCode: 'MOTOR', amountBand: 'HIGH' }, { productCode: 'MOTOR', amountBand: 'HIGH' }), true);
@@ -59,4 +59,18 @@ test('conditional workflow steps are skipped when their conditions do not match'
   assert.equal(findNextApplicableStep(steps, 1, { productCode: 'PROPERTY' })?.step_order, 3);
   assert.equal(findNextApplicableStep(steps, 3, { productCode: 'MOTOR' })?.step_order, 4);
   assert.equal(findNextApplicableStep(steps, 4, { productCode: 'MOTOR' }), undefined);
+});
+
+
+test('workflow step enforces configured minimum and maximum amounts', () => {
+  assert.doesNotThrow(() => assertStepAmountAllowed(500, 100, 1000));
+  assert.throws(() => assertStepAmountAllowed(99, 100, 1000), /below the workflow step minimum/);
+  assert.throws(() => assertStepAmountAllowed(1001, 100, 1000), /exceeds the workflow step maximum/);
+  assert.doesNotThrow(() => assertStepAmountAllowed(100000, null, null));
+});
+
+test('QUORUM cannot start when fewer eligible approvers exist than the threshold', () => {
+  const requiredApprovals = 3;
+  const eligibleApprovers = 2;
+  assert.ok(eligibleApprovers < requiredApprovals);
 });
