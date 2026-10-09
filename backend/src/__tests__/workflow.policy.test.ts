@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assertDecisionAllowed, assertDecisionCapability, assertStepAmountAllowed, conditionMatches, findNextApplicableStep, isStepComplete } from '../services/workflow.policy.js';
+import { assertDecisionAllowed, assertDecisionCapability, assertQuorumFeasible, assertStepAmountAllowed, conditionMatches, findNextApplicableStep, isStepComplete } from '../services/workflow.policy.js';
 
 test('workflow conditions match only when all configured context values match', () => {
   assert.equal(conditionMatches({ productCode: 'MOTOR', amountBand: 'HIGH' }, { productCode: 'MOTOR', amountBand: 'HIGH' }), true);
@@ -70,7 +70,7 @@ test('workflow step enforces configured minimum and maximum amounts', () => {
 });
 
 test('QUORUM cannot start when fewer eligible approvers exist than the threshold', () => {
-  const requiredApprovals = 3;
-  const eligibleApprovers = 2;
-  assert.ok(eligibleApprovers < requiredApprovals);
+  assert.doesNotThrow(() => assertQuorumFeasible(2, 2));
+  assert.throws(() => assertQuorumFeasible(3, 2), /only 2 eligible approver/);
+  assert.throws(() => assertQuorumFeasible(0, 5), /positive integer/);
 });
