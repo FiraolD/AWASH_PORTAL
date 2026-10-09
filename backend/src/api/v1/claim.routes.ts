@@ -542,7 +542,7 @@ router.post('/:id/review', authenticate, authorize(...CLAIM_ROLES), validateBody
       const instance = await workflowService.startInstance({
         entityType: 'CLAIM',
         entityId: id,
-        requestedBy: claim.assignedOfficer || claim.userId || userId,
+        requestedBy: userId,
         context: {
           referenceNumber: claim.claimNumber,
           amount: approvedAmount ? Number(approvedAmount) : Number(claim.estimatedAmount || 0),
