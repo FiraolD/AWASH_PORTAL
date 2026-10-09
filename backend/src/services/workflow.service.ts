@@ -104,10 +104,7 @@ export class WorkflowService {
         UPDATE workflow_versions SET status='ACTIVE', effective_from=NOW(), effective_to=NULL
         WHERE id=$1
       `, [versionId]);
-      await client.query(`
-        INSERT INTO workflow_history(workflow_instance_id,event_type,actor_user_id,details)
-        SELECT gen_random_uuid(),'WORKFLOW_ACTIVATED',$2,jsonb_build_object('version_id',$1)
-      `, [versionId, actorId]);
+      // Workflow history is instance-scoped. Activation is configuration history, not a runtime instance event.
       await client.query('COMMIT');
       return this.getVersion(versionId);
     } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
