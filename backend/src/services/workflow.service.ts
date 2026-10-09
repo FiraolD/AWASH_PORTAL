@@ -1,6 +1,6 @@
 import pool from '../lib/db.js';
 import { randomUUID } from 'crypto';
-import { assertDecisionAllowed, conditionMatches as matchesConditions, isStepComplete } from './workflow.policy.js';
+import { assertDecisionAllowed, assertDecisionCapability, conditionMatches as matchesConditions, isStepComplete } from './workflow.policy.js';
 
 export type WorkflowEntityType = 'POLICY' | 'CLAIM' | 'ENDORSEMENT' | 'CANCELLATION';
 export type WorkflowDecision = 'APPROVED' | 'REJECTED' | 'REQUIRES_MODIFICATION';
@@ -160,7 +160,20 @@ export class WorkflowService {
       `, [instanceId, input.requestedBy, first.step_order, JSON.stringify({ workflow_code: version.code, version: version.version_no })]);
       await client.query('COMMIT');
       return this.getInstance(instanceId);
-    } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
+    } catch (e: any) {
+      await client.query('ROLLBACK');
+      // Concurrent requests for the same entity may race past the initial lookup.
+      // The partial unique index is the final guard; return the winning instance.
+      if (e?.code === '23505' && e?.constraint === 'idx_workflow_instances_one_open_per_entity') {
+        const concurrent = await pool.query(`
+          SELECT * FROM workflow_instances
+          WHERE entity_type=$1 AND entity_id=$2 AND status IN ('PENDING','IN_PROGRESS')
+          ORDER BY started_at DESC LIMIT 1
+        `, [input.entityType, input.entityId]);
+        if (concurrent.rows.length) return concurrent.rows[0];
+      }
+      throw e;
+    } finally { client.release(); }
   }
 
   private async createTasks(client: any, instanceId: string, step: any, requesterId: string, context: any) {
@@ -225,6 +238,16 @@ export class WorkflowService {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+      // Lock the instance before its task so two different approvers cannot advance
+      // the same workflow concurrently or deadlock while cancelling sibling tasks.
+      const instanceLock = await client.query(`
+        SELECT wi.id FROM workflow_instances wi
+        JOIN workflow_tasks wt ON wt.workflow_instance_id=wi.id
+        WHERE wt.id=$1 AND wt.assignee_user_id=$2 AND wt.status='PENDING'
+        FOR UPDATE OF wi
+      `, [taskId, actor.id]);
+      if (!instanceLock.rows.length) throw new Error('Approval task is unavailable, already decided, or you are not assigned to it');
+
       const taskResult = await client.query(`
         SELECT wt.*, wi.*, ws.step_order, ws.approval_mode, ws.required_approvals, ws.authority_level_code,
                ws.name AS step_name, wv.version_no, wd.code AS workflow_code
@@ -248,15 +271,18 @@ export class WorkflowService {
 
       const amount = Number(task.context?.amount ?? 0);
       const authority = await client.query(`
-        SELECT wa.max_amount FROM workflow_authorities wa
+        SELECT wa.max_amount, wa.can_approve, wa.can_reject, wa.can_modify
+        FROM workflow_authorities wa
         JOIN role_levels rl ON rl.id=wa.role_level_id
-        WHERE wa.is_active=true AND wa.entity_type=$1 AND rl."levelCode"=$2
+        WHERE wa.is_active=true AND rl."isActive"=true AND wa.entity_type=$1 AND rl."levelCode"=$2
           AND (wa.product_code IS NULL OR wa.product_code=$3)
-          AND wa.can_approve=true
-        ORDER BY wa.max_amount DESC NULLS FIRST LIMIT 1
+        ORDER BY (wa.product_code=$3) DESC NULLS LAST, wa.max_amount DESC NULLS FIRST LIMIT 1
       `, [task.entity_type, role.rows[0].role, task.context?.productCode ?? null]);
-      const maxAmount = authority.rows[0]?.max_amount;
+      const authorityRow = authority.rows[0];
+      if (!authorityRow) throw new Error('No active approval authority is configured for this user and entity');
+      const maxAmount = authorityRow.max_amount;
       assertDecisionAllowed({ actorId: actor.id, requesterId: task.requested_by, operationalOwnerId: task.context?.operationalOwnerId, amount, maxAmount });
+      assertDecisionCapability(decision, authorityRow);
 
       await client.query(`
         INSERT INTO workflow_decisions(workflow_instance_id,workflow_task_id,actor_user_id,decision,comment,metadata)
