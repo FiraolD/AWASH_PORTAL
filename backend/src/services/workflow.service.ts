@@ -299,6 +299,8 @@ export class WorkflowService {
         AND is_active=true AND step_order>$2 ORDER BY step_order LIMIT 1
       `, [task.workflow_instance_id, task.step_order]);
 
+      // Once a step reaches its completion rule, outstanding parallel tasks are no longer actionable.
+      await client.query("UPDATE workflow_tasks SET status='CANCELLED', updated_at=NOW() WHERE workflow_instance_id=$1 AND workflow_step_id=$2 AND status='PENDING'", [task.workflow_instance_id, task.workflow_step_id]);
       if (!next.rows.length) {
         await client.query('UPDATE workflow_instances SET status=\'APPROVED\', completed_at=NOW(), updated_at=NOW() WHERE id=$1', [task.workflow_instance_id]);
         await this.applyEntityOutcome(client, task.entity_type, task.entity_id, 'APPROVED', actor.id, task.context);
@@ -307,7 +309,6 @@ export class WorkflowService {
           VALUES($1,'WORKFLOW_COMPLETED',$2,$3,'IN_PROGRESS','APPROVED',$4)
         `, [task.workflow_instance_id, actor.id, task.step_order, JSON.stringify({ workflow_code: task.workflow_code })]);
       } else {
-        await client.query("UPDATE workflow_tasks SET status='CANCELLED', updated_at=NOW() WHERE workflow_instance_id=$1 AND workflow_step_id=$2 AND status='PENDING'", [task.workflow_instance_id, task.workflow_step_id]);
         await client.query('UPDATE workflow_instances SET status=\'IN_PROGRESS\', current_step_order=$2, updated_at=NOW() WHERE id=$1', [task.workflow_instance_id, next.rows[0].step_order]);
         await this.createTasks(client, task.workflow_instance_id, next.rows[0], task.requested_by, { ...(task.context ?? {}), entityType: task.entity_type });
         await client.query(`
@@ -380,7 +381,7 @@ export class WorkflowService {
 
   async listAuthorities() {
     const { rows } = await pool.query(`
-      SELECT wa.*, rl."levelCode", rl."levelName", rl.department
+      SELECT wa.*, rl."levelCode" AS level_code, rl."levelName" AS level_name, rl.department
       FROM workflow_authorities wa JOIN role_levels rl ON rl.id=wa.role_level_id
       ORDER BY rl.department, rl."levelOrder", wa.entity_type, wa.product_code NULLS FIRST
     `);
