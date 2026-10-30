@@ -238,7 +238,15 @@ export default function App() {
           </Route>
 
           {/* ==================== MASTER ADMIN ==================== */}
-          <Route path="admin">\n            <Route\n              path="sql"\n              element={\n                <RoleGuard allowedRoles={[UserRole.MASTER_ADMIN, UserRole.SYSTEM_ADMIN, UserRole.SUPER_ADMIN]}>\n                  <SqlQueryPage />\n                </RoleGuard>\n              }\n            />
+          <Route path="admin">
+            <Route
+              path="sql"
+              element={
+                <RoleGuard allowedRoles={[UserRole.MASTER_ADMIN, UserRole.SYSTEM_ADMIN, UserRole.SUPER_ADMIN]}>
+                  <SqlQueryPage />
+                </RoleGuard>
+              }
+            />
             <Route
               path="users"
               element={
