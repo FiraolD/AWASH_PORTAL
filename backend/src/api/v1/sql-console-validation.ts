@@ -4,7 +4,7 @@ const BLOCKED_KEYWORDS = /\b(delete|merge|upsert|create|alter|drop|truncate|gran
 // This denylist is defense-in-depth, not a complete PostgreSQL function sandbox.
 const BLOCKED_FUNCTIONS = /\b(nextval|setval|set_config|pg_read_file|pg_read_binary_file|pg_ls_dir|lo_import|lo_export|lo_create|lo_put|lo_unlink|dblink|dblink_exec|pg_terminate_backend|pg_cancel_backend|pg_reload_conf|pg_rotate_logfile|pg_stat_reset|pg_stat_reset_shared|pg_advisory_lock|pg_advisory_xact_lock|pg_advisory_unlock|pg_advisory_unlock_all|pg_notify|pg_logical_emit_message|pg_sleep|pg_sleep_for|pg_sleep_until)\s*\(/i;
 
-type SqlOperation = 'SELECT' | 'INSERT' | 'UPDATE';
+export type SqlOperation = 'SELECT' | 'INSERT' | 'UPDATE';
 
 function stripQuotedContent(sql: string): string {
   return sql
