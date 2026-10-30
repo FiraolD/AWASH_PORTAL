@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api/v1';
+// Browser requests use the Vercel same-origin proxy. The HttpOnly session
+// cookie is therefore first-party and does not depend on third-party cookies.
+const API_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
 export const apiClient = axios.create({
   baseURL: API_URL,
@@ -11,10 +13,11 @@ export const apiClient = axios.create({
 
 apiClient.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('awash-auth-storage');
-      window.location.href = '/login';
+  (error) => {
+    const requestUrl = String(error.config?.url || '');
+    const isLoginRequest = requestUrl.includes('/auth/login');
+    if (error.response?.status === 401 && !isLoginRequest) {
+      window.dispatchEvent(new Event('awash:unauthorized'));
     }
     return Promise.reject(error);
   }
