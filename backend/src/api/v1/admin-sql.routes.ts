@@ -9,7 +9,7 @@ const MAX_SQL_LENGTH = 10_000;
 const MAX_ROWS = 200;
 const STATEMENT_TIMEOUT_MS = 5_000;
 const ALLOWED_ROLES = ['MASTER_ADMIN', 'SYSTEM_ADMIN', 'SUPER_ADMIN'] as const;
-const BLOCKED_KEYWORDS = /\\b(delete|merge|upsert|create|alter|drop|truncate|grant|revoke|comment|copy|call|do|execute|prepare|deallocate|refresh|vacuum|analyze|reindex|cluster|listen|notify|unlisten|set|reset|discard|lock|begin|commit|rollback|savepoint|release|into)\\b/i;
+const BLOCKED_KEYWORDS = /\\b(delete|merge|upsert|create|alter|drop|truncate|grant|revoke|comment|copy|call|do|execute|prepare|deallocate|refresh|vacuum|analyze|reindex|cluster|listen|notify|unlisten|set|reset|discard|lock|begin|commit|rollback|savepoint|release)\\b/i;
 const BLOCKED_FUNCTIONS = /\\b(nextval|setval|set_config|pg_read_file|pg_read_binary_file|pg_ls_dir|lo_import|lo_export|dblink|dblink_exec|pg_terminate_backend|pg_cancel_backend|pg_reload_conf|pg_rotate_logfile|pg_stat_reset|pg_stat_reset_shared|pg_advisory_lock|pg_advisory_xact_lock)\\s*\\(/i;
 
 type SqlOperation = 'SELECT' | 'INSERT' | 'UPDATE';
