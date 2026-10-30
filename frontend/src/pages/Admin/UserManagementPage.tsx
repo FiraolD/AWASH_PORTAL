@@ -99,72 +99,48 @@ export default function UserManagementPage() {
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   const { token } = useAuthStore();
 
+  // The auth store is the source of truth for the active access token.
+  // The token is intentionally not persisted to localStorage.
   useEffect(() => {
-    fetchUsers();
-  }, []);
-
-useEffect(() => {
-  console.log('Token from store:', token);
-  if (token) {
-    fetchUsers();
-  } else {
-    console.error('No token found, user not authenticated');
-    toast.error('Authentication required. Please login again.');
-  }
-}, [token]);
-const fetchUsers = async () => {
-  try {
-    setLoading(true);
-    console.log('Fetching users...');
-    
-    // Get token directly from localStorage
-    const stored = localStorage.getItem('awash-auth-storage');
-    let authToken = null;
-    
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      authToken = parsed.state?.token;
-      console.log('Retrieved token from localStorage:', authToken ? 'Yes' : 'No');
-    }
-    
-    if (!authToken) {
-      console.error('No authentication token found');
-      toast.error('Please login again');
-      window.location.href = '/login';
+    if (!token) {
+      setLoading(false);
+      toast.error('Your session is not authenticated. Please sign in again.');
       return;
     }
-    
-    const response = await axios.get(`${API_URL}/users`, {
-      headers: { 
-        'Authorization': `Bearer ${authToken}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    console.log('Users fetched:', response.data);
-    setUsers(response.data);
-  } catch (error: unknown) {
-    console.error('Failed to fetch users:', error);
-    if (axios.isAxiosError(error) && error.response?.status === 401) {
-      toast.error('Session expired. Please login again.');
-      // Clear localStorage and redirect to login
-      localStorage.removeItem('awash-auth-storage');
-      window.location.href = '/login';
-    } else {
-      toast.error('Failed to load users');
+    void fetchUsers();
+  }, [token]);
+
+  const fetchUsers = async () => {
+    const authToken = useAuthStore.getState().token;
+    if (!authToken) {
+      setLoading(false);
+      return;
     }
-  } finally {
-    setLoading(false);
-  }
-};
-const getAuthToken = () => {
-  const stored = localStorage.getItem('awash-auth-storage');
-  if (stored) {
-    const parsed = JSON.parse(stored);
-    return parsed.state?.token;
-  }
-  return null;
-};
+
+    try {
+      setLoading(true);
+      const response = await axios.get(`${API_URL}/users`, {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      setUsers(response.data);
+    } catch (error: unknown) {
+      console.error('Failed to fetch users:', error);
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        toast.error('Session expired. Please sign in again.');
+        useAuthStore.getState().logout();
+        window.location.href = '/login';
+      } else {
+        toast.error('Failed to load users');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getAuthToken = () => useAuthStore.getState().token;
 
 const updateUserRole = async (userId: string, newRole: string) => {
   const token = getAuthToken();
