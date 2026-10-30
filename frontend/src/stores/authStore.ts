@@ -1,6 +1,6 @@
-﻿import { create } from 'zustand';
+import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { apiClient as axiosInstance } from '../api/client';
+import { apiClient } from '../api/client';
 
 interface User {
   id: string;
@@ -16,6 +16,7 @@ interface User {
 
 interface AuthState {
   user: User | null;
+  /** Deprecated compatibility field. Browser sessions use an HttpOnly cookie. */
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -37,64 +38,55 @@ interface RegisterData {
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
-  user: null,
-  token: null,
-  isAuthenticated: false,
-  isLoading: false,
+      user: null,
+      token: null,
+      isAuthenticated: false,
+      isLoading: true,
 
-  login: async (email: string, password: string) => {
-    set({ isLoading: true });
-    try {
-      const response = await axiosInstance.post('/auth/login', { email, password });
-      const { user, token } = response.data;
-      
-      set({ user, token, isAuthenticated: true, isLoading: false });
-      
-    } catch (error: any) {
-      set({ isLoading: false });
-      throw error.response?.data?.error || 'Login failed';
-    }
-  },
+      login: async (email, password) => {
+        set({ isLoading: true });
+        try {
+          const response = await apiClient.post('/auth/login', { email, password });
+          // The server sets the HttpOnly cookie; no JWT is exposed to JavaScript.
+          set({ user: response.data.user, token: null, isAuthenticated: true, isLoading: false });
+        } catch (error: any) {
+          set({ isLoading: false });
+          throw error.response?.data?.error || 'Login failed';
+        }
+      },
 
-  register: async (data: RegisterData) => {
-    set({ isLoading: true });
-    try {
-      const response = await axiosInstance.post('/auth/signup', data);
-      const { user } = response.data;
+      register: async (data) => {
+        set({ isLoading: true });
+        try {
+          const response = await apiClient.post('/auth/signup', data);
+          set({ user: response.data.user, token: null, isAuthenticated: false, isLoading: false });
+        } catch (error: any) {
+          set({ isLoading: false });
+          throw error.response?.data?.error || 'Registration failed';
+        }
+      },
 
-      // Accounts require email verification before authentication.
-      set({ user, token: null, isAuthenticated: false, isLoading: false });
-      
-    } catch (error: any) {
-      set({ isLoading: false });
-      throw error.response?.data?.error || 'Registration failed';
-    }
-  },
+      updateUser: (updates) => {
+        const current = get().user;
+        if (current) set({ user: { ...current, ...updates } });
+      },
 
-  updateUser: (updates: Partial<User>) => {
-    const current = get().user;
-    if (!current) return;
-    const user = { ...current, ...updates };
-    set({ user });
+      logout: () => {
+        void apiClient.post('/auth/logout').catch(() => undefined);
+        set({ user: null, token: null, isAuthenticated: false, isLoading: false });
+      },
 
-  },
-
-  logout: () => {
-    void axiosInstance.post('/auth/logout').catch(() => undefined);
-    set({ user: null, token: null, isAuthenticated: false, isLoading: false });
-  },
-
-  fetchUser: async () => {
-    set({ isLoading: true });
-    try {
-      const response = await axiosInstance.get('/auth/profile');
-      const user = response.data;
-      set({ user, isAuthenticated: true, isLoading: false });
-    } catch (error) {
-      set({ isLoading: false, isAuthenticated: false });
-      get().logout();
-    }
-  },
+      // Revalidate the server-managed session on every page load. Persisted
+      // profile data is only a UI cache and never grants access by itself.
+      fetchUser: async () => {
+        set({ isLoading: true });
+        try {
+          const response = await apiClient.get('/auth/profile');
+          set({ user: response.data, token: null, isAuthenticated: true, isLoading: false });
+        } catch {
+          set({ user: null, token: null, isAuthenticated: false, isLoading: false });
+        }
+      },
     }),
     {
       name: 'awash-auth-storage',
@@ -102,5 +94,3 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 );
-
-
