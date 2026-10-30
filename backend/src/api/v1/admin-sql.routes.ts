@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { createHash, randomUUID } from 'node:crypto';
+import type { PoolClient } from 'pg';
 import pool from '../../lib/db.js';
 import { authenticate, authorize, AuthRequest } from '../../middleware/auth.middleware.js';
 
@@ -78,7 +79,7 @@ router.post('/query', authenticate, authorize(...ALLOWED_ROLES), async (req: Aut
 
   const queryHash = createHash('sha256').update(sql).digest('hex');
   const startedAt = Date.now();
-  let client: Awaited<ReturnType<typeof pool.connect>> | undefined;
+  let client: PoolClient | undefined;
 
   try {
     client = await pool.connect();
