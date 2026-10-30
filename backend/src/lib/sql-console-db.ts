@@ -19,7 +19,7 @@ export function getSqlConsolePool(): InstanceType<typeof Pool> | null {
       ? false
       : {
           rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false',
-          ...(process.env.DB_SSL_CA ? { ca: process.env.DB_SSL_CA.replace(/\\\\n/g, '\\n') } : {}),
+          ...(process.env.DB_SSL_CA ? { ca: process.env.DB_SSL_CA.replace(/\\n/g, '\n') } : {}),
         };
 
     sqlConsolePool = new Pool({
