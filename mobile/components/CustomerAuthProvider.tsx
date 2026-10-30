@@ -72,7 +72,7 @@ export function CustomerAuthProvider({ children }: PropsWithChildren) {
     setError(null);
     const result = await customerRequest<{ user: Customer; token: string }>('/auth/login', '', {
       method: 'POST',
-      headers: {},
+      headers: { 'X-Client-Type': 'mobile' },
       body: JSON.stringify({ email: email.trim(), password }),
     });
     if (result.user.role !== 'CUSTOMER') {
