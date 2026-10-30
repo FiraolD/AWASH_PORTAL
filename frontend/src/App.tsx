@@ -113,6 +113,16 @@ const LoadingFallback = () => (
 // MAIN APP
 // ============================================
 export default function App() {
+  React.useEffect(() => {
+    void useAuthStore.getState().fetchUser();
+
+    const handleUnauthorized = () => {
+      useAuthStore.setState({ user: null, token: null, isAuthenticated: false, isLoading: false });
+    };
+    window.addEventListener('awash:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('awash:unauthorized', handleUnauthorized);
+  }, []);
+
   return (
     <React.Suspense fallback={<LoadingFallback />}>
       <Toaster position="top-right" richColors closeButton />
