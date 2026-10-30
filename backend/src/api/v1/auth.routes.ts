@@ -263,6 +263,9 @@ router.post('/login', authRateLimit, async (req, res: Response) => {
         email: user.email,
         role: user.role,
       },
+      // Native mobile clients explicitly request a bearer token. Browser
+      // clients receive only the HttpOnly cookie, never a JS-readable JWT.
+      ...(req.header('X-Client-Type') === 'mobile' ? { token } : {}),
     });
   } catch (error: any) {
     console.error('[Auth] Login error:', error.message);
