@@ -37,6 +37,7 @@ const ProductManagementPage = React.lazy(() => import('./pages/Admin/ProductMana
 //const WorkflowConfigPage = React.lazy(() => import('./pages/Admin/WorkflowConfigPage'));
 const AuditLogsPage = React.lazy(() => import('./pages/Admin/AuditLogsPage'));
 const ApprovalRulesConfigPage = React.lazy(() => import('./pages/Admin/ApprovalRulesConfigPage'));
+const SqlQueryPage = React.lazy(() => import('./pages/Admin/SqlQueryPage'));
 
 // ============================================
 // CUSTOMER ADMIN PAGES
@@ -237,7 +238,7 @@ export default function App() {
           </Route>
 
           {/* ==================== MASTER ADMIN ==================== */}
-          <Route path="admin">
+          <Route path="admin">\n            <Route\n              path="sql"\n              element={\n                <RoleGuard allowedRoles={[UserRole.MASTER_ADMIN, UserRole.SYSTEM_ADMIN, UserRole.SUPER_ADMIN]}>\n                  <SqlQueryPage />\n                </RoleGuard>\n              }\n            />
             <Route
               path="users"
               element={
