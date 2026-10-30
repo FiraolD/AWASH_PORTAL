@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import pool from '../../lib/db.js';
 import { authenticate, authorize, AuthRequest } from '../../middleware/auth.middleware.js';
 
@@ -43,7 +43,7 @@ function normalizeSql(input: unknown): string {
     throw new Error('This query contains a command that is not allowed in the read-only console.');
   }
 
-  return statement;
+  if (/\\b(nextval|setval|set_config|pg_read_file|pg_read_binary_file|pg_ls_dir|lo_import|lo_export|dblink|dblink_exec|pg_terminate_backend|pg_cancel_backend|pg_reload_conf|pg_rotate_logfile|pg_stat_reset|pg_stat_reset_shared|pg_advisory_lock|pg_advisory_xact_lock)\\s*\\(/i.test(statement)) {\n    throw new Error('This query calls a function that is not allowed in the read-only console.');\n  }\n\n  return statement;
 }
 
 function toJsonSafe(value: unknown): unknown {
