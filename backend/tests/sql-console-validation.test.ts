@@ -58,5 +58,5 @@ test('rejects SELECT INTO and EXPLAIN', () => {
 
 test('rejects oversized queries and empty input', () => {
   assert.throws(() => normalizeSql('   '), /Enter a SQL query/i);
-  assert.throws(() => normalizeSql('SELECT 1 ' + ' '.repeat(10001)), /character limit/i);
+  assert.throws(() => normalizeSql('SELECT 1 ' + 'x'.repeat(10001)), /character limit/i);
 });
