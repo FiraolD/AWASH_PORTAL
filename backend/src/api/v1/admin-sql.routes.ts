@@ -122,7 +122,7 @@ router.post('/query', authenticate, authorize(...ALLOWED_ROLES), async (req: Aut
 
   try {
     client = await pool.connect();
-    await client.query('BEGIN');
+    await client.query(operation === 'SELECT' ? 'BEGIN READ ONLY' : 'BEGIN');
     await client.query('SET LOCAL statement_timeout = ' + STATEMENT_TIMEOUT_MS);
     await client.query('SET LOCAL idle_in_transaction_session_timeout = 10000');
 
