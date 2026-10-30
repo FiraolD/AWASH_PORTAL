@@ -60,7 +60,11 @@ export function normalizeSql(input: unknown): { sql: string; operation: SqlOpera
     if (BLOCKED_FUNCTIONS.test(safeScan)) throw new Error('This query calls a function that is not allowed in the SQL console.');
   }
 
-  if (operation !== 'SELECT' && /\baudit_logs\b/i.test(statement)) {\n    throw new Error('The audit_logs table is protected from direct SQL modifications.');\n  }\n\n  if (operation === 'INSERT' && !/\breturning\b/i.test(safeScan)) {
+  if (operation !== 'SELECT' && /\baudit_logs\b/i.test(statement)) {
+    throw new Error('The audit_logs table is protected from direct SQL modifications.');
+  }
+
+  if (operation === 'INSERT' && !/\breturning\b/i.test(safeScan)) {
     throw new Error('INSERT statements must include RETURNING so the affected rows can be reviewed.');
   }
   if (operation === 'UPDATE') {
