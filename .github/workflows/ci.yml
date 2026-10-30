@@ -29,6 +29,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Backend tests
+        if: matrix.workspace == 'backend'
+        run: npm test
+
       - name: Lint
         if: matrix.workspace == 'frontend'
         run: npm run lint
