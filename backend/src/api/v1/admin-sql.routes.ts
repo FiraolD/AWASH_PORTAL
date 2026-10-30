@@ -5,11 +5,12 @@ import pool from '../../lib/db.js';
 import { getSqlConsolePool } from '../../lib/sql-console-db.js';
 import { authenticate, authorize, AuthRequest } from '../../middleware/auth.middleware.js';
 
+import { normalizeSql, type SqlOperation } from './sql-console-validation.js';
+
 const router = Router();
 const MAX_ROWS = 200;
 const STATEMENT_TIMEOUT_MS = 5_000;
 const ALLOWED_ROLES = ['MASTER_ADMIN', 'SYSTEM_ADMIN', 'SUPER_ADMIN'] as const;
-import { normalizeSql, type SqlOperation } from './sql-console-validation.js';
 
 function toJsonSafe(value: unknown): unknown {
   if (typeof value === 'bigint') return value.toString();
