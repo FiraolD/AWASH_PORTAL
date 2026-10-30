@@ -11,31 +11,25 @@ const ALLOWED_ROLES = ['MASTER_ADMIN', 'SYSTEM_ADMIN', 'SUPER_ADMIN'];
 
 function normalizeSql(input: unknown): string {
   if (typeof input !== 'string') throw new Error('Enter a SQL query.');
-
   const sql = input.trim();
   if (!sql) throw new Error('Enter a SQL query.');
-  if (sql.length > MAX_SQL_LENGTH) {
-    throw new Error(\`Query exceeds the \${MAX_SQL_LENGTH.toLocaleString()} character limit.\`);
-  }
+  if (sql.length > MAX_SQL_LENGTH) throw new Error(\`Query exceeds the \${MAX_SQL_LENGTH.toLocaleString()} character limit.\`);
 
-  // Reject comments and multiple statements to keep the console predictable.
   if (sql.includes('--') || sql.includes('/*') || sql.includes('*/')) {
     throw new Error('SQL comments are not supported in the query console.');
   }
 
-  const statement = sql.replace(/;\\s*$/, '').trim();
+  const statement = sql.replace(/;\s*$/, '').trim();
   if (statement.includes(';')) throw new Error('Only one SQL statement can be executed at a time.');
-  if (!/^(select|with)\\b/i.test(statement)) {
+  if (!/^(select|with)\b/i.test(statement)) {
     throw new Error('Only SELECT queries and read-only CTE queries are allowed.');
   }
 
-  if (/\\b(insert|update|delete|merge|upsert|create|alter|drop|truncate|grant|revoke|comment|copy|call|do|execute|prepare|deallocate|refresh|vacuum|analyze|reindex|cluster|listen|notify|unlisten|set|reset|discard|lock)\\b/i.test(statement)) {
+  if (/\b(insert|update|delete|merge|upsert|create|alter|drop|truncate|grant|revoke|comment|copy|call|do|execute|prepare|deallocate|refresh|vacuum|analyze|reindex|cluster|listen|notify|unlisten|set|reset|discard|lock)\b/i.test(statement)) {
     throw new Error('This query contains a command that is not allowed in the read-only console.');
   }
 
-  // Block PostgreSQL functions that can mutate state or access server resources
-  // even when invoked from a SELECT statement.
-  if (/\\b(nextval|setval|set_config|pg_read_file|pg_read_binary_file|pg_ls_dir|lo_import|lo_export|dblink|dblink_exec|pg_terminate_backend|pg_cancel_backend|pg_reload_conf|pg_rotate_logfile|pg_stat_reset|pg_stat_reset_shared|pg_advisory_lock|pg_advisory_xact_lock)\\s*\\(/i.test(statement)) {
+  if (/\b(nextval|setval|set_config|pg_read_file|pg_read_binary_file|pg_ls_dir|lo_import|lo_export|dblink|dblink_exec|pg_terminate_backend|pg_cancel_backend|pg_reload_conf|pg_rotate_logfile|pg_stat_reset|pg_stat_reset_shared|pg_advisory_lock|pg_advisory_xact_lock)\s*\(/i.test(statement)) {
     throw new Error('This query calls a function that is not allowed in the read-only console.');
   }
 
@@ -48,20 +42,12 @@ function toJsonSafe(value: unknown): unknown {
   if (Buffer.isBuffer(value)) return value.toString('base64');
   if (Array.isArray(value)) return value.map(toJsonSafe);
   if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, toJsonSafe(item)])
-    );
+    return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, toJsonSafe(item)]));
   }
   return value;
 }
 
-async function writeQueryAudit(
-  req: AuthRequest,
-  queryHash: string,
-  durationMs: number,
-  rowCount: number,
-  success: boolean
-): Promise<void> {
+async function writeQueryAudit(req: AuthRequest, queryHash: string, durationMs: number, rowCount: number, success: boolean): Promise<void> {
   try {
     await pool.query(
       \`INSERT INTO audit_logs
@@ -101,14 +87,14 @@ router.post('/query', authenticate, authorize(...ALLOWED_ROLES), async (req: Aut
     await client.query(\`SET LOCAL statement_timeout = \${STATEMENT_TIMEOUT_MS}\`);
     await client.query('SET LOCAL idle_in_transaction_session_timeout = 10000');
 
-    // Enforce the row cap inside PostgreSQL, not only in the browser.
     const result = await client.query({
-      text: \`SELECT * FROM (\\n\${sql}\\n) AS admin_sql_result LIMIT \${MAX_ROWS + 1}\`,
+      text: \`SELECT * FROM (
+\${sql}
+) AS admin_sql_result LIMIT \${MAX_ROWS + 1}\`,
       rowMode: 'array',
     });
 
     await client.query('COMMIT');
-
     const truncated = result.rows.length > MAX_ROWS;
     const rows = result.rows.slice(0, MAX_ROWS).map((row) => toJsonSafe(row));
     const durationMs = Date.now() - startedAt;
@@ -132,12 +118,7 @@ router.post('/query', authenticate, authorize(...ALLOWED_ROLES), async (req: Aut
 
     const durationMs = Date.now() - startedAt;
     await writeQueryAudit(req, queryHash, durationMs, 0, false);
-    console.error('[SQL_CONSOLE] Query failed:', {
-      queryHash,
-      code: error?.code,
-      message: error?.message,
-      userId: req.user?.id,
-    });
+    console.error('[SQL_CONSOLE] Query failed:', { queryHash, code: error?.code, message: error?.message, userId: req.user?.id });
 
     res.status(error?.code === '57014' ? 408 : 400).json({
       error: error?.code === '57014'
