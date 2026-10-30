@@ -17,5 +17,5 @@ export const authService = {
     apiClient.post('/auth/reset-password', { token, newPassword }),
 
   getCurrentUser: () =>
-    apiClient.get('/auth/me'),
+    apiClient.get('/auth/profile'),
 };

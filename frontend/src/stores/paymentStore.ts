@@ -1,6 +1,6 @@
 // frontend/src/stores/paymentStore.ts
 import { create } from 'zustand';
-import axios from '../lib/axios';
+import axios from '../api/client';
 import { Payment, PaymentMethod } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';

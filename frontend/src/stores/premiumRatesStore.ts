@@ -1,6 +1,6 @@
 // src/stores/premiumRatesStore.ts
 import { create } from 'zustand';
-import axiosInstance from '../lib/axios';
+import { apiClient as axiosInstance } from '../api/client';
 
 export interface PremiumRate {
   id: string;

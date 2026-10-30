@@ -317,7 +317,7 @@ export default function PolicyDetailsPage() {
         authToken = parsed.state?.token;
       } catch (e) {}
     }
-    return { Authorization: `Bearer ${authToken}` };
+    return authToken ? { Authorization: `Bearer ${authToken}` } : {};
   };
 
   const fetchPolicyDetails = async () => {

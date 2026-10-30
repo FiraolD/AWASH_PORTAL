@@ -79,7 +79,7 @@ export default function CustomerDashboard() {
         authToken = parsed.state?.token;
       } catch (e) {}
     }
-    return { Authorization: `Bearer ${authToken}` };
+    return authToken ? { Authorization: `Bearer ${authToken}` } : {};
   };
 
   const fetchDashboardData = async () => {

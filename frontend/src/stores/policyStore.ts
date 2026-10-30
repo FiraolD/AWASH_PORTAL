@@ -35,7 +35,7 @@ const getAuthHeaders = () => {
       authToken = parsed.state?.token;
     } catch (e) {}
   }
-  return { Authorization: `Bearer ${authToken}` };
+  return authToken ? { Authorization: `Bearer ${authToken}` } : {};
 };
 
 export const usePolicyStore = create<PolicyState>((set, get) => ({

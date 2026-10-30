@@ -4,7 +4,7 @@ import { Input } from './ui/Input';
 import { Label } from './ui/Label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/Dialog';
 import { toast } from 'sonner';
-import axiosInstance from '../lib/axios';
+import { apiClient as axiosInstance } from '../api/client';
 import { Loader2, Copy, CheckCircle } from 'lucide-react';
 
 interface PaymentReferenceGeneratorProps {
