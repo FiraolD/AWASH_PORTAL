@@ -75,7 +75,7 @@ export const navigationConfig = {
     { title: 'Approval Rules', href: '/admin/approval-rules', icon: 'CheckSquare', roles: [UserRole.MASTER_ADMIN] },
     //{ title: 'Workflow Rules', href: '/admin/workflow', icon: 'GitBranch', roles: [UserRole.MASTER_ADMIN] },
     { title: 'Audit Logs', href: '/admin/audit-logs', icon: 'FileSearch', roles: [UserRole.MASTER_ADMIN, UserRole.CEO] },
-    { title: 'System Settings', href: '/admin/settings', icon: 'Settings', roles: [UserRole.MASTER_ADMIN] },
+    { title: 'System Settings', href: '/admin/settings', icon: 'Settings', roles: [UserRole.MASTER_ADMIN] },\n    { title: 'SQL Query Console', href: '/admin/sql', icon: 'Database', roles: MASTER_ADMIN_ROLES },
 
     { title: 'Review Queue', href: '/underwriting/queue', icon: 'Shield', roles: UNDERWRITING_ROLES },
     { title: 'Risk Assessment', href: '/underwriting/risk-assessment', icon: 'Activity', roles: [UserRole.UNDERWRITING_ADMIN, UserRole.UNDERWRITING_OFFICER_II, UserRole.SENIOR_UNDERWRITING_OFFICER, UserRole.SUPERVISOR_UNDERWRITING, ...UNDERWRITING_LEADERSHIP_ROLES] },
