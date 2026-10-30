@@ -9,41 +9,37 @@ const MAX_ROWS = 200;
 const STATEMENT_TIMEOUT_MS = 5_000;
 const ALLOWED_ROLES = ['MASTER_ADMIN', 'SYSTEM_ADMIN', 'SUPER_ADMIN'];
 
-/**
- * This console is intentionally read-only. The PostgreSQL transaction is also
- * marked READ ONLY, so database permissions are not delegated to the browser.
- */
 function normalizeSql(input: unknown): string {
-  if (typeof input !== 'string') {
-    throw new Error('Enter a SQL query.');
-  }
+  if (typeof input !== 'string') throw new Error('Enter a SQL query.');
 
   const sql = input.trim();
   if (!sql) throw new Error('Enter a SQL query.');
   if (sql.length > MAX_SQL_LENGTH) {
-    throw new Error(`Query exceeds the ${MAX_SQL_LENGTH.toLocaleString()} character limit.`);
+    throw new Error(\`Query exceeds the \${MAX_SQL_LENGTH.toLocaleString()} character limit.\`);
   }
 
-  // Keep the console deliberately narrow: one SELECT/CTE statement, no comments
-  // or statement separators that could hide additional commands.
+  // Reject comments and multiple statements to keep the console predictable.
   if (sql.includes('--') || sql.includes('/*') || sql.includes('*/')) {
     throw new Error('SQL comments are not supported in the query console.');
   }
 
-  const statement = sql.replace(/;\s*$/, '').trim();
-  if (statement.includes(';')) {
-    throw new Error('Only one SQL statement can be executed at a time.');
-  }
-
-  if (!/^(select|with)\b/i.test(statement)) {
+  const statement = sql.replace(/;\\s*$/, '').trim();
+  if (statement.includes(';')) throw new Error('Only one SQL statement can be executed at a time.');
+  if (!/^(select|with)\\b/i.test(statement)) {
     throw new Error('Only SELECT queries and read-only CTE queries are allowed.');
   }
 
-  if (/\b(insert|update|delete|merge|upsert|create|alter|drop|truncate|grant|revoke|comment|copy|call|do|execute|prepare|deallocate|refresh|vacuum|analyze|reindex|cluster|listen|notify|unlisten|set|reset|discard|lock)\b/i.test(statement)) {
+  if (/\\b(insert|update|delete|merge|upsert|create|alter|drop|truncate|grant|revoke|comment|copy|call|do|execute|prepare|deallocate|refresh|vacuum|analyze|reindex|cluster|listen|notify|unlisten|set|reset|discard|lock)\\b/i.test(statement)) {
     throw new Error('This query contains a command that is not allowed in the read-only console.');
   }
 
-  if (/\\b(nextval|setval|set_config|pg_read_file|pg_read_binary_file|pg_ls_dir|lo_import|lo_export|dblink|dblink_exec|pg_terminate_backend|pg_cancel_backend|pg_reload_conf|pg_rotate_logfile|pg_stat_reset|pg_stat_reset_shared|pg_advisory_lock|pg_advisory_xact_lock)\\s*\\(/i.test(statement)) {\n    throw new Error('This query calls a function that is not allowed in the read-only console.');\n  }\n\n  return statement;
+  // Block PostgreSQL functions that can mutate state or access server resources
+  // even when invoked from a SELECT statement.
+  if (/\\b(nextval|setval|set_config|pg_read_file|pg_read_binary_file|pg_ls_dir|lo_import|lo_export|dblink|dblink_exec|pg_terminate_backend|pg_cancel_backend|pg_reload_conf|pg_rotate_logfile|pg_stat_reset|pg_stat_reset_shared|pg_advisory_lock|pg_advisory_xact_lock)\\s*\\(/i.test(statement)) {
+    throw new Error('This query calls a function that is not allowed in the read-only console.');
+  }
+
+  return statement;
 }
 
 function toJsonSafe(value: unknown): unknown {
@@ -68,10 +64,11 @@ async function writeQueryAudit(
 ): Promise<void> {
   try {
     await pool.query(
-      `INSERT INTO audit_logs
-        ("userId", action, "entityType", "entityId", "newValues", "ipAddress", "userAgent")
-       VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7)`,
+      \`INSERT INTO audit_logs
+        (id, "userId", action, "entityType", "entityId", "newValues", "ipAddress", "userAgent")
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8)\`,
       [
+        randomUUID(),
         req.user?.id || null,
         success ? 'SQL_QUERY_EXECUTED' : 'SQL_QUERY_FAILED',
         'DATABASE',
@@ -82,8 +79,6 @@ async function writeQueryAudit(
       ]
     );
   } catch (auditError) {
-    // Query execution must not be reported as failed solely because audit
-    // persistence is temporarily unavailable. This is still surfaced to logs.
     console.error('[SQL_CONSOLE] Failed to persist query audit event:', auditError);
   }
 }
@@ -103,12 +98,12 @@ router.post('/query', authenticate, authorize(...ALLOWED_ROLES), async (req: Aut
 
   try {
     await client.query('BEGIN READ ONLY');
-    await client.query(`SET LOCAL statement_timeout = ${STATEMENT_TIMEOUT_MS}`);
+    await client.query(\`SET LOCAL statement_timeout = \${STATEMENT_TIMEOUT_MS}\`);
     await client.query('SET LOCAL idle_in_transaction_session_timeout = 10000');
 
-    // Wrap the submitted SELECT to enforce a hard result cap at the database.
+    // Enforce the row cap inside PostgreSQL, not only in the browser.
     const result = await client.query({
-      text: `SELECT * FROM (\n${sql}\n) AS admin_sql_result LIMIT ${MAX_ROWS + 1}`,
+      text: \`SELECT * FROM (\\n\${sql}\\n) AS admin_sql_result LIMIT \${MAX_ROWS + 1}\`,
       rowMode: 'array',
     });
 
@@ -117,7 +112,6 @@ router.post('/query', authenticate, authorize(...ALLOWED_ROLES), async (req: Aut
     const truncated = result.rows.length > MAX_ROWS;
     const rows = result.rows.slice(0, MAX_ROWS).map((row) => toJsonSafe(row));
     const durationMs = Date.now() - startedAt;
-
     await writeQueryAudit(req, queryHash, durationMs, rows.length, true);
 
     res.json({
@@ -133,7 +127,7 @@ router.post('/query', authenticate, authorize(...ALLOWED_ROLES), async (req: Aut
     try {
       await client.query('ROLLBACK');
     } catch {
-      // The connection may already have been aborted by PostgreSQL.
+      // PostgreSQL may already have aborted the transaction.
     }
 
     const durationMs = Date.now() - startedAt;
@@ -145,8 +139,7 @@ router.post('/query', authenticate, authorize(...ALLOWED_ROLES), async (req: Aut
       userId: req.user?.id,
     });
 
-    const status = error?.code === '57014' ? 408 : 400;
-    res.status(status).json({
+    res.status(error?.code === '57014' ? 408 : 400).json({
       error: error?.code === '57014'
         ? 'Query timed out. The execution limit is 5 seconds.'
         : 'The query could not be executed. Check SQL syntax, table/column names, and database permissions.',
