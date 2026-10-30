@@ -9,7 +9,7 @@ import {
   LayoutDashboard, FileText, Shield, CreditCard, Users, Settings,
   HelpCircle, User, LogOut, Menu, ChevronLeft, ChevronRight,
   Package, Workflow, CheckSquare, FileSearch, DollarSign, Clock,
-  Activity, AlertTriangle, FileCheck, Ticket
+  Activity, AlertTriangle, FileCheck, Ticket, Database
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useUIStore } from '../../stores/uiStore';
@@ -19,7 +19,7 @@ import { navigationConfig, hasPermission } from '../../lib/utils/rolePermissions
 
 const iconMap: Record<string, any> = {
   LayoutDashboard, FileText, Shield, CreditCard, Users, Settings,
-  HelpCircle, User, Package, Workflow, CheckSquare, FileSearch,
+  HelpCircle, User, Package, Workflow, CheckSquare, FileSearch, Database,
   DollarSign, Clock, Activity, AlertTriangle, FileCheck, Ticket
 };
 

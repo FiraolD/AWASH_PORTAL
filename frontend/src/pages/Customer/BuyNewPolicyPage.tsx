@@ -202,7 +202,7 @@ const fetchCustomFields = async (productId: string, productType: string) => {
       const product = res.data;
       
       // Check multiple possible property names
-      let fields = product.customFields || product.fields || product.formFields || product.productFields;
+      const fields = product.customFields || product.fields || product.formFields || product.productFields;
       
       if (Array.isArray(fields) && fields.length > 0) {
         console.log('[fetchCustomFields] Found fields in product:', fields);

@@ -9,6 +9,7 @@ import profileRoutes from './profile.routes.js';
 
 // Admin
 import adminRoutes from './admin.routes.js';
+import adminSqlRoutes from './admin-sql.routes.js';
 import migrationsRoutes from './migrations.routes.js';
 import roleLevelsRoutes from './role-levels.routes.js';
 
@@ -70,6 +71,7 @@ router.use('/profile', profileRoutes);
 // ADMIN
 // ============================================================================
 router.use('/admin', adminRoutes);
+router.use('/admin/sql', adminSqlRoutes);
 router.use('/migrations', migrationsRoutes);
 router.use('/role-levels', roleLevelsRoutes);
 
