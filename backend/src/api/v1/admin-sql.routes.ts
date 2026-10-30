@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { createHash, randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import pool from '../../lib/db.js';
+import { getSqlConsolePool } from '../../lib/sql-console-db.js';
 import { authenticate, authorize, AuthRequest } from '../../middleware/auth.middleware.js';
 
 const router = Router();
@@ -119,9 +120,23 @@ router.post('/query', authenticate, authorize(...ALLOWED_ROLES), async (req: Aut
   const queryHash = createHash('sha256').update(sql).digest('hex');
   const startedAt = Date.now();
   let client: PoolClient | undefined;
+  let sqlPool: ReturnType<typeof getSqlConsolePool>;
 
   try {
-    client = await pool.connect();
+    try {
+      sqlPool = getSqlConsolePool();
+    } catch (configurationError) {
+      console.error('[SQL_CONSOLE] Dedicated database connection configuration is invalid:', configurationError);
+      res.status(503).json({ error: 'SQL Console database connection is not configured correctly.' });
+      return;
+    }
+
+    if (!sqlPool) {
+      res.status(503).json({ error: 'SQL Console is unavailable: SQL_CONSOLE_DATABASE_URL is not configured.' });
+      return;
+    }
+
+    client = await sqlPool.connect();
     await client.query(operation === 'SELECT' ? 'BEGIN READ ONLY' : 'BEGIN');
     await client.query('SET LOCAL statement_timeout = ' + STATEMENT_TIMEOUT_MS);
     await client.query('SET LOCAL idle_in_transaction_session_timeout = 10000');
@@ -164,7 +179,8 @@ router.post('/query', authenticate, authorize(...ALLOWED_ROLES), async (req: Aut
     const durationMs = Date.now() - startedAt;
     await writeQueryAudit(req, queryHash, operation, durationMs, 0, false);
     console.error('[SQL_CONSOLE] Query failed:', { queryHash, operation, code: error?.code, message: error?.message, userId: req.user?.id });
-    res.status(error?.code === '57014' ? 408 : 400).json({
+    const connectionFailure = ['ECONNREFUSED', 'ENOTFOUND', 'ETIMEDOUT', 'ECONNRESET', '28P01', '3D000'].includes(error?.code);
+    res.status(error?.code === '57014' ? 408 : connectionFailure ? 503 : 400).json({
       error: error?.code === '57014'
         ? 'Query timed out. The execution limit is 5 seconds.'
         : 'The query could not be executed. Check SQL syntax, table/column names, and database permissions.',
