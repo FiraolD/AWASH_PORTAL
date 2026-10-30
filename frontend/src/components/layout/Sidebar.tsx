@@ -19,7 +19,7 @@ import { navigationConfig, hasPermission } from '../../lib/utils/rolePermissions
 
 const iconMap: Record<string, any> = {
   LayoutDashboard, FileText, Shield, CreditCard, Users, Settings,
-  HelpCircle, User, Package, Workflow, CheckSquare, FileSearch,
+  HelpCircle, User, Package, Workflow, CheckSquare, FileSearch, Database,
   DollarSign, Clock, Activity, AlertTriangle, FileCheck, Ticket
 };
 
