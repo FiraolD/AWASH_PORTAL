@@ -17,14 +17,14 @@ test('accepts a read-only CTE', () => {
 });
 
 test('accepts INSERT only when RETURNING is present', () => {
-  assert.equal(normalizeSql('INSERT INTO users (name) VALUES (\'Test\') RETURNING id').operation, 'INSERT');
-  assert.throws(() => normalizeSql('INSERT INTO users (name) VALUES (\'Test\')'), /RETURNING/i);
+  assert.equal(normalizeSql("INSERT INTO users (name) VALUES ('Test') RETURNING id").operation, 'INSERT');
+  assert.throws(() => normalizeSql("INSERT INTO users (name) VALUES ('Test')"), /RETURNING/i);
 });
 
 test('accepts UPDATE only with WHERE and RETURNING', () => {
-  assert.equal(normalizeSql('UPDATE users SET name = \'Test\' WHERE id = 1 RETURNING id').operation, 'UPDATE');
-  assert.throws(() => normalizeSql('UPDATE users SET name = \'Test\' RETURNING id'), /WHERE/i);
-  assert.throws(() => normalizeSql('UPDATE users SET name = \'Test\' WHERE id = 1'), /RETURNING/i);
+  assert.equal(normalizeSql("UPDATE users SET name = 'Test' WHERE id = 1 RETURNING id").operation, 'UPDATE');
+  assert.throws(() => normalizeSql("UPDATE users SET name = 'Test' RETURNING id"), /WHERE/i);
+  assert.throws(() => normalizeSql("UPDATE users SET name = 'Test' WHERE id = 1"), /RETURNING/i);
 });
 
 test('rejects DELETE and other unsupported top-level statements', () => {
@@ -34,7 +34,7 @@ test('rejects DELETE and other unsupported top-level statements', () => {
 
 test('rejects data-modifying CTEs', () => {
   assert.throws(
-    () => normalizeSql('WITH changed AS (UPDATE users SET name = \'X\' WHERE id = 1 RETURNING id) SELECT * FROM changed'),
+    () => normalizeSql("WITH changed AS (UPDATE users SET name = 'X' WHERE id = 1 RETURNING id) SELECT * FROM changed"),
     /Data-modifying CTEs/i,
   );
 });
@@ -45,8 +45,15 @@ test('rejects multiple statements and SQL comments', () => {
 });
 
 test('rejects direct audit_logs modification and dangerous functions', () => {
-  assert.throws(() => normalizeSql('UPDATE audit_logs SET action = \'x\' WHERE id = 1 RETURNING id'), /audit_logs table is protected/i);
-  assert.throws(() => normalizeSql('SELECT nextval(\'some_sequence\')'), /function that is not allowed/i);
+  assert.throws(() => normalizeSql("UPDATE audit_logs SET action = 'x' WHERE id = 1 RETURNING id"), /audit_logs table is protected/i);
+  for (const fn of ['nextval', 'pg_notify', 'lo_create', 'pg_advisory_unlock_all', 'pg_sleep']) {
+    assert.throws(() => normalizeSql(`SELECT ${fn}('test')`), /function that is not allowed/i);
+  }
+});
+
+test('rejects SELECT INTO and EXPLAIN', () => {
+  assert.throws(() => normalizeSql('SELECT id INTO new_users FROM users'), /SELECT INTO/i);
+  assert.throws(() => normalizeSql('EXPLAIN SELECT * FROM users'), /Only SELECT, INSERT and UPDATE/i);
 });
 
 test('rejects oversized queries and empty input', () => {
