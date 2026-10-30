@@ -13,7 +13,7 @@ function normalizeSql(input: unknown): string {
   if (typeof input !== 'string') throw new Error('Enter a SQL query.');
   const sql = input.trim();
   if (!sql) throw new Error('Enter a SQL query.');
-  if (sql.length > MAX_SQL_LENGTH) throw new Error(\`Query exceeds the \${MAX_SQL_LENGTH.toLocaleString()} character limit.\`);
+  if (sql.length > MAX_SQL_LENGTH) throw new Error('Query exceeds the ' + MAX_SQL_LENGTH.toLocaleString() + ' character limit.');
 
   if (sql.includes('--') || sql.includes('/*') || sql.includes('*/')) {
     throw new Error('SQL comments are not supported in the query console.');
@@ -50,9 +50,7 @@ function toJsonSafe(value: unknown): unknown {
 async function writeQueryAudit(req: AuthRequest, queryHash: string, durationMs: number, rowCount: number, success: boolean): Promise<void> {
   try {
     await pool.query(
-      \`INSERT INTO audit_logs
-        (id, "userId", action, "entityType", "entityId", "newValues", "ipAddress", "userAgent")
-       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8)\`,
+      'INSERT INTO audit_logs (id, "userId", action, "entityType", "entityId", "newValues", "ipAddress", "userAgent") VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8)',
       [
         randomUUID(),
         req.user?.id || null,
@@ -80,17 +78,16 @@ router.post('/query', authenticate, authorize(...ALLOWED_ROLES), async (req: Aut
 
   const queryHash = createHash('sha256').update(sql).digest('hex');
   const startedAt = Date.now();
-  const client = await pool.connect();
+  let client: Awaited<ReturnType<typeof pool.connect>> | undefined;
 
   try {
+    client = await pool.connect();
     await client.query('BEGIN READ ONLY');
-    await client.query(\`SET LOCAL statement_timeout = \${STATEMENT_TIMEOUT_MS}\`);
+    await client.query('SET LOCAL statement_timeout = ' + STATEMENT_TIMEOUT_MS);
     await client.query('SET LOCAL idle_in_transaction_session_timeout = 10000');
 
     const result = await client.query({
-      text: \`SELECT * FROM (
-\${sql}
-) AS admin_sql_result LIMIT \${MAX_ROWS + 1}\`,
+      text: 'SELECT * FROM (\n' + sql + '\n) AS admin_sql_result LIMIT ' + (MAX_ROWS + 1),
       rowMode: 'array',
     });
 
@@ -110,10 +107,12 @@ router.post('/query', authenticate, authorize(...ALLOWED_ROLES), async (req: Aut
       readOnly: true,
     });
   } catch (error: any) {
-    try {
-      await client.query('ROLLBACK');
-    } catch {
-      // PostgreSQL may already have aborted the transaction.
+    if (client) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // PostgreSQL may already have aborted the transaction.
+      }
     }
 
     const durationMs = Date.now() - startedAt;
@@ -127,7 +126,7 @@ router.post('/query', authenticate, authorize(...ALLOWED_ROLES), async (req: Aut
       queryHash,
     });
   } finally {
-    client.release();
+    client?.release();
   }
 });
 
