@@ -146,7 +146,7 @@ export default function ClaimDetailsPage() {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   
 
-  const getAuthHeaders = () => {
+  const getAuthHeaders = (): Record<string, string> => {
     const stored = localStorage.getItem('awash-auth-storage');
     let authToken = token;
     if (!authToken && stored) {
