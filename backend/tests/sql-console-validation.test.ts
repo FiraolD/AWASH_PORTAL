@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { normalizeSql } from '../src/api/v1/admin-sql.routes.js';
+import { normalizeSql } from '../src/api/v1/sql-console-validation.js';
 
 test('accepts a basic SELECT and classifies it as read-only', () => {
   assert.deepEqual(normalizeSql('SELECT id, name FROM users'), {
