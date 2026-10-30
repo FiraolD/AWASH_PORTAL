@@ -9,8 +9,8 @@ const MAX_SQL_LENGTH = 10_000;
 const MAX_ROWS = 200;
 const STATEMENT_TIMEOUT_MS = 5_000;
 const ALLOWED_ROLES = ['MASTER_ADMIN', 'SYSTEM_ADMIN', 'SUPER_ADMIN'] as const;
-const BLOCKED_KEYWORDS = /\\b(delete|merge|upsert|create|alter|drop|truncate|grant|revoke|comment|copy|call|do|execute|prepare|deallocate|refresh|vacuum|analyze|reindex|cluster|listen|notify|unlisten|set|reset|discard|lock|begin|commit|rollback|savepoint|release)\\b/i;
-const BLOCKED_FUNCTIONS = /\\b(nextval|setval|set_config|pg_read_file|pg_read_binary_file|pg_ls_dir|lo_import|lo_export|dblink|dblink_exec|pg_terminate_backend|pg_cancel_backend|pg_reload_conf|pg_rotate_logfile|pg_stat_reset|pg_stat_reset_shared|pg_advisory_lock|pg_advisory_xact_lock)\\s*\\(/i;
+const BLOCKED_KEYWORDS = /\b(delete|merge|upsert|create|alter|drop|truncate|grant|revoke|comment|copy|call|do|execute|prepare|deallocate|refresh|vacuum|analyze|reindex|cluster|listen|notify|unlisten|set|reset|discard|lock|begin|commit|rollback|savepoint|release)\b/i;
+const BLOCKED_FUNCTIONS = /\b(nextval|setval|set_config|pg_read_file|pg_read_binary_file|pg_ls_dir|lo_import|lo_export|dblink|dblink_exec|pg_terminate_backend|pg_cancel_backend|pg_reload_conf|pg_rotate_logfile|pg_stat_reset|pg_stat_reset_shared|pg_advisory_lock|pg_advisory_xact_lock)\s*\(/i;
 
 type SqlOperation = 'SELECT' | 'INSERT' | 'UPDATE';
 
@@ -18,7 +18,7 @@ function stripQuotedContent(sql: string): string {
   return sql
     .replace(/'(?:''|[^'])*'/g, "''")
     .replace(/"(?:""|[^"])*"/g, '""')
-    .replace(/\\$([a-zA-Z_][a-zA-Z0-9_]*)?\\$[\\s\\S]*?\\$\\1?\\$/g, '$$');
+    .replace(/\$([a-zA-Z_][a-zA-Z0-9_]*)?\$[\s\S]*?\$\1?\$/g, '$$');
 }
 
 export function normalizeSql(input: unknown): { sql: string; operation: SqlOperation } {
@@ -30,10 +30,10 @@ export function normalizeSql(input: unknown): { sql: string; operation: SqlOpera
     throw new Error('SQL comments are not supported in the query console.');
   }
 
-  const statement = sql.replace(/;\\s*$/, '').trim();
+  const statement = sql.replace(/;\s*$/, '').trim();
   if (!statement || statement.includes(';')) throw new Error('Only one SQL statement can be executed at a time.');
 
-  const operationMatch = statement.match(/^(select|with|insert|update)\\b/i);
+  const operationMatch = statement.match(/^(select|with|insert|update)\b/i);
   if (!operationMatch) throw new Error('Only SELECT, INSERT and UPDATE statements are allowed.');
   const operation = operationMatch[1].toUpperCase() as SqlOperation | 'WITH';
   const safeScan = stripQuotedContent(statement);
@@ -46,26 +46,26 @@ export function normalizeSql(input: unknown): { sql: string; operation: SqlOpera
   }
 
   if (operation === 'WITH') {
-    if (/\\b(insert|update|delete|merge)\\b/i.test(safeScan)) {
+    if (/\b(insert|update|delete|merge)\b/i.test(safeScan)) {
       throw new Error('Data-modifying CTEs are not supported. Run a direct INSERT or UPDATE statement instead.');
     }
-    if (!/\\bselect\\b/i.test(safeScan)) throw new Error('Only read-only SELECT CTE queries are allowed.');
+    if (!/\bselect\b/i.test(safeScan)) throw new Error('Only read-only SELECT CTE queries are allowed.');
     return { sql: statement, operation: 'SELECT' };
   }
 
   if (operation === 'SELECT') {
-    if (/\\bfor\\s+(update|share|no\\s+key\\s+update|key\\s+share)\\b/i.test(safeScan)) {
+    if (/\bfor\s+(update|share|no\s+key\s+update|key\s+share)\b/i.test(safeScan)) {
       throw new Error('Locking SELECT queries are not supported.');
     }
     if (BLOCKED_FUNCTIONS.test(safeScan)) throw new Error('This query calls a function that is not allowed in the SQL console.');
   }
 
-  if (operation === 'INSERT' && !/\\breturning\\b/i.test(safeScan)) {
+  if (operation !== 'SELECT' && /\baudit_logs\b/i.test(statement)) {\n    throw new Error('The audit_logs table is protected from direct SQL modifications.');\n  }\n\n  if (operation === 'INSERT' && !/\breturning\b/i.test(safeScan)) {
     throw new Error('INSERT statements must include RETURNING so the affected rows can be reviewed.');
   }
   if (operation === 'UPDATE') {
-    if (!/\\bwhere\\b/i.test(safeScan)) throw new Error('UPDATE statements must include a WHERE clause.');
-    if (!/\\breturning\\b/i.test(safeScan)) throw new Error('UPDATE statements must include RETURNING so the affected rows can be reviewed.');
+    if (!/\bwhere\b/i.test(safeScan)) throw new Error('UPDATE statements must include a WHERE clause.');
+    if (!/\breturning\b/i.test(safeScan)) throw new Error('UPDATE statements must include RETURNING so the affected rows can be reviewed.');
   }
 
   return { sql: statement, operation };
@@ -124,7 +124,7 @@ router.post('/query', authenticate, authorize(...ALLOWED_ROLES), async (req: Aut
 
     const result = operation === 'SELECT'
       ? await client.query({
-          text: 'SELECT * FROM (\\n' + sql + '\\n) AS admin_sql_result LIMIT ' + (MAX_ROWS + 1),
+          text: 'SELECT * FROM (\n' + sql + '\n) AS admin_sql_result LIMIT ' + (MAX_ROWS + 1),
           rowMode: 'array',
         })
       : await client.query({ text: sql, rowMode: 'array' });
