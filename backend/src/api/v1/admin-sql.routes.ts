@@ -10,8 +10,9 @@ const MAX_SQL_LENGTH = 10_000;
 const MAX_ROWS = 200;
 const STATEMENT_TIMEOUT_MS = 5_000;
 const ALLOWED_ROLES = ['MASTER_ADMIN', 'SYSTEM_ADMIN', 'SUPER_ADMIN'] as const;
-const BLOCKED_KEYWORDS = /\b(delete|merge|upsert|create|alter|drop|truncate|grant|revoke|comment|copy|call|do|execute|prepare|deallocate|refresh|vacuum|analyze|reindex|cluster|listen|notify|unlisten|reset|discard|lock|begin|commit|rollback|savepoint|release)\b/i;
-const BLOCKED_FUNCTIONS = /\b(nextval|setval|set_config|pg_read_file|pg_read_binary_file|pg_ls_dir|lo_import|lo_export|dblink|dblink_exec|pg_terminate_backend|pg_cancel_backend|pg_reload_conf|pg_rotate_logfile|pg_stat_reset|pg_stat_reset_shared|pg_advisory_lock|pg_advisory_xact_lock)\s*\(/i;
+const BLOCKED_KEYWORDS = /\b(delete|merge|upsert|create|alter|drop|truncate|grant|revoke|comment|copy|call|do|execute|prepare|deallocate|refresh|vacuum|analyze|reindex|cluster|listen|notify|unlisten|reset|discard|lock|begin|commit|rollback|savepoint|release|explain)\b/i;
+// This denylist is defense-in-depth, not a complete PostgreSQL function sandbox.
+const BLOCKED_FUNCTIONS = /\b(nextval|setval|set_config|pg_read_file|pg_read_binary_file|pg_ls_dir|lo_import|lo_export|lo_create|lo_put|lo_unlink|dblink|dblink_exec|pg_terminate_backend|pg_cancel_backend|pg_reload_conf|pg_rotate_logfile|pg_stat_reset|pg_stat_reset_shared|pg_advisory_lock|pg_advisory_xact_lock|pg_advisory_unlock|pg_advisory_unlock_all|pg_notify|pg_logical_emit_message|pg_sleep|pg_sleep_for|pg_sleep_until)\s*\(/i;
 
 type SqlOperation = 'SELECT' | 'INSERT' | 'UPDATE';
 
@@ -29,6 +30,11 @@ export function normalizeSql(input: unknown): { sql: string; operation: SqlOpera
   if (sql.length > MAX_SQL_LENGTH) throw new Error('Query exceeds the ' + MAX_SQL_LENGTH.toLocaleString() + ' character limit.');
   if (sql.includes('--') || sql.includes('/*') || sql.includes('*/')) {
     throw new Error('SQL comments are not supported in the query console.');
+  }
+  // The regex validator is not a PostgreSQL parser. Reject lexical forms whose
+  // escaping rules are easy to misinterpret rather than attempting to sanitize them.
+  if (/\$([a-zA-Z_][a-zA-Z0-9_]*)?\$/.test(sql) || /\bE\s*'/i.test(sql)) {
+    throw new Error('Dollar-quoted and escape-string literals are not supported in the SQL Console.');
   }
 
   const statement = sql.replace(/;\s*$/, '').trim();
@@ -57,6 +63,9 @@ export function normalizeSql(input: unknown): { sql: string; operation: SqlOpera
   if (operation === 'SELECT') {
     if (/\bfor\s+(update|share|no\s+key\s+update|key\s+share)\b/i.test(safeScan)) {
       throw new Error('Locking SELECT queries are not supported.');
+    }
+    if (/\binto\b/i.test(safeScan)) {
+      throw new Error('SELECT INTO is not supported in the SQL Console.');
     }
     if (BLOCKED_FUNCTIONS.test(safeScan)) throw new Error('This query calls a function that is not allowed in the SQL console.');
   }
@@ -190,5 +199,4 @@ router.post('/query', authenticate, authorize(...ALLOWED_ROLES), async (req: Aut
     client?.release();
   }
 });
-
 export default router;
