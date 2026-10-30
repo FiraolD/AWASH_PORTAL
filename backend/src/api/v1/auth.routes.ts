@@ -263,7 +263,6 @@ router.post('/login', authRateLimit, async (req, res: Response) => {
         email: user.email,
         role: user.role,
       },
-      token,
     });
   } catch (error: any) {
     console.error('[Auth] Login error:', error.message);
