@@ -20,7 +20,7 @@ export function csrfOriginGuard(req: Request, res: Response, next: NextFunction)
   }
 
   const origin = req.headers.origin;
-  if (origin && !isOriginAllowed(origin, getAllowedOrigins())) {
+  if (!origin || !isOriginAllowed(origin, getAllowedOrigins())) {
     res.status(403).json({ error: 'Cross-origin request blocked.' });
     return;
   }
