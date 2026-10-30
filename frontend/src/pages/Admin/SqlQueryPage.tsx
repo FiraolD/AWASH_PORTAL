@@ -13,6 +13,7 @@ type QueryResult = {
   maxRows: number;
   durationMs: number;
   readOnly: boolean;
+  operation: 'SELECT' | 'INSERT' | 'UPDATE';
 };
 
 const DEFAULT_QUERY = 'SELECT table_schema, table_name\nFROM information_schema.tables\nWHERE table_schema NOT IN (\'pg_catalog\', \'information_schema\')\nORDER BY table_schema, table_name\nLIMIT 50;';
@@ -34,6 +35,9 @@ export default function SqlQueryPage() {
       toast.error('Enter a SQL query first.');
       return;
     }
+
+    const operation = sql.trim().match(/^(select|with|insert|update)\b/i)?.[1]?.toUpperCase();
+    if ((operation === 'INSERT' || operation === 'UPDATE') && !window.confirm('You are about to execute a production database ' + operation + ' statement. Continue only if you have reviewed the SQL and its RETURNING results.')) return;
 
     setRunning(true);
     setError('');
@@ -73,12 +77,12 @@ export default function SqlQueryPage() {
             <div className="rounded-2xl bg-blue-50 p-3 text-[#1A3E6F]"><Database className="h-6 w-6" /></div>
             <div>
               <h1 className="text-2xl font-bold text-[#1A3E6F] sm:text-3xl">SQL Query Console</h1>
-              <p className="mt-1 text-sm text-slate-500">Inspect production database records and schema.</p>
+              <p className="mt-1 text-sm text-slate-500">Inspect and perform controlled data updates in the production database.</p>
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">
-          <ShieldCheck className="h-4 w-4" /> Read-only mode
+          <ShieldCheck className="h-4 w-4" /> SELECT · INSERT · UPDATE
         </div>
       </div>
 
@@ -87,7 +91,7 @@ export default function SqlQueryPage() {
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
           <div className="text-sm text-amber-900">
             <p className="font-semibold">Production database safety restrictions</p>
-            <p className="mt-1">Only one SELECT or read-only CTE statement is accepted. INSERT, UPDATE, DELETE, schema changes, and other write operations are blocked. Each query has a 5-second timeout and results are capped at 200 rows. Query activity is audited.</p>
+            <p className="mt-1">Allowed: one SELECT, read-only CTE, INSERT, or UPDATE statement. INSERT and UPDATE require RETURNING; UPDATE also requires a WHERE clause. Writes affecting more than 200 rows are rolled back. DELETE, TRUNCATE, schema changes, and administrative commands remain blocked. Each query has a 5-second timeout and activity is audited.</p>
           </div>
         </div>
       </div>
@@ -117,7 +121,7 @@ export default function SqlQueryPage() {
             </Button>
             {result && <Button variant="outline" onClick={copyResults}><Copy className="mr-2 h-4 w-4" /> Copy results</Button>}
           </div>
-          <p className="text-xs text-slate-500">Tip: use information_schema.tables to inspect available tables. Quote mixed-case PostgreSQL identifiers, for example <code className="rounded bg-slate-100 px-1 py-0.5">"createdAt"</code>.</p>
+          <p className="text-xs text-slate-500">Tip: use information_schema.tables to inspect available tables. INSERT/UPDATE statements must include RETURNING; UPDATE must include WHERE. Every write prompts for confirmation. Quote mixed-case PostgreSQL identifiers, for example <code className="rounded bg-slate-100 px-1 py-0.5">"createdAt"</code>.</p>
         </CardContent>
       </Card>
 
@@ -129,9 +133,9 @@ export default function SqlQueryPage() {
         <Card>
           <CardHeader>
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <CardTitle className="flex items-center gap-2"><Table2 className="h-5 w-5" /> Query Results</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Table2 className="h-5 w-5" /> {result.operation} {result.operation === 'SELECT' ? 'Results' : 'Completed'}</CardTitle>
               <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                <span>{result.rowCount} row(s)</span>
+                <span>{result.rowCount} {result.operation === 'SELECT' ? 'row(s)' : 'row(s) affected'}</span>
                 <span className="flex items-center gap-1"><Clock3 className="h-3.5 w-3.5" /> {result.durationMs} ms</span>
               </div>
             </div>
